@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+.env
+
+# Results (large data, keep structure only)
+results/baseline/*.csv
+results/contention/*.csv
+results/tempo/*.csv
+results/smoke/smoke_nccl/*.csv
+results/figures/*.pdf
+results/figures/*.png
+
+# Logs
+logs/*.err
+logs/*.out
+*.log
+
+# Slurm job output
+slurm-*.out
+slurm-*.err
+
+# fio temp files
+/tmp/tempo_dummy*
