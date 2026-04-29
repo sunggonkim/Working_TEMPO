@@ -12,8 +12,6 @@ results/baseline/*.csv
 results/contention/*.csv
 results/tempo/*.csv
 results/smoke/smoke_nccl/*.csv
-results/figures/*.pdf
-results/figures/*.png
 
 # Logs
 logs/*.err

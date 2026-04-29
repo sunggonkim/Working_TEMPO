@@ -40,6 +40,16 @@ REPO_DIR="${SLURM_SUBMIT_DIR:-/pscratch/sd/s/sgkim/Skim-Tempo}"
 [[ "$(basename "$REPO_DIR")" == "phase0" ]] && REPO_DIR="$(dirname "$REPO_DIR")"
 cd "$REPO_DIR"
 
+# Fix NCCL plugin API mismatch: pytorch/2.8.0 has NCCL 2.28.9 but module's
+# LD_LIBRARY_PATH has NCCL 2.24.3 OFI plugin → use 2.29.2-cu13 plugin instead.
+# vLLM with TP=4 uses NCCL for single-node multi-GPU even without network.
+export LD_LIBRARY_PATH=/global/common/software/nersc9/nccl/2.29.2-cu13/plugin/lib:/global/common/software/nersc9/nccl/2.29.2-cu13/lib:${LD_LIBRARY_PATH}
+export FI_CXI_ATS=0
+export NCCL_NET_GDR_LEVEL=0
+export NCCL_DEBUG=WARN
+# vLLM v1 multiproc executor: use fork (default) but ensure workers inherit env
+export VLLM_WORKER_MULTIPROC_METHOD=fork
+
 export PHASE0_OUTPUT="${REPO_DIR}/results/phase0"
 export PYTHONPATH="${REPO_DIR}:${PYTHONPATH:-}"
 mkdir -p "$PHASE0_OUTPUT" results/figures logs
