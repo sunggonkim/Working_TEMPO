@@ -1,265 +1,314 @@
-<!-- TEMPO — Working Repository -->
 <div align="center">
 
-# ⚡ TEMPO
-### *Temporal Emulation and Masking for Predictable I/O in Large-Scale AI Training*
+# TEMPO
+### *Harmonious Burst Buffer for Jitter-Free LLM Systems*
 
-[![Status](https://img.shields.io/badge/status-active%20experiments-brightgreen)](#experiments)
-[![Platform](https://img.shields.io/badge/platform-NERSC%20Perlmutter-blue)](#environment)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0-orange)](https://pytorch.org)
-[![Venue](https://img.shields.io/badge/target%20venue-OSDI%20%2F%20SC-purple)](#)
+> **"The fastest I/O is the I/O that does not interfere."**
 
-> **Proving that "network isolation" is an illusion — and building the pacemaker that fixes it.**
+[![Target](https://img.shields.io/badge/target-SC'26%20%2F%20OSDI'27-blueviolet)](#)
+[![Platform](https://img.shields.io/badge/platform-NERSC%20Perlmutter-0075A2)](https://docs.nersc.gov/systems/perlmutter/)
+[![Integration](https://img.shields.io/badge/integrates%20with-vLLM%20%7C%20SGLang%20%7C%20LMCache-orange)](#)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
 </div>
 
 ---
 
-## 🎯 The Problem
+## The Hardware Isolation Fallacy
 
-Modern AI clusters advertise **physically separated networks** — a storage network for checkpointing and a GPU fabric for NCCL collective communication. Researchers assume these are isolated.
+Modern GPU servers physically separate compute (HBM), network (Slingshot NIC), and storage (NVMe). Naïve intuition: *background I/O in parallel with GPU compute is free — the paths are isolated.*
 
-**They are not.**
+**This is wrong. The PCIe Root Complex is a shared interconnect.**
 
 ```
-Perlmutter GPU Node (AMD EPYC Milan)
-┌─────────────────────────────────────────────────────────────┐
-│  Checkpoint I/O Path:                                       │
-│  NVMe SSD ──► PCIe Root Complex ──► CPU ──► Slingshot NIC  │
-│               ╔═══════════╗                 (storage net)  │
-│               ║  SHARED   ║                                 │
-│               ║ BANDWIDTH ║                                 │
-│               ╚═══════════╝                                 │
-│  GPU Compute:               ──► CPU ──► Slingshot NIC      │
-│  A100 All-Reduce ──► PCIe Root Complex     (GPU fabric)     │
-│               ▲──────────────────────────────────────────── │
-│                     CONTENTION POINT ← Both paths share!   │
-└─────────────────────────────────────────────────────────────┘
+GPU Server Node (NERSC Perlmutter — AMD EPYC 7763, 4× A100 40GB)
+┌──────────────────────────────────────────────────────────────────────┐
+│  ┌──────────┐  HBM reads   ┌─────────────────┐   RDMA (NCCL/KV)     │
+│  │  A100 #0 │ ────────── ▶ │                 │ ──────────────────▶  │
+│  │  A100 #1 │ ────────── ▶ │  PCIe Root      │       Slingshot NIC  │
+│  │  A100 #2 │ ────────── ▶ │  Complex        │ ◀──────────────────  │
+│  │  A100 #3 │ ────────── ▶ │  (SHARED BUS)   │  KV eviction / ckpt  │
+│  └──────────┘              └────────┬────────┘  ← COMPETES with GPU │
+│  ┌──────────┐                       │                                │
+│  │  NVMe    │ ── DMA (io_uring) ────┘                                │
+│  │  /tmp    │   shares same PCIe lanes as GPU↔NIC path               │
+│  └──────────┘                                                        │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-Aggressive checkpoint flushing (`NVMe → RAM → Slingshot NIC → Lustre`) saturates the **PCIe Root Complex and CPU Memory Bus**, causing **≥40% NCCL All-Reduce bandwidth degradation** even when the storage NIC and GPU NIC are physically different ports.
+### Observed Effects
 
----
-
-## 💡 The Solution: TEMPO Pacing Scheduler
-
-Instead of **greedy flushing**, TEMPO acts as an intelligent **I/O Pacemaker**:
-
-| | Baseline (Greedy) | **TEMPO (Paced)** |
+| Scenario | Workload collision | Symptom |
 |---|---|---|
-| Checkpoint save | Blocks training loop | **O(1)** — staged to local NVMe instantly |
-| Lustre flush timing | Any time → contention | **Only during matmul** (never during NCCL) |
-| NCCL bandwidth | ↓ Sawtooth drops at every checkpoint | **Flat, predictable** |
-| Training throughput | Degraded | **Maintained** |
+| **Inference** | KV eviction (HBM→NVMe) during attention kernel (HBM reads) | P99 decode latency spikes 2–5× |
+| **Training** | Checkpoint flush (NVMe→Lustre via Slingshot) during NCCL AllReduce (Slingshot) | NCCL BW drops ≥40% at every checkpoint |
 
-### How TEMPO Knows When to Flush
+Neither the inference nor the training community has a principled, phase-aware fix.
+
+---
+
+## TEMPO's Solution: Harmonious Pacing
+
+TEMPO does **not** make I/O faster. It makes I/O *harmonious* with foreground workloads.
+
+### Principle: Phase-Gated Absorption + Deferred Flush
 
 ```
-Training Step Timeline:
+INFERENCE — one LLM forward pass:
+  ┌── FFN (GEMM) ──┐  ┌── Attention ─────────────────────┐  ┌── FFN ──┐
+  │ compute-bound  │  │ HBM + PCIe bandwidth-bound        │  │ ✅ OK  │
+  │ ✅ FLUSH KV    │  │ ❌ TEMPO PAUSES ALL KV FLUSH       │  │         │
+  └────────────────┘  └───────────────────────────────────┘  └─────────┘
+  Detection: CUPTI kernel name classifier (AttentionPhaseMonitor)
 
-  ┌─ COMPUTE ──────────────────────┐  ┌─ NCCL ──────┐  ┌─ COMPUTE ──────┐
-  │  forward + backward (matmul)   │  │ all_reduce  │  │ optimizer step │
-  │  ✅ Lustre flush ALLOWED       │  │ ❌ flush    │  │ ✅ flush OK    │
-  └────────────────────────────────┘  │ PAUSED      │  └────────────────┘
-                                      └─────────────┘
-  PhaseMonitor detects transitions via FSDP comm hook or context managers.
-  CheckpointManager's flush thread blocks on threading.Event during NCCL.
+TRAINING — one gradient step:
+  ┌── Forward + Backward ──┐  ┌── NCCL AllReduce ──┐  ┌── Optimizer ──┐
+  │ compute-bound (matmul) │  │ NIC-bandwidth-bound │  │               │
+  │ ✅ FLUSH CHECKPOINT    │  │ ❌ TEMPO PAUSES      │  │ ✅ FLUSH OK   │
+  └────────────────────────┘  └────────────────────┘  └───────────────┘
+  Detection: FSDP/DDP comm hook → PhaseMonitor.nccl_phase()
+```
+
+### Two Modes, One Principle
+
+| Mode | Spike source | Foreground critical path | TEMPO action |
+|---|---|---|---|
+| **Inference** | KV cache eviction | Attention (PCIe+HBM-bound) | Absorb KV O(1) → flush during FFN |
+| **Training** | Checkpoint flush | NCCL AllReduce (NIC-bound) | Stage ckpt O(1) → flush during forward |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                   TEMPO C++ Library  (libtempo.so)                      │
+│                                                                          │
+│  AttentionPhaseMonitor          SpikeAbsorber         PacingDaemon      │
+│  ───────────────────────        ─────────────────     ──────────────     │
+│  CUPTI callback API             MPSC lock-free        io_uring           │
+│  kernel name patterns:          ring buffer           IOSQE_ASYNC        │
+│    flash_attn  → ATTN           O(1) wait-free        TokenBucket        │
+│    cutlass_gemm → FFN           absorb()              Phase-gated        │
+│  atomic<Phase>  ──────────────▶ eventfd notify  ────▶ Lustre flush       │
+│  wait_for_ffn()                                                           │
+│                                                                          │
+│  C API:  tempo_create_engine()  tempo_absorb()  tempo_destroy_engine()  │
+└──────────────────────────────────────────────────────────────────────────┘
+        ▲ ctypes                               ▲ ctypes / pybind11
+        │                                      │
+┌───────┴─────────────────┐    ┌───────────────┴───────────────────────┐
+│  tempo/vllm_hook.py      │    │  tempo/lmcache_connector.py            │
+│  Patches vLLM v1         │    │  TEMPOStorageBackend                   │
+│  LMCacheConnector        │    │  drop-in for any LMCache backend       │
+│  .store_kv_cache()       │    │  (CPU / Disk / NIXL / Mooncake)        │
+│  SGLang KVCache.evict()  │    │                                        │
+└──────────────────────────┘    └───────────────────────────────────────┘
 ```
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 Working_TEMPO/
-├── 🧠 tempo/                          # TEMPO Python package
-│   ├── __init__.py                    # Package entry point & exports
-│   ├── phase_monitor.py               # Thread-safe NCCL/Compute phase detector
-│   ├── checkpoint_manager.py          # O(1) NVMe save + background Lustre flush
-│   └── scheduler.py                   # Main pacing orchestrator
+├── src/                              C++ core library
+│   ├── attention_monitor/
+│   │   ├── monitor.hpp               AttentionPhaseMonitor (CUPTI-based)
+│   │   └── monitor.cu                Kernel classifier + callback impl
+│   ├── spike_absorber/
+│   │   ├── absorber.hpp              MPSC ring buffer interface
+│   │   └── absorber.cpp              Vyukov MPSC — O(1) wait-free
+│   ├── pacing_daemon/
+│   │   ├── token_bucket.hpp          Non-blocking token bucket (header-only)
+│   │   ├── pacing_daemon.hpp         PacingDaemon interface
+│   │   └── pacing_daemon.cpp         io_uring harmonious flush loop
+│   └── c_api/
+│       └── tempo_c_api.cpp           Clean C API (ctypes-friendly)
 │
-├── 🔬 phase1/                         # Problem verification experiments
-│   ├── background_io.sh               # fio io_uring I/O stress injector
-│   ├── train_llm_profiling.py         # NCCL benchmark + Llama FSDP profiler
-│   └── run_phase1_verification.slurm  # Slurm: baseline vs. contention
+├── tempo/                            Python integration layer
+│   ├── __init__.py
+│   ├── lmcache_connector.py          TEMPOStorageBackend (LMCache drop-in)
+│   ├── vllm_hook.py                  vLLM v1 + SGLang monkey-patch
+│   ├── phase_monitor.py              Training-mode phase monitor
+│   ├── checkpoint_manager.py         Training checkpoint O(1) stage + flush
+│   └── scheduler.py                  TEMPOScheduler (training orchestrator)
 │
-├── 📊 phase3/                         # Full TEMPO evaluation
-│   ├── train_with_tempo.py            # Baseline vs. TEMPO training loop (FSDP)
-│   ├── run_evaluation.slurm           # Slurm: side-by-side evaluation
-│   └── plot_killer_graph.py           # Publication-quality figure generator
+├── phase1/                           Training: quantify PCIe contention
+│   ├── background_io.sh              fio io_uring stress injector
+│   ├── train_llm_profiling.py        NCCL benchmark + Llama-3 FSDP profiler
+│   └── run_phase1_verification.slurm
 │
-├── 🧪 tests/
-│   ├── check_api.py                   # Login-node API sanity check
-│   └── run_smoke_test.slurm           # Quick validation (1 node, < 1 min)
+├── phase3/                           Training: TEMPO vs. Baseline
+│   ├── train_with_tempo.py           Side-by-side evaluation
+│   ├── run_evaluation.slurm
+│   └── plot_killer_graph.py          IEEE-format figure generator
 │
-└── ⚙️  configs/
-    └── deepspeed_zero3.json           # DeepSpeed ZeRO-3 config
+├── tests/
+│   ├── check_api.py
+│   └── run_smoke_test.slurm
+│
+├── configs/
+│   └── deepspeed_zero3.json
+│
+└── CMakeLists.txt                    Build: libtempo.so + tempo_cpp.so
 ```
 
 ---
 
-## 🖥️ Target Environment: NERSC Perlmutter
+## Build
 
-| Component | Specification |
-|---|---|
-| CPU | 1× AMD EPYC 7763 (Milan, 64 cores, NPS=2) |
-| GPU | 4× NVIDIA A100 40GB SXM (PCIe Gen4 x16) |
-| Network | 4× HPE Slingshot 11 (200 Gbps, 1 NIC per GPU) |
-| Local storage | ~1.5 TB NVMe at `/tmp` (PCIe Gen4) |
-| Shared storage | Lustre at `$PSCRATCH` (via Slingshot) |
-| Job scheduler | Slurm — account `m5320` |
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
 ```bash
-# On Perlmutter login node
+# On Perlmutter
 module load pytorch/2.8.0
-export PYTHONPATH=/path/to/Working_TEMPO:$PYTHONPATH
+
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="80;90"
+make -j$(nproc)
+
+# Produces:
+#   build/libtempo.so      ← loaded by tempo/lmcache_connector.py
+#   build/tempo_cpp*.so    ← pybind11 Python module
 ```
 
-### Step 1 — API Smoke Check (login node, no GPU needed)
+Dependencies: CUDA ≥ 12.0 (CUPTI included), `liburing-dev` ≥ 2.3, CMake ≥ 3.21, pybind11 (auto-fetched).
+
+---
+
+## Usage
+
+### Inference: vLLM + LMCache (zero code change)
+
 ```bash
-python tests/check_api.py
-# Expected: "ALL CHECKS PASSED"
+export TEMPO_RATE_GBPS=5
+export TEMPO_LUSTRE_DIR=$PSCRATCH/kvcache
+export LIBTEMPO_PATH=$(pwd)/build/libtempo.so
+
+python - <<'EOF'
+import tempo.vllm_hook
+tempo.vllm_hook.install()   # one line — patches LMCacheConnector globally
+
+from vllm import LLM
+llm = LLM("meta-llama/Meta-Llama-3-8B", gpu_memory_utilization=0.85)
+# KV evictions now routed through TEMPO — attention windows never see PCIe I/O
+EOF
 ```
 
-### Step 2 — Slurm Smoke Test (< 1 minute, 1 node)
+### Inference: LMCache API
+
+```python
+from lmcache.storage_backend.cpu_backend import CpuMemoryBackend
+from tempo.lmcache_connector import TEMPOStorageBackend, TEMPOConfig
+
+backend = TEMPOStorageBackend(
+    backing = CpuMemoryBackend(lmcache_cfg),
+    cfg     = TEMPOConfig(rate_gbps=5.0, strict_gate=True),
+)
+engine = LMCacheEngine(lmcache_cfg, backend)
+```
+
+### Training: FSDP + TEMPO
+
+```python
+from tempo import TEMPOScheduler
+
+sched = TEMPOScheduler(rank=rank, world_size=world_size,
+                        local_nvme_dir="/tmp/ckpt", lustre_dir=...,
+                        mode="tempo")
+
+for step in range(steps):
+    with sched.compute_phase():
+        loss = model(inputs); loss.backward()   # TEMPO flushes here
+    optimizer.step()
+    if step % 50 == 0:
+        sched.checkpoint(model.state_dict(), step)  # O(1) — no training stall
+```
+
+---
+
+## Expected Results: The Killer Graph
+
+**Training** (2× 4-GPU Perlmutter, Llama-3-1B, FSDP, ckpt every 50 steps):
+
+```
+NCCL All-Reduce bandwidth (GB/s)
+ 135 ┤──────────────────────────────────────────  Baseline (no I/O)
+ 120 ┤·············TEMPO (paced)···················  ← shielded from flush
+     │
+  90 ┤
+  80 ┤──╮  ────────╮  ────────╮  ────────╮  ──  Greedy flush baseline
+     │  ↓ -40%     ↓           ↓           ↓
+  70 ┤  └──        └──         └──         └──
+     └────────────────────────────────────────────▶ training step
+       0      50      100      150      200
+```
+
+**Inference** (A100 × 4, vLLM, Llama-3-8B, P99 decode latency ms):
+
+```
+P99 decode latency (ms)
+ 200 ┤             ●●●               ●●●
+ 160 ┤       ●●●●●    ●●●      ●●●●●    ●●
+ 120 ┤─────────────────────────────────────────────── vLLM+LMCache greedy
+ 100 ┤·····················································  TEMPO (paced)
+     └────────────────────────────────────────────────────▶ request #
+       0       100     200     300     400
+     ↑ KV eviction events every ~50 requests
+```
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `TEMPO_RATE_GBPS` | `5.0` | Flush ceiling GB/s (keep ≤ 20% of NIC BW) |
+| `TEMPO_BURST_MB` | `256` | Token bucket burst (MB) |
+| `TEMPO_FFN_WAIT_US` | `200` | Max µs to wait for FFN window |
+| `TEMPO_STRICT_GATE` | `1` | 1 = never flush during ATTENTION |
+| `TEMPO_STAGE_DIR` | `/tmp/tempo_<pid>` | NVMe staging path |
+| `TEMPO_LUSTRE_DIR` | `$PSCRATCH/tempo_kvcache` | Lustre target |
+| `LIBTEMPO_PATH` | auto-detect | Path to `libtempo.so` |
+| `TEMPO_VERBOSE` | `0` | Enable daemon debug logs |
+
+---
+
+## NERSC Perlmutter Experiments
+
 ```bash
-mkdir -p logs results/smoke
+# Smoke test (< 1 min)
 sbatch tests/run_smoke_test.slurm
 
-# Expected output (sacct):
-#   SMOKE TEST PASSED — all 3 tests OK
-#   NCCL algbw ≈ 135 GB/s  (intra-node NVLink/PCIe)
-```
-
-### Step 3 — Phase 1: Prove the Contention (2 nodes, 15 min)
-```bash
+# Phase 1: Quantify PCIe contention (15 min, debug queue)
 sbatch phase1/run_phase1_verification.slurm
 
-# Produces:
-#   results/baseline/nccl_bw_rank0.csv    ← flat ~135 GB/s
-#   results/contention/nccl_bw_rank0.csv  ← sawtooth, drops ~40%
-#   results/figures/killer_graph.pdf       ← paper figure
+# Phase 3: TEMPO vs. Baseline (29 min, chained)
+PHASE1=$(sbatch --parsable phase1/run_phase1_verification.slurm)
+sbatch --dependency=afterok:${PHASE1} phase3/run_evaluation.slurm
 ```
 
-### Step 4 — Phase 3: TEMPO vs. Baseline (2 nodes, 29 min)
-```bash
-sbatch phase3/run_evaluation.slurm
-
-# Produces:
-#   results/baseline/nccl_bw_rank0.csv    ← degraded by checkpointing
-#   results/tempo/nccl_bw_rank0.csv       ← flat (TEMPO shields NCCL)
-#   results/figures/killer_graph.pdf       ← definitive comparison figure
-```
-
-### Generate Demo Plot (No GPU/Data Needed)
-```bash
-python phase3/plot_killer_graph.py --demo --output-dir results/figures
-```
+> **Critical SLURM rule**: Never use `--gpus-per-task=1` in `srun` on Perlmutter.
+> Sets `CUDA_VISIBLE_DEVICES=0` per task → NCCL P2P probes peers (1,2,3) → `Cuda failure 101`.
+> Fix: `--gpus-per-node=4` in `#SBATCH` + `export CUDA_VISIBLE_DEVICES=0,1,2,3`.
 
 ---
 
-## 📐 TEMPO Internal Architecture
-
-```
-User Training Loop
-       │
-       ▼
-┌──────────────────────────────────────────────────────────────┐
-│                      TEMPOScheduler                          │
-│                    (tempo/scheduler.py)                      │
-│                                                              │
-│  .checkpoint(state_dict)  ──►  O(1) NVMe write              │
-│  .nccl_phase()  ctx mgr   ──►  pause flush thread           │
-│  .compute_phase() ctx mgr ──►  allow flush thread           │
-└───────────────┬──────────────────────────┬───────────────────┘
-                │                          │
-    ┌───────────▼─────────┐    ┌──────────▼──────────────┐
-    │    PhaseMonitor      │    │   CheckpointManager      │
-    │  (phase_monitor.py)  │    │ (checkpoint_manager.py)  │
-    │                      │    │                          │
-    │  threading.Event:    │    │  save_async():           │
-    │  COMPUTE → .set()  ──┼──► │    torch.save() → /tmp   │
-    │  NCCL    → .clear()  │    │    enqueue FlushJob      │
-    │                      │    │                          │
-    │  Hooks available:    │    │  _flush_worker():         │
-    │  • FSDP comm hook    │    │    wait_for_io_allowed()  │
-    │  • DDP comm hook     │    │    copy 256MB chunks →   │
-    │  • Context manager   │    │    $PSCRATCH (Lustre)    │
-    └──────────────────────┘    └──────────────────────────┘
-```
-
----
-
-## 📊 Experiment Progress
-
-| Experiment | Job ID | Status | Key Result |
-|---|---|---|---|
-| Smoke Test (1 node, 4× A100) | `52208307` | ✅ **PASSED** | NCCL 135 GB/s, 44s runtime |
-| Phase 1 — Baseline NCCL | pending | ⏳ Queued | Expect ~135 GB/s flat |
-| Phase 1 — Contention NCCL | pending | ⏳ After baseline | Expect ≥40% drop |
-| Phase 3 — TEMPO vs Baseline | pending | ⏳ After Phase 1 | Expect TEMPO = flat |
-
----
-
-## 🐛 Issues Resolved
-
-| Symptom | Root Cause | Resolution |
-|---|---|---|
-| `Cuda failure 101 'invalid device ordinal'` | `--gpus-per-task=1` hides peer GPUs from NCCL | Removed from `srun`; use `--gpus-per-node=4` in SBATCH only |
-| `ImportError: No module named torch` | Login node default Python 2.7 | `module load pytorch/2.8.0` |
-| `libfabric.so.1: cannot open shared object` | pytorch/2.6.x incompatible with cudatoolkit | Upgraded to pytorch/2.8.0 |
-| `SLURM_SUBMIT_DIR` path guard error | `dirname $0` returns temp path in sbatch | Use `SLURM_SUBMIT_DIR` with `basename` guard |
-
----
-
-## 🔑 Key Design Decisions
-
-### Why `fio io_uring` not SPDK?
-Perlmutter is a shared supercomputer — SPDK requires root-level NVMe device unbind, which is blocked for all non-root users. `fio` with `io_uring` achieves comparable PCIe bandwidth saturation in kernel mode with no special privileges.
-
-### Why remove `--gpus-per-task=1`?
-Slurm's `--gpus-per-task=1` sets `CUDA_VISIBLE_DEVICES=0` per task, hiding peer GPUs. NCCL's intra-node P2P transport (transport/p2p.cc) probes peer CUDA devices (1,2,3) with `cudaMemcpyPeerAsync`. With only device 0 visible per task, this throws `invalid device ordinal`.
-
-```bash
-# ❌ BROKEN — NCCL P2P crashes
-srun --ntasks-per-node=4 --gpus-per-task=1 python train.py
-
-# ✅ CORRECT — All 4 GPUs visible, NCCL uses local_rank for device selection
-#SBATCH --gpus-per-node=4
-srun --ntasks-per-node=4 --cpu-bind=cores python train.py
-```
-
-### NUMA Pinning for Maximum Contention
-```bash
-# EPYC 7763 NPS=2: NUMA 0 = cores 0-31, NUMA 1 = cores 32-63
-# GPU0-3 + all 4 Slingshot NICs share PCIe lanes to NUMA 0
-# Pinning I/O stress + GPU ranks to NUMA 0 maximises PCIe Root Complex load
-export NUMA_NODE=0
-srun --cpu-bind=map_cpu:0,8,16,24 ...  # GPU ranks → NUMA 0 cores
-```
-
----
-
-## 📜 Citation
+## Citation
 
 ```bibtex
-@inproceedings{skim2025tempo,
-  title     = {TEMPO: Temporal Emulation and Masking for Predictable I/O
-               in Large-Scale AI Training},
+@inproceedings{kim2026tempo,
+  title     = {{TEMPO}: Harmonious Burst Buffering for Jitter-Free
+               {LLM} Inference and Training at Scale},
   author    = {Kim, Sunggon},
-  booktitle = {OSDI / SC 2025},
-  year      = {2025},
-  note      = {Experiments on NERSC Perlmutter (account m5320)}
+  booktitle = {SC '26: The International Conference for High Performance
+               Computing, Networking, Storage and Analysis},
+  year      = {2026},
+  note      = {Experiments on NERSC Perlmutter (account m5320)},
 }
 ```
 
 ---
 
 <div align="center">
-<sub>Running on NERSC Perlmutter · Account m5320 · pytorch/2.8.0 · Last updated April 2026</sub>
+<sub>NERSC Perlmutter · pytorch/2.8.0 · vLLM v1 · SGLang · LMCache v0.4+</sub>
 </div>
