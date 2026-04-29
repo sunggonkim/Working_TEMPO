@@ -101,6 +101,7 @@ def make_demo_data(duration_s: float = 60.0, dt_s: float = 0.05) -> tuple:
 
     itl_df = pd.DataFrame({
         "timestamp_ns": (token_times * 1e9).astype(np.int64),
+        "time_s":       token_times,
         "request_id":   [f"req_{i % 64:04d}" for i in range(len(token_times))],
         "token_idx":    np.tile(np.arange(256), len(token_times) // 256 + 1)[: len(token_times)],
         "itl_ms":       np.clip(itl_base, 1.0, None),

@@ -55,9 +55,14 @@ export MASTER_PORT=29500
 export WORLD_SIZE=$(( SLURM_NNODES * 4 ))   # 4 GPUs per node
 
 # Perlmutter Slingshot 11 NIC — required NCCL/libfabric settings
-export FI_CXI_ATS=0                          # Disable Address Translation Services
-export NCCL_NET_GDR_LEVEL=3                  # Enable GPU Direct RDMA
+# Reference: https://docs.nersc.gov/development/languages/python/using-python-perlmutter/#pytorch
+export FI_CXI_ATS=0                          # Disable Address Translation Services (required for Slingshot)
+export FI_MR_CACHE_MONITOR=disabled          # Fix: OFI MR cache causes GDR registration EFAULT on NCCL 2.27
+export NCCL_NET_GDR_LEVEL=0                  # Disable GPU Direct RDMA (GDR registration fails on current libfabric)
+                                             # NOTE: this does NOT affect contention measurement —
+                                             #   both baseline and contention use CPU-mediated transfers equally.
 export NCCL_CROSS_NIC=1                      # Allow NIC crossover for large messages
+export NCCL_SOCKET_IFNAME=hsn                # Use Slingshot (hsn) NIC explicitly
 export NCCL_DEBUG=WARN
 
 # NUMA pinning for MAXIMUM PCIe contention:

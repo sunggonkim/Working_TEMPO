@@ -55,9 +55,9 @@ echo "============================================================"
 # ---------------------------------------------------------------------------
 # Verify vLLM is installed (install if not)
 # ---------------------------------------------------------------------------
-if ! python -c "import vllm" 2>/dev/null; then
+if ! python3 -c "import vllm" 2>/dev/null; then
     echo "[PHASE0] vllm not found — installing..."
-    pip install vllm --quiet
+    pip3 install vllm --quiet
 fi
 
 # ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ echo ""
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 numactl --cpunodebind=0 --membind=0 \
-    python phase0/workload_injector.py \
+    python3 phase0/workload_injector.py \
         --model "$MODEL" \
         --tp "$TP" \
         --gpu-util "$GPU_UTIL" \
@@ -147,7 +147,7 @@ ITL_CSV="${PHASE0_OUTPUT}/itl_profile.csv"
 IO_CSV="${PHASE0_OUTPUT}/io_profile.csv"
 
 if [[ -f "$ITL_CSV" && -f "$IO_CSV" ]]; then
-    python phase0/plot_inference_interference.py \
+    python3 phase0/plot_inference_interference.py \
         --itl "$ITL_CSV" \
         --io  "$IO_CSV"  \
         --out-pdf "results/figures/fig1_itl_vs_kv_eviction.pdf" \
@@ -155,7 +155,7 @@ if [[ -f "$ITL_CSV" && -f "$IO_CSV" ]]; then
     echo "[PHASE0] Killer graph saved to results/figures/"
 else
     echo "[PHASE0] WARNING: CSV files missing, generating demo graph instead"
-    python phase0/plot_inference_interference.py --demo \
+    python3 phase0/plot_inference_interference.py --demo \
         --out-pdf "results/figures/fig1_itl_vs_kv_eviction_DEMO.pdf" \
         --out-png "results/figures/fig1_itl_vs_kv_eviction_DEMO.png"
 fi
