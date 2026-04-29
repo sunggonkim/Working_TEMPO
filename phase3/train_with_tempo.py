@@ -147,52 +147,59 @@ def fsdp_wrap(model, decoder_cls, device):
 # ============================================================================
 
 class _TimedCommState:
-    def __init__(self, world_size: int, phase_monitor: Optional[PhaseMonitor]):
+    def __init__(self, world_size: int, phase_monitor: Optional[PhaseMonitor],
+                 process_group=None):
         self.world_size    = world_size
         self.phase_monitor = phase_monitor
+        self.process_group = process_group   # FSDP process group for reduce_scatter
         self.records: List[dict] = []
         self._s = torch.cuda.Event(enable_timing=True)
         self._e = torch.cuda.Event(enable_timing=True)
         self.step = 0
 
 
-def timed_pacing_hook(state: _TimedCommState, bucket):
+def timed_pacing_hook(
+    state: _TimedCommState,
+    padded_unsharded_grad: torch.Tensor,
+    new_sharded_grad: torch.Tensor,
+) -> None:
     """
-    FSDP comm hook with dual responsibilities:
-      1. Measure NCCL all_reduce latency (for CSV output / Killer Graph).
+    FSDP comm hook (PyTorch 2.11+ API: state, padded_unsharded_grad, new_sharded_grad).
+    Dual responsibilities:
+      1. Measure NCCL reduce_scatter latency (for CSV output / Killer Graph).
       2. Signal PhaseMonitor to pause background I/O flush (TEMPO mode).
     """
     if state.phase_monitor:
         from tempo.phase_monitor import TrainingPhase
         state.phase_monitor.set_phase(TrainingPhase.NCCL_COMM)
 
+    size_GB = padded_unsharded_grad.nbytes / 1e9
     state._s.record()
-    tensor = bucket.buffer()
-    size_GB = tensor.nbytes / 1e9
 
-    fut = dist.all_reduce(tensor, async_op=True).get_future()
+    dist.reduce_scatter_tensor(
+        new_sharded_grad,
+        padded_unsharded_grad,
+        group=state.process_group,
+    )
 
-    def on_done(fut):
-        state._e.record()
-        torch.cuda.synchronize()
-        lat_ms  = state._s.elapsed_time(state._e)
-        algbw   = size_GB / (lat_ms * 1e-3)
-        busbw   = algbw * 2 * (state.world_size - 1) / state.world_size
+    state._e.record()
+    torch.cuda.synchronize()
+    lat_ms = state._s.elapsed_time(state._e)
+    algbw  = size_GB / (lat_ms * 1e-3)
+    # reduce_scatter busbw formula: (N-1)/N × algbw
+    busbw  = algbw * (state.world_size - 1) / state.world_size
 
-        if state.phase_monitor:
-            from tempo.phase_monitor import TrainingPhase
-            state.phase_monitor.set_phase(TrainingPhase.COMPUTE)
+    if state.phase_monitor:
+        from tempo.phase_monitor import TrainingPhase
+        state.phase_monitor.set_phase(TrainingPhase.COMPUTE)
 
-        state.records.append({
-            "step":       state.step,
-            "latency_ms": round(lat_ms, 4),
-            "algbw_GBs":  round(algbw,  4),
-            "busbw_GBs":  round(busbw,  4),
-            "timestamp":  round(time.time(), 3),
-        })
-        return [fut.value()[0] / state.world_size]
-
-    return fut.then(on_done)
+    state.records.append({
+        "step":       state.step,
+        "latency_ms": round(lat_ms, 4),
+        "algbw_GBs":  round(algbw,  4),
+        "busbw_GBs":  round(busbw,  4),
+        "timestamp":  round(time.time(), 3),
+    })
 
 
 # ============================================================================
@@ -229,6 +236,7 @@ def main():
     comm_state = _TimedCommState(
         world_size    = world_size,
         phase_monitor = tempo.phase_monitor if args.mode == "tempo" else None,
+        process_group = model.process_group,
     )
     model.register_comm_hook(comm_state, timed_pacing_hook)
 
