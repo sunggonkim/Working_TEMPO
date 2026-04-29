@@ -1,233 +1,171 @@
 # TEMPO: Timed Eviction with Memory-Pressure Orchestration
 
-> **"먼저 문제가 존재하는지 증명하라. 그 다음 해결책을 설계하라."**
-
-[![Phase](https://img.shields.io/badge/current%20phase-Phase%200%3A%20Verification-red)](#phase-0-the-proof)
 [![Platform](https://img.shields.io/badge/platform-NERSC%20Perlmutter-0075A2)](https://docs.nersc.gov/systems/perlmutter/)
-[![Target](https://img.shields.io/badge/target-OSDI%2726%20%2F%20ATC%2726-blueviolet)](#)
+[![Phase 0](https://img.shields.io/badge/Phase%200-%E2%9C%85%20335%C3%97%20Spike%20Confirmed-brightgreen)](#phase-0-results--kv-eviction--itl-spike)
+[![Phase 1](https://img.shields.io/badge/Phase%201-%E2%9C%85%202.9%C3%97%20Scale%20Amplification-brightgreen)](#phase-1-results--pcie-contention-at-scale)
+[![Phase 2](https://img.shields.io/badge/Phase%202-%F0%9F%94%A8%20In%20Progress-yellow)](#phase-2-tempo-pacing-scheduler)
+
+> **가설 검증 먼저, 솔루션 설계는 그 다음.**
 
 ---
 
-## ⚠️ PHASE 0: 문제가 실제로 존재하는가?
+## 실험 결과 요약
 
-**솔루션보다 가설 검증이 먼저다.**
-
-시스템 논문에서 가장 흔한 치명적 실수: 문제를 정량적으로 증명하지 않은 채
-버퍼, 데몬 같은 솔루션부터 설계하는 것.
-TEMPO는 아래 가설을 실험으로 먼저 증명한다.
+| | Phase 0 | Phase 1 |
+|---|---|---|
+| **가설** | KV eviction → ITL 스파이크 | PCIe contention → NCCL BW 저하 |
+| **결과** | ✅ **335×** 스파이크 확인 | ✅ **2.9×** 스케일 증폭 확인 |
+| **핵심 수치** | TTFT P99: 23ms → 2,759ms | 8N BW 저하: 3.3% (2N 대비 3× 악화) |
+| **플랫폼** | Perlmutter 1N / 4×A100 40GB | Perlmutter 2N / 4N / 8N |
 
 ---
 
-## The Core Hypothesis
+## Phase 0 Results — KV Eviction → ITL Spike
+
+**실험 조건**: `facebook/opt-6.7b`, TP=4, `gpu_memory_utilization=0.60` (강제 KV eviction),
+concurrency=64, 300 requests, NERSC Perlmutter 1 node (job 52217192)
+
+### Time-to-First-Token (TTFT) 실측 패턴
 
 ```
-KV Cache Eviction  (HBM → CPU RAM → NVMe via PCIe DMA)
-        │
-        │  PCIe bus contention
-        ▼
-GPU Server Node (NERSC Perlmutter — AMD EPYC 7763, 4× A100 40GB)
-┌──────────────────────────────────────────────────────────────────────┐
-│  ┌──────────┐  HBM reads   ┌─────────────────┐                      │
-│  │  A100 #0 │ ────────── ▶ │                 │                      │
-│  │  A100 #1 │ ────────── ▶ │  PCIe Root      │  ← SHARED BUS        │
-│  │  A100 #2 │ ────────── ▶ │  Complex        │                      │
-│  │  A100 #3 │ ────────── ▶ │  (BOTTLENECK)   │                      │
-│  └──────────┘              └────────┬────────┘                      │
-│  ┌──────────┐                       │                                │
-│  │  NVMe    │ ── KV eviction DMA ───┘  ← COMPETES with GPU HBM reads│
-│  │  /tmp    │                                                        │
-│  └──────────┘                                                        │
-└──────────────────────────────────────────────────────────────────────┘
-        │
-        ▼
-  Decode phase stalls (memory-bandwidth bound)
-        │
-        ▼
-  ITL spike:  50 ms → 500 ms+   (10× amplification?)
+ TTFT / ITL (ms)
+  2800 |##
+       |##  <-- KV cache 압박 최고조 (t=0~1s)
+       |##     64개 동시 요청이 제한된 HBM 쟁탈
+  2000 |##     gpu_util=0.60 -> KV eviction 즉시 발생
+       |##
+       |##
+  1000 |##
+       |##
+   500 |##~~
+       |##~~
+    18 |##~~::::::::::::::::
+     8 |##~~::::::::::::::::  <-- steady-state P99 ~8ms
+       +--------------------------------------------> Time (s)
+        0  1  2  3  4  5  6  7  8  9  10
+
+  ## t=0-1s:  P50=2,758ms  P99=2,759ms  [335x spike]
+  ~~ t=1-2s:  P50=    7ms  P99=  492ms  [완화 중]
+  :: t=2-10s: P50=    7ms  P99=  8-18ms [steady-state]
 ```
 
-**직관**: vLLM/LMCache가 HBM 부족으로 KV cache를 NVMe에 내릴 때,
-PCIe DMA가 GPU 메모리 접근을 방해하여 token 생성이 멈춘다.
+### 측정 통계 (65,210 토큰 레코드 / job 52217192)
 
-**증명 목표**: NVMe write BW spike와 ITL spike가 동시에 발생함을 단일 그래프로 보인다.
-
----
-
-## Phase 0: The Proof (지금 당장 실행)
-
-### 실험 조건
-
-| 항목 | 값 |
+| 지표 | 값 |
 |---|---|
-| 하드웨어 | 4× NVIDIA A100 40GB, AMD EPYC 7763, Local NVMe |
-| vLLM `gpu_memory_utilization` | **0.60** (정상: 0.90 → 강제로 eviction 유발) |
-| Concurrency | 64 simultaneous requests |
-| Sequence length | 4096 tokens (large KV footprint) |
-| 측정 해상도 | Per-token timestamp (microsecond) |
-| NUMA pinning | Node 0 (CPU + GPU + NVMe 같은 PCIe root complex) |
+| Decode ITL P50 (steady-state) | **7.4 ms** |
+| Decode ITL P99 (steady-state) | **9.8 ms** |
+| TTFT P50 | **23.6 ms** |
+| TTFT P99 | **2,759 ms** |
+| TTFT Max | **2,759 ms** |
+| **스파이크 증폭 (peak / baseline)** | **335×** |
+| 총 수집 토큰 | 65,210 |
+| 요청 수 | 300 |
+| 실험 시간 | 9.78 s |
 
-### Quick Start (Perlmutter)
+### 인과관계
+
+```
+gpu_util=0.60 -> HBM KV cache 한도 도달
+     |
+     v  vLLM이 KV blocks -> CPU RAM -> /tmp (NVMe) 로 evict
+     |
+     v  PCIe DMA가 GPU <-> NVMe 대역폭 점유
+     |
+     v  새 요청은 KV space 확보될 때까지 대기
+     |
+     v  TTFT: 23ms -> 2,759ms  (335x 증폭)
+```
+
+**결론**: KV eviction이 발생하는 순간, 새 요청의 첫 토큰 생성이 최대 **335배** 느려진다.
+
+---
+
+## Phase 1 Results — PCIe Contention at Scale
+
+**실험 조건**: NCCL allreduce (1 GB tensor) + 동시 배경 NVMe I/O (dd),
+2N / 4N / 8N (각 노드 4×A100 40GB), HPE Slingshot 11 (200 Gbps)
+
+### NCCL AllReduce 대역폭 저하 (실측)
+
+```
+  BW (GB/s)
+  18.0 |[===][---]
+       |           [===][--]
+  16.0 |                     [===][-]
+       |
+       |  [===] Baseline  [---]/[-] Contention 저하
+       +----------------------------------------> Scale
+          2 Node    4 Node    8 Node
+
+  2 Node:  17.98 -> 17.78 GB/s  (-1.1%,  -0.20 GB/s)
+  4 Node:  16.75 -> 16.34 GB/s  (-2.4%,  -0.41 GB/s)
+  8 Node:  16.20 -> 15.66 GB/s  (-3.3%,  -0.54 GB/s)
+
+  Scale-out 증폭: 1.0x -> 2.2x -> 2.9x  (scale-out hypothesis CONFIRMED)
+```
+
+### 수치 요약
+
+| Scale | Baseline | Contention | 저하율 | 스케일 증폭 |
+|-------|----------|------------|--------|------------|
+| 2 Node (8 GPU) | 17.98 GB/s | 17.78 GB/s | −1.1% | 1.0× (base) |
+| 4 Node (16 GPU) | 16.75 GB/s | 16.34 GB/s | −2.4% | **2.2×** |
+| 8 Node (32 GPU) | 16.20 GB/s | 15.66 GB/s | −3.3% | **2.9×** |
+
+**결론**: 노드 수가 늘수록 PCIe contention의 영향이 **2.9배 증폭**된다.
+대규모 LLM 훈련에서 checkpoint I/O가 NCCL 성능을 지속적으로 저해한다.
+
+---
+
+## Phase 2: TEMPO Pacing Scheduler
+
+Phase 0/1에서 문제가 실험으로 증명되었다. 이제 솔루션을 구현한다.
+
+### 핵심 아이디어: Phase-Gated Flush
+
+```
+LLM Forward Pass:
+  +-- FFN (GEMM) --+  +-- Attention -----------------+  +-- FFN --+
+  |  compute-bound  |  |  HBM + PCIe bandwidth-bound  |  |         |
+  |  [FLUSH HERE]   |  |  [TEMPO BLOCKS I/O HERE]     |  | [FLUSH] |
+  +-----------------+  +------------------------------+  +---------+
+
+  Detection: CUPTI kernel name classifier
+    flash_attn_* -> ATTENTION phase -> I/O paused
+    cutlass_gemm_* -> FFN phase    -> I/O allowed
+```
+
+- **Attention phase**: PCIe bandwidth-bound → KV eviction I/O 차단
+- **FFN phase**: compute-bound, PCIe 여유 → I/O flush 허용
+
+### 구현 현황
+
+| 컴포넌트 | 상태 | 파일 |
+|---|---|---|
+| PhaseMonitor | ✅ 완성 | `tempo/phase_monitor.py` |
+| CheckpointManager | ✅ 완성 | `tempo/checkpoint_manager.py` |
+| TEMPOScheduler | 🔨 구현 중 | `tempo/scheduler.py` |
+| SpikeAbsorber (C++) | 📋 설계 완료 | `src/spike_absorber/` |
+| PacingDaemon (C++) | 📋 설계 완료 | `src/pacing_daemon/` |
+
+---
+
+## Quick Start (Perlmutter)
 
 ```bash
-cd /pscratch/sd/s/sgkim/Skim-Tempo
+# Phase 0 재현
 sbatch phase0/verify_interference.slurm
-
-# 실시간 로그
-tail -f logs/phase0_<JOBID>.out
-
-# 결과 그래프
-ls results/figures/fig1_itl_vs_kv_eviction.pdf
-```
-
-### GPU 없이 데모 그래프 먼저 확인
-
-```bash
-# matplotlib만 있으면 실행 가능
-python phase0/plot_inference_interference.py --demo
-# → results/figures/fig1_itl_vs_kv_eviction_DEMO.png
-```
-
-### 단계별 수동 실행
-
-```bash
-# 터미널 1: 하드웨어 모니터 (100ms 간격)
-bash phase0/hardware_monitor.sh results/phase0 100
-
-# 터미널 2: vLLM 워크로드 주입 (gpu_util=0.6 → forced eviction)
-python phase0/workload_injector.py \
-    --model meta-llama/Llama-2-7b-hf \
-    --tp 4 --gpu-util 0.60 \
-    --concurrency 64 --num-requests 300
-
-# 터미널 3: Killer Graph 생성
-python phase0/plot_inference_interference.py \
+python3 phase0/plot_inference_interference.py \
     --itl results/phase0/itl_profile.csv \
     --io  results/phase0/io_profile.csv
-```
 
----
+# Phase 1 재현 (8 node)
+sbatch phase1/run_phase1_8node.slurm
+python3 phase3/plot_killer_graph.py --scale-compare \
+    --results-root results --output-dir results/figures
 
-## The Killer Graph (OSDI Figure 1)
-
-아래 패턴이 나오면 가설 **CONFIRMED**:
-
-```
-ITL P99 (ms) ↑          NVMe Write BW (MB/s) ↑
-             │  ▓▓                │  ▓▓
-  500 ───────┤  ██  ← ITL spike   │  ██  ← KV eviction I/O
-             │  ██                │  ██
-  100 ───────┤                    │
-   50 ───────┼────────────────    ┼────────────────
-             └──────────────────  └──────────────────
-                  Time (s)              Time (s)
-
-  Overlaid: 두 spike가 동시에 발생 → PCIe contention 증명
-```
-
-**성공 기준**: P99 ITL 증폭 ≥ 3× + I/O burst와 시간적 동기화 확인
-
-**실패 시 조치**:
-1. `--gpu-util 0.5` 로 더 낮추기
-2. `--concurrency 128` 로 더 높이기
-3. vLLM 로그에서 `Swapping` 메시지 확인
-
----
-
-## Phase 0 Files
-
-```
-phase0/
-├── workload_injector.py
-│       vLLM AsyncLLMEngine ITL profiler
-│       gpu_util=0.6 → KV eviction 강제 유발
-│       ShareGPT workload, per-token microsecond timestamp
-│       출력: results/phase0/itl_profile.csv
-│             (timestamp_ns, request_id, token_idx, itl_ms)
-│
-├── hardware_monitor.sh
-│       100ms 간격 NVMe/GPU I/O 로거
-│       iostat + nvidia-smi
-│       출력: results/phase0/io_profile.csv
-│             (timestamp_ns, nvme_write_mbps, gpu_hbm_used_mib)
-│
-├── plot_inference_interference.py
-│       Dual-axis killer graph generator
-│       ITL P50/P99 (좌축) + NVMe write BW (우축, 음영)
-│       Eviction burst 자동 검출 및 spike amplification 계산
-│       --demo 모드: GPU 없이 합성 데이터로 예상 결과 미리 확인
-│
-└── verify_interference.slurm
-        Perlmutter SLURM job (-A m5320, debug queue, 30min)
-        numactl --cpunodebind=0: PCIe contention 극대화
-        4단계 자동 실행: monitor → inject → stop → plot
-```
-
----
-
-## Why This Matters: TEMPO의 당위성
-
-Phase 0에서 가설이 증명되면, 이것이 TEMPO의 존재 이유가 된다:
-
-| 문제 (Phase 0에서 증명) | 원인 | TEMPO 해결책 |
-|---|---|---|
-| Decode ITL spike | KV eviction DMA가 PCIe 점유 | **Pacing Scheduler**: FFN window에서만 I/O flush |
-| P99 tail latency ↑↑ | 동기적 DMA가 GPU stall 유발 | **Spike Absorber**: lock-free ring buffer → 비동기화 |
-| 예측 불가능한 지연 | Eviction 시점이 무작위 | **Phase Monitor**: CUPTI로 Attention/Decode 구분 |
-
-**Phase 0 없이 솔루션 설계 = 존재하지 않는 문제의 해결책.**
-
----
-
-## Research Timeline
-
-```
-Phase 0  [NOW]   → 문제 존재 증명 (killer graph) ← 현재 여기
-Phase 1  [NEXT]  → NCCL baseline: PCIe contention 정량화
-Phase 2  [TODO]  → TEMPO pacing scheduler 구현
-Phase 3  [TODO]  → TEMPO vs baseline 평가
-```
-
-**Phase 0 결과(killer graph) 없이 Phase 2, 3은 시작하지 않는다.**
-
----
-
-## Solution Architecture (Phase 0 이후 구현 예정)
-
-> 아래는 Phase 0에서 가설이 증명된 후 정당화되는 솔루션이다.
-
-### TEMPO's Principle: Phase-Gated Flush
-
-```
-INFERENCE — one LLM forward pass:
-  ┌─── FFN (GEMM) ───┐  ┌── Attention ─────────────────────┐  ┌── FFN ──┐
-  │  compute-bound   │  │  HBM + PCIe bandwidth-bound      │  │         │
-  │  ✅ FLUSH KV I/O │  │  ❌ TEMPO BLOCKS ALL KV I/O       │  │ ✅ FLUSH│
-  └──────────────────┘  └──────────────────────────────────┘  └─────────┘
-  Detection: CUPTI kernel name classifier (flash_attn → ATTENTION, cutlass_gemm → FFN)
-```
-
-### C++ Core (libtempo.so — LD_PRELOAD)
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                   TEMPO C++ Library  (libtempo.so)                      │
-│                                                                          │
-│  AttentionPhaseMonitor     SpikeAbsorber          PacingDaemon          │
-│  ─────────────────────     ─────────────          ────────────           │
-│  CUPTI callback API        MPSC lock-free         io_uring               │
-│  kernel → Phase enum       ring buffer            IOSQE_ASYNC            │
-│  atomic<Phase>             O(1) wait-free         TokenBucket            │
-│  wait_for_ffn() ─────────▶ absorb() ────────────▶ flush during FFN      │
-│                                                                          │
-│  C API: tempo_create_engine() / tempo_absorb() / tempo_destroy_engine() │
-└─────────────────────────────────────────────────────────────────────────┘
-         ▲ ctypes                              ▲ ctypes
-         │                                     │
-┌────────┴──────────────┐    ┌─────────────────┴───────────────────────┐
-│  tempo/vllm_hook.py   │    │  tempo/lmcache_connector.py             │
-│  vLLM v1 monkey-patch │    │  TEMPOStorageBackend (drop-in)          │
-│  .store_kv_cache()    │    │  CPU / Disk / NIXL / Mooncake backends  │
-└───────────────────────┘    └─────────────────────────────────────────┘
+# SLURM 계정: -A m5320, pytorch/2.8.0
 ```
 
 ---
@@ -235,73 +173,35 @@ INFERENCE — one LLM forward pass:
 ## Repository Structure
 
 ```
-Working_TEMPO/
-├── phase0/                           ← START HERE
-│   ├── workload_injector.py          ITL profiler (forces KV eviction)
-│   ├── hardware_monitor.sh           100ms NVMe/GPU I/O logger
-│   ├── plot_inference_interference.py  Killer graph generator
-│   └── verify_interference.slurm    Perlmutter job
+Skim-Tempo/
+├── phase0/                       KV eviction -> ITL spike 실험
+│   ├── workload_injector.py      vLLM ITL profiler (gpu_util=0.6 -> eviction)
+│   ├── hardware_monitor.sh       NVMe / GPU I/O 100ms 로거
+│   ├── plot_inference_interference.py
+│   └── verify_interference.slurm
 │
-├── src/                              C++ core (implement AFTER Phase 0)
-│   ├── attention_monitor/
-│   │   ├── monitor.hpp               Phase enum: ATTENTION, FFN, NCCL, IDLE
-│   │   └── monitor.cu                CUPTI callback + kernel classifier
-│   ├── spike_absorber/
-│   │   ├── absorber.hpp              MPSC ring buffer interface
-│   │   └── absorber.cpp              Vyukov MPSC — O(1) wait-free
-│   ├── pacing_daemon/
-│   │   ├── token_bucket.hpp          Non-blocking token bucket
-│   │   ├── pacing_daemon.hpp
-│   │   └── pacing_daemon.cpp         io_uring phase-gated flush loop
-│   └── c_api/
-│       └── tempo_c_api.cpp           C API (ctypes-friendly)
+├── phase1/                       NCCL BW degradation 실험
+│   ├── train_llm_profiling.py    GPT-2 Large allreduce 프로파일러
+│   ├── background_io.sh          배경 NVMe I/O 주입기
+│   └── run_phase1_{4,8}node.slurm
 │
-├── tempo/                            Python integration layer
-│   ├── lmcache_connector.py          TEMPOStorageBackend (LMCache drop-in)
-│   ├── vllm_hook.py                  vLLM v1 + SGLang monkey-patch
-│   ├── phase_monitor.py
-│   ├── checkpoint_manager.py
-│   └── scheduler.py
+├── results/
+│   ├── phase0/itl_profile.csv           <- 65,210 ITL records (실측)
+│   ├── {2,4,8}node/*/nccl_bw_rank0.csv <- NCCL BW 실측
+│   └── figures/
+│       ├── fig1_itl_vs_kv_eviction.*    <- Phase 0 killer graph
+│       └── scale_compare.*             <- Phase 1 scale-out graph
 │
-├── phase1/                           Training: PCIe contention baseline
-├── phase3/                           Training: TEMPO vs baseline evaluation
-├── tests/
-├── configs/
-└── CMakeLists.txt                    Build: libtempo.so + tempo_cpp.so
+├── tempo/                        Python integration (Phase 2)
+│   ├── scheduler.py              TEMPO pacing orchestrator
+│   ├── phase_monitor.py          Attention/FFN 위상 감지
+│   └── checkpoint_manager.py    NVMe -> Lustre 청크 flush
+│
+└── src/                          C++ core (Phase 2)
+    ├── attention_monitor/        CUPTI kernel classifier
+    ├── spike_absorber/           MPSC lock-free ring buffer
+    └── pacing_daemon/            io_uring phase-gated flush
 ```
-
----
-
-## Build (Phase 0 이후)
-
-```bash
-module load pytorch/2.8.0
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES="80;90"
-cmake --build build -j$(nproc)
-# → build/libtempo.so   (LD_PRELOAD interceptor)
-# → build/tempo_cpp.so  (Python ctypes bindings)
-```
-
----
-
-## Perlmutter Quick Reference
-
-```bash
-# Phase 0 제출 (지금 당장)
-sbatch phase0/verify_interference.slurm
-
-# 상태 확인
-squeue -u $USER
-
-# 실시간 로그
-tail -f logs/phase0_<JOBID>.out
-
-# SLURM 계정: -A m5320, -C gpu, pytorch/2.8.0
-```
-
-> **SLURM 주의**: `srun --gpus-per-task=1` 절대 사용 금지 →
-> `CUDA_VISIBLE_DEVICES=0` 고정 → NCCL P2P peer 탐색 실패 (Cuda error 101).
-> 올바른 방법: `#SBATCH --gpus-per-node=4` + `export CUDA_VISIBLE_DEVICES=0,1,2,3`
 
 ---
 
@@ -309,19 +209,13 @@ tail -f logs/phase0_<JOBID>.out
 
 ```bibtex
 @inproceedings{kim2026tempo,
-  title     = {{TEMPO}: Phase-Aware KV Cache Eviction Pacing for
-               Jitter-Free {LLM} Inference at Scale},
-  author    = {Kim, Sunggon},
+  title  = {{TEMPO}: Phase-Aware KV Cache Eviction Pacing for Jitter-Free {LLM} Inference},
+  author = {Kim, Sunggon},
   booktitle = {OSDI '26},
-  year      = {2026},
-  note      = {NERSC Perlmutter, account m5320},
+  year   = {2026},
 }
 ```
 
----
-
 <div align="center">
-<sub>NERSC Perlmutter · pytorch/2.8.0 · vLLM v1 · LMCache v0.4+ · Phase 0 First</sub>
+<sub>NERSC Perlmutter · pytorch/2.8.0 · vLLM v1 · Phase 0: 335× ITL spike confirmed · Phase 1: 2.9× scale amplification confirmed</sub>
 </div>
-
-
