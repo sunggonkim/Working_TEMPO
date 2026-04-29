@@ -154,10 +154,14 @@ def aggregate_itl(itl_df: pd.DataFrame, bin_s: float = 0.5) -> pd.DataFrame:
     Bin tokens into time windows and compute P50/P99/P999 per bin.
     Returns DataFrame indexed by bin_center_s.
     """
+    t_min = itl_df["time_s"].min()
     t_max = itl_df["time_s"].max()
-    bins = np.arange(0, t_max + bin_s, bin_s)
+    bins = np.arange(t_min, t_max + bin_s, bin_s)
+    if len(bins) < 2:
+        bins = np.array([t_min, t_max + bin_s])
+    labels = bins[:-1] + bin_s / 2
     itl_df = itl_df.copy()
-    itl_df["bin"] = pd.cut(itl_df["time_s"], bins=bins, labels=bins[:-1] + bin_s / 2)
+    itl_df["bin"] = pd.cut(itl_df["time_s"], bins=bins, labels=labels)
     itl_df["bin"] = itl_df["bin"].astype(float)
 
     agg = itl_df.groupby("bin")["itl_ms"].agg(
@@ -224,21 +228,22 @@ def plot_killer_graph(
     # ---- Secondary axis (I/O BW) ----
     ax2 = ax1.twinx()
 
-    # Plot NVMe write BW as shaded area
-    ax2.fill_between(
-        io_df["time_s"],
-        io_df["nvme_write_mbps"],
-        alpha=0.35,
-        color=COLOR_IO,
-        label="NVMe Write BW (KV Eviction I/O)",
-    )
-    ax2.plot(
-        io_df["time_s"],
-        io_df["nvme_write_mbps"],
-        color=COLOR_IO,
-        linewidth=0.8,
-        alpha=0.6,
-    )
+    # Plot NVMe write BW as shaded area (skip if no I/O data)
+    if len(io_df) > 0:
+        ax2.fill_between(
+            io_df["time_s"],
+            io_df["nvme_write_mbps"],
+            alpha=0.35,
+            color=COLOR_IO,
+            label="NVMe Write BW (KV Eviction I/O)",
+        )
+        ax2.plot(
+            io_df["time_s"],
+            io_df["nvme_write_mbps"],
+            color=COLOR_IO,
+            linewidth=0.8,
+            alpha=0.6,
+        )
     ax2.set_ylabel("NVMe Write Throughput (MB/s)\n[KV Cache Eviction I/O]",
                    color=COLOR_IO, fontsize=FONT_SIZE_LABEL)
     ax2.tick_params(axis="y", labelcolor=COLOR_IO, labelsize=FONT_SIZE_TICK)
@@ -415,17 +420,25 @@ def main() -> None:
         itl_marker = float(itl_marker_path.read_text()) if itl_marker_path.exists() else None
         io_marker  = float(io_marker_path.read_text())  if io_marker_path.exists()  else None
 
-        if itl_marker and io_marker:
+        if len(io_df) == 0:
+            # I/O monitor produced no samples — skip cross-trace sync, normalize ITL from 0
+            print(f"[PLOT] WARN: I/O profile empty — skipping marker sync, normalizing ITL from t=0")
+            itl_df["time_s"] = (itl_df["timestamp_ns"] - itl_df["timestamp_ns"].min()) / 1e9
+        elif itl_marker and io_marker:
             print(f"[PLOT] Synchronizing timestamps via marker files")
             itl_df, io_df = synchronize(itl_df, io_df, itl_marker, io_marker)
         else:
             print(f"[PLOT] WARN: marker files not found — using relative time (may be misaligned)")
 
-        # Clip to common time range
-        t_start = max(itl_df["time_s"].min(), io_df["time_s"].min())
-        t_end   = min(itl_df["time_s"].max(), io_df["time_s"].max())
-        itl_df = itl_df[(itl_df["time_s"] >= t_start) & (itl_df["time_s"] <= t_end)]
-        io_df  = io_df[ (io_df["time_s"]  >= t_start) & (io_df["time_s"]  <= t_end)]
+        # Clip to common time range (only when both traces have data)
+        if len(io_df) > 0:
+            t_start = max(itl_df["time_s"].min(), io_df["time_s"].min())
+            t_end   = min(itl_df["time_s"].max(), io_df["time_s"].max())
+            itl_df = itl_df[(itl_df["time_s"] >= t_start) & (itl_df["time_s"] <= t_end)]
+            io_df  = io_df[ (io_df["time_s"]  >= t_start) & (io_df["time_s"]  <= t_end)]
+        else:
+            t_start = itl_df["time_s"].min()
+            t_end   = itl_df["time_s"].max()
 
         print(f"[PLOT] Common time window: {t_start:.1f}s → {t_end:.1f}s "
               f"({t_end - t_start:.1f}s total)")
