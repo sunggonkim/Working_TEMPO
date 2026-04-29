@@ -324,7 +324,7 @@ def plot_scale_compare(
 
     SCALE_CFG = [
         # (dir_name, label, n_gpus)
-        ("baseline",  "1 node  (4 GPU)",  4),
+        ("2node",     "2 nodes (8 GPU)",  8),
         ("4node",     "4 nodes (16 GPU)", 16),
         ("8node",     "8 nodes (32 GPU)", 32),
     ]

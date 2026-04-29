@@ -56,6 +56,12 @@ echo "============================================================"
 # ---------------------------------------------------------------------------
 # Verify vLLM is installed (install if not)
 # ---------------------------------------------------------------------------
+# Use /tmp (local NVMe) for HuggingFace cache — Lustre ($PSCRATCH) does not
+# support fcntl file locking (errno 524) which HF hub uses for download locking.
+export HF_HOME="/tmp/hf_cache_${SLURM_JOB_ID}"
+export TRANSFORMERS_CACHE="${HF_HOME}"
+mkdir -p "${HF_HOME}"
+
 if ! python3 -c "import vllm" 2>/dev/null; then
     echo "[PHASE0] vllm not found — installing..."
     pip3 install vllm --quiet
@@ -87,7 +93,10 @@ GPU_UTIL=0.60         # INTENTIONALLY LOW — forces KV eviction (paper uses 0.6
 CONCURRENCY=64        # simultaneous requests — saturates HBM fast
 NUM_REQUESTS=300      # total requests in the run
 MAX_TOKENS=256        # decode length per request
-MAX_MODEL_LEN=4096    # long context = large KV footprint
+MAX_MODEL_LEN=2048    # OPT-6.7B max_position_embeddings=2048; use full context for KV pressure
+
+# Allow vLLM to use the model's full context window
+export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
 
 # ---------------------------------------------------------------------------
 # STEP 1: Start hardware monitor (background, NUMA node 0)
