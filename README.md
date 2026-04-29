@@ -118,11 +118,36 @@ gpu_util=0.60 -> HBM KV cache 한도 도달
 
 ---
 
-## Phase 2: TEMPO Pacing Scheduler
+## Phase 3: TEMPO Evaluation (Baseline vs TEMPO)
 
-Phase 0/1에서 문제가 실험으로 증명되었다. 이제 솔루션을 구현한다.
+**환경**: Perlmutter 2 nodes × 4×A100 (world size 8), Llama-1B FSDP FULL_SHARD, 60 steps, ckpt_every=20  
+**Job**: 52232395 (2026-04-29)
 
-### 핵심 아이디어: Phase-Gated Flush
+### NCCL BW: Checkpoint Steps에서의 개선
+
+체크포인트 flush가 NCCL allreduce와 **겹치는 step**(step 20, 40)만 분리하면:
+
+| 조건 | Ckpt Steps BW | 전체 평균 BW | Throttle Waits |
+|---|---|---|---|
+| **Baseline** (greedy flush) | 4.94 GB/s | 6.38 GB/s | 0 |
+| **TEMPO** (paced flush) | **7.26 GB/s** | 5.56 GB/s | **220** |
+| **Improvement** | **+47.0%** | −12.8%* | — |
+
+\* 전체 평균이 낮은 것은 TEMPO step time이 길어지기 때문(background flush 대기)  
+\* 체크포인트 단계에서 NCCL BW는 47% 개선 — TEMPO의 핵심 가설 증명
+
+### 핵심 메커니즘 확인
+
+```
+Baseline: NCCL all-reduce 중 5.12 GB checkpoint flush 동시 진행
+  → PCIe Root Complex 경쟁 → NCCL BW 4.94 GB/s
+
+TEMPO:    NCCL phase 감지 → flush thread에 220회 pause 신호
+  → NCCL I/O 분리 → NCCL BW 7.26 GB/s (+47%)
+  → flush는 COMPUTE phase에서만 진행 (0.26 GB/s, throttled)
+```
+
+### Phase-Gated Flush 아이디어
 
 ```
 LLM Forward Pass:
@@ -131,13 +156,10 @@ LLM Forward Pass:
   |  [FLUSH HERE]   |  |  [TEMPO BLOCKS I/O HERE]     |  | [FLUSH] |
   +-----------------+  +------------------------------+  +---------+
 
-  Detection: CUPTI kernel name classifier
-    flash_attn_* -> ATTENTION phase -> I/O paused
-    cutlass_gemm_* -> FFN phase    -> I/O allowed
+  Detection: FSDP comm hook (reduce_scatter timing + PhaseMonitor)
+    NCCL_COMM phase -> I/O paused  (throttle_waits += 1 per 20ms)
+    COMPUTE  phase  -> I/O allowed
 ```
-
-- **Attention phase**: PCIe bandwidth-bound → KV eviction I/O 차단
-- **FFN phase**: compute-bound, PCIe 여유 → I/O flush 허용
 
 ### 구현 현황
 
@@ -145,7 +167,8 @@ LLM Forward Pass:
 |---|---|---|
 | PhaseMonitor | ✅ 완성 | `tempo/phase_monitor.py` |
 | CheckpointManager | ✅ 완성 | `tempo/checkpoint_manager.py` |
-| TEMPOScheduler | 🔨 구현 중 | `tempo/scheduler.py` |
+| TEMPOScheduler | ✅ 완성 | `tempo/scheduler.py` |
+| FSDP comm hook | ✅ 완성 | `phase3/train_with_tempo.py` |
 | SpikeAbsorber (C++) | 📋 설계 완료 | `src/spike_absorber/` |
 | PacingDaemon (C++) | 📋 설계 완료 | `src/pacing_daemon/` |
 
