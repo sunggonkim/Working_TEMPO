@@ -26,8 +26,10 @@ export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_PORT=29501
 export WORLD_SIZE=$(( SLURM_NNODES * 4 ))
 
+# NCCL fix: use 2.29.2 plugin compatible with NCCL 2.28.9 (same as Phase 1)
+export LD_LIBRARY_PATH=/global/common/software/nersc9/nccl/2.29.2-cu13/plugin/lib:/global/common/software/nersc9/nccl/2.29.2-cu13/lib:${LD_LIBRARY_PATH}
 export FI_CXI_ATS=0
-export NCCL_NET_GDR_LEVEL=3
+export NCCL_NET_GDR_LEVEL=0
 export NCCL_CROSS_NIC=1
 export NCCL_DEBUG=WARN
 
@@ -42,6 +44,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 SRUN_FLAGS=(
     --ntasks-per-node=4
     --cpu-bind=map_cpu:0,8,16,24
+    --export=ALL
 )
 
 TRAIN_FLAGS=(
@@ -104,11 +107,12 @@ echo "====== Plotting Killer Graph ======"
 
 python phase3/plot_killer_graph.py \
     --baseline-csv   results/baseline/nccl_bw_rank0.csv \
-    --contention-csv results/tempo/nccl_bw_rank0.csv \
+    --contention-csv results/baseline/nccl_bw_rank0.csv \
     --tempo-csv      results/tempo/nccl_bw_rank0.csv \
     --output-dir     results/figures \
-    --title          "TEMPO: Pacing Scheduler for LLM Checkpoints (Perlmutter, 4 nodes)" \
-    --ckpt-every     50
+    --title          "TEMPO: Pacing Scheduler for LLM Checkpoints (Perlmutter, 2 nodes)" \
+    --ckpt-every     20 \
+    --bw-metric      algbw_GBs
 
 echo ""
 echo "==========================================="
