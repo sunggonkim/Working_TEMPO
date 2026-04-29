@@ -1,0 +1,298 @@
+"""
+tempo/checkpoint_manager.py — O(1) Local NVMe Checkpoint + Background Lustre Flush
+
+Design:
+    Training loop calls save_async(state_dict, step) → writes to /tmp (local NVMe).
+    Returns immediately (bounded by NVMe bandwidth ~2–5 GB/s, not Lustre ~100–200 MB/s).
+    A background daemon thread picks up the saved file and copies it to $PSCRATCH
+    (Lustre) in configurable chunks, pausing before each chunk if PhaseMonitor
+    signals that an NCCL collective is in flight.
+
+    This decouples checkpoint latency (felt by the training loop) from Lustre I/O
+    bandwidth, giving TEMPO's guarantee of "Macro-Determinism": the training step
+    time is not affected by the flush, and NCCL bandwidth is not degraded because
+    the flush pauses during communication phases.
+
+Flush Throttling:
+    The flush thread calls `phase_monitor.wait_for_io_allowed()` before every
+    CHUNK_SIZE bytes.  In BASELINE mode (no PhaseMonitor), it flushes greedily,
+    reproducing the contention scenario shown in the "Killer Graph".
+"""
+
+import os
+import queue
+import shutil
+import threading
+import logging
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+import torch
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+@dataclass
+class _FlushJob:
+    """Internal queue item: one pending checkpoint flush."""
+    local_path:   str
+    remote_path:  str
+    step:         int
+    rank:         int
+    size_bytes:   int
+    enqueue_time: float = field(default_factory=time.perf_counter)
+
+
+# ---------------------------------------------------------------------------
+class CheckpointManager:
+    """
+    TEMPO Checkpoint Manager.
+
+    Parameters
+    ----------
+    local_nvme_dir : str
+        Root directory on local NVMe (e.g. /tmp/tempo_ckpts).
+        A per-rank subdirectory is created automatically.
+    lustre_dir : str or None
+        Destination directory on Lustre ($PSCRATCH/...).
+        If None, checkpoints are kept on local NVMe only (no flush).
+    rank : int
+        Current process rank.
+    world_size : int
+        Total number of ranks (used for logging only).
+    max_pending : int
+        Maximum number of unflused checkpoints before save_async() drops jobs.
+    flush_chunk_bytes : int
+        Number of bytes written per flush iteration.  Smaller = finer-grained
+        throttling response to NCCL phase changes; larger = higher throughput.
+    phase_monitor : PhaseMonitor or None
+        If provided, the flush thread pauses during NCCL phases.
+        If None, the flush is greedy (reproduces "Contention" baseline).
+    """
+
+    DEFAULT_CHUNK = 256 * 1024 * 1024   # 256 MB
+
+    def __init__(
+        self,
+        local_nvme_dir: str        = "/tmp/tempo_ckpts",
+        lustre_dir:     Optional[str] = None,
+        rank:           int        = 0,
+        world_size:     int        = 1,
+        max_pending:    int        = 3,
+        flush_chunk_bytes: int     = DEFAULT_CHUNK,
+        phase_monitor              = None,
+    ):
+        self.rank        = rank
+        self.world_size  = world_size
+        self.max_pending = max_pending
+        self.chunk_bytes = flush_chunk_bytes
+        self.phase_monitor = phase_monitor
+
+        self.local_dir  = Path(local_nvme_dir) / f"rank{rank}"
+        self.lustre_dir = Path(lustre_dir) if lustre_dir else None
+
+        self.local_dir.mkdir(parents=True, exist_ok=True)
+        if self.lustre_dir:
+            self.lustre_dir.mkdir(parents=True, exist_ok=True)
+
+        self._queue: queue.Queue = queue.Queue(maxsize=max_pending)
+        self._stop  = threading.Event()
+
+        # Statistics (protected by _stats_lock)
+        self._stats_lock   = threading.Lock()
+        self._bytes_local  = 0    # total written to local NVMe
+        self._bytes_lustre = 0    # total flushed to Lustre
+        self._bytes_pending= 0    # queued but not yet flushed
+        self._flush_count  = 0
+        self._throttle_waits = 0  # times flush thread paused for NCCL
+
+        self._flush_thread = threading.Thread(
+            target=self._flush_worker,
+            name=f"TEMPO-Flush-Rank{rank}",
+            daemon=True,
+        )
+        self._flush_thread.start()
+        logger.info(f"[CkptMgr] Rank {rank}: local={self.local_dir}  "
+                    f"lustre={self.lustre_dir}  chunk={flush_chunk_bytes//1024//1024}MB")
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def save_async(
+        self,
+        state_dict:  dict,
+        step:        int,
+        metadata:    Optional[dict] = None,
+    ) -> str:
+        """
+        Write checkpoint to local NVMe.  Returns immediately after the local
+        write completes (typical latency: 200–500 ms for an 8B model shard).
+        Enqueues the file for background flush to Lustre.
+
+        Returns the local file path.
+        """
+        fname      = f"step_{step:07d}_rank{self.rank}.pt"
+        local_path = self.local_dir / fname
+
+        t0 = time.perf_counter()
+        torch.save({"state_dict": state_dict,
+                    "step": step,
+                    "rank": self.rank,
+                    "metadata": metadata or {}},
+                   str(local_path))
+        local_ms   = (time.perf_counter() - t0) * 1e3
+        size_bytes = local_path.stat().st_size
+
+        with self._stats_lock:
+            self._bytes_local += size_bytes
+
+        logger.info(f"[CkptMgr] Step {step}: saved locally "
+                    f"({size_bytes/1e9:.2f} GB in {local_ms:.0f} ms)")
+
+        # Enqueue flush job
+        if self.lustre_dir is not None:
+            job = _FlushJob(
+                local_path  = str(local_path),
+                remote_path = str(self.lustre_dir / fname),
+                step        = step,
+                rank        = self.rank,
+                size_bytes  = size_bytes,
+            )
+            try:
+                self._queue.put_nowait(job)
+                with self._stats_lock:
+                    self._bytes_pending += size_bytes
+            except queue.Full:
+                logger.warning(f"[CkptMgr] Flush queue full — dropping step {step}. "
+                               "Increase max_pending or reduce checkpoint frequency.")
+
+        return str(local_path)
+
+    def save_sync_lustre(self, state_dict: dict, step: int,
+                         metadata: Optional[dict] = None) -> str:
+        """
+        BASELINE (greedy) mode: save directly to Lustre, blocking the caller.
+        Used to reproduce the contention scenario.
+        """
+        if self.lustre_dir is None:
+            raise ValueError("lustre_dir must be set for save_sync_lustre()")
+
+        fname       = f"step_{step:07d}_rank{self.rank}.pt"
+        lustre_path = self.lustre_dir / fname
+
+        t0 = time.perf_counter()
+        torch.save({"state_dict": state_dict,
+                    "step": step,
+                    "rank": self.rank,
+                    "metadata": metadata or {}},
+                   str(lustre_path))
+        elapsed = time.perf_counter() - t0
+        size_bytes = lustre_path.stat().st_size
+
+        with self._stats_lock:
+            self._bytes_lustre += size_bytes
+            self._flush_count += 1
+
+        logger.info(f"[CkptMgr GREEDY] Step {step}: flushed directly to Lustre "
+                    f"({size_bytes/1e9:.2f} GB in {elapsed:.2f} s, "
+                    f"{size_bytes/elapsed/1e9:.2f} GB/s)")
+        return str(lustre_path)
+
+    def wait_for_all_flushes(self, timeout: float = 600.0) -> None:
+        """Block until all queued checkpoints have been flushed to Lustre."""
+        self._queue.join()
+
+    def get_stats(self) -> dict:
+        with self._stats_lock:
+            return {
+                "bytes_local_GB":    round(self._bytes_local   / 1e9, 3),
+                "bytes_lustre_GB":   round(self._bytes_lustre  / 1e9, 3),
+                "bytes_pending_GB":  round(self._bytes_pending / 1e9, 3),
+                "flush_count":       self._flush_count,
+                "throttle_waits":    self._throttle_waits,
+            }
+
+    def shutdown(self, wait: bool = True) -> None:
+        """Signal flush thread to exit; optionally wait for it."""
+        self._stop.set()
+        if wait:
+            self._flush_thread.join(timeout=30.0)
+        logger.info(f"[CkptMgr] Rank {self.rank}: shutdown. stats={self.get_stats()}")
+
+    # ------------------------------------------------------------------
+    # Background flush worker
+    # ------------------------------------------------------------------
+
+    def _flush_worker(self) -> None:
+        logger.info(f"[CkptMgr Flush] Rank {self.rank}: flush thread started")
+        while not self._stop.is_set():
+            try:
+                job: _FlushJob = self._queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            try:
+                self._do_flush(job)
+            except Exception as exc:
+                logger.error(f"[CkptMgr Flush] Rank {self.rank}: "
+                             f"error flushing step {job.step}: {exc}")
+            finally:
+                self._queue.task_done()
+        logger.info(f"[CkptMgr Flush] Rank {self.rank}: flush thread stopped")
+
+    def _do_flush(self, job: _FlushJob) -> None:
+        """
+        Copy job.local_path → job.remote_path in chunks, pausing
+        before each chunk if an NCCL collective is active.
+        Atomically renames .tmp → final path on completion.
+        """
+        src = Path(job.local_path)
+        dst = Path(job.remote_path)
+
+        if not src.exists():
+            logger.warning(f"[CkptMgr Flush] Source missing: {src}")
+            with self._stats_lock:
+                self._bytes_pending -= job.size_bytes
+            return
+
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        tmp_dst = dst.with_suffix(".tmp")
+
+        t0 = time.perf_counter()
+        bytes_copied = 0
+
+        with open(str(src), "rb") as fsrc, open(str(tmp_dst), "wb") as fdst:
+            while True:
+                # --- TEMPO pacing gate ---
+                if self.phase_monitor is not None:
+                    while not self.phase_monitor.wait_for_io_allowed(timeout=0.02):
+                        with self._stats_lock:
+                            self._throttle_waits += 1
+                        if self._stop.is_set():
+                            return
+
+                chunk = fsrc.read(self.chunk_bytes)
+                if not chunk:
+                    break
+                fdst.write(chunk)
+                bytes_copied += len(chunk)
+
+        # Atomic replace
+        tmp_dst.rename(dst)
+
+        elapsed    = time.perf_counter() - t0
+        flush_bw   = bytes_copied / elapsed / 1e9
+
+        with self._stats_lock:
+            self._bytes_lustre  += bytes_copied
+            self._bytes_pending -= job.size_bytes
+            self._flush_count   += 1
+
+        logger.info(f"[CkptMgr Flush] Step {job.step}: Lustre flush done "
+                    f"({bytes_copied/1e9:.2f} GB, {elapsed:.2f} s, {flush_bw:.2f} GB/s)")
+
+        # Remove local copy after successful flush
+        src.unlink(missing_ok=True)
