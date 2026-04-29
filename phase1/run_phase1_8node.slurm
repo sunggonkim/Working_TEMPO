@@ -35,12 +35,12 @@ export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_PORT=29500
 export WORLD_SIZE=$(( SLURM_NNODES * 4 ))
 
-# Slingshot 11 — stable settings
+# Slingshot 11 — minimal stable settings (same as 2-node run)
+# Fix NCCL plugin API mismatch: use 2.29.2-cu13 plugin instead of module's 2.24.3
+export LD_LIBRARY_PATH=/global/common/software/nersc9/nccl/2.29.2-cu13/plugin/lib:/global/common/software/nersc9/nccl/2.29.2-cu13/lib:${LD_LIBRARY_PATH}
 export FI_CXI_ATS=0
-export FI_MR_CACHE_MONITOR=disabled
 export NCCL_NET_GDR_LEVEL=0
 export NCCL_CROSS_NIC=1
-export NCCL_SOCKET_IFNAME=hsn
 export NCCL_DEBUG=WARN
 
 export NUMA_NODE_FOR_IO=0
@@ -77,6 +77,7 @@ echo ""
 echo "--- Run 2: CONTENTION (all 8 nodes under I/O stress) ---"
 
 srun \
+    --overlap \
     --ntasks-per-node=1 \
     --cpu-bind=map_cpu:0 \
     --export=ALL,NUMA_NODE=${NUMA_NODE_FOR_IO},IO_SIZE=8g,BLOCK_SIZE=4m,NUM_JOBS=8,RUNTIME=300,DUMMY_SIZE_MB=2048,LOG_DIR=logs \
@@ -88,6 +89,7 @@ echo "Waiting 5s for I/O to reach steady state..."
 sleep 5
 
 srun \
+    --overlap \
     --ntasks-per-node=4 \
     --cpu-bind=cores \
     python phase1/train_llm_profiling.py \

@@ -54,15 +54,15 @@ export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_PORT=29500
 export WORLD_SIZE=$(( SLURM_NNODES * 4 ))   # 4 GPUs per node
 
-# Perlmutter Slingshot 11 NIC — required NCCL/libfabric settings
-# Reference: https://docs.nersc.gov/development/languages/python/using-python-perlmutter/#pytorch
-export FI_CXI_ATS=0                          # Disable Address Translation Services (required for Slingshot)
-export FI_MR_CACHE_MONITOR=disabled          # Fix: OFI MR cache causes GDR registration EFAULT on NCCL 2.27
-export NCCL_NET_GDR_LEVEL=0                  # Disable GPU Direct RDMA (GDR registration fails on current libfabric)
-                                             # NOTE: this does NOT affect contention measurement —
-                                             #   both baseline and contention use CPU-mediated transfers equally.
-export NCCL_CROSS_NIC=1                      # Allow NIC crossover for large messages
-export NCCL_SOCKET_IFNAME=hsn                # Use Slingshot (hsn) NIC explicitly
+# Perlmutter Slingshot 11 NIC — NCCL/libfabric settings
+# pytorch/2.8.0 has NCCL 2.28.9 built-in; module sets NCCL_NET=AWS Libfabric
+# but LD_LIBRARY_PATH points to NCCL 2.24.3 plugin (API mismatch → "Failed to initialize any NET plugin").
+# Fix: override LD_LIBRARY_PATH to use NCCL 2.29.2-cu13 plugin (compatible with 2.28.x API).
+export LD_LIBRARY_PATH=/global/common/software/nersc9/nccl/2.29.2-cu13/plugin/lib:/global/common/software/nersc9/nccl/2.29.2-cu13/lib:${LD_LIBRARY_PATH}
+export FI_CXI_ATS=0                          # Required: Disable Address Translation Services for Slingshot
+export NCCL_NET_GDR_LEVEL=0                  # Disable GPU Direct RDMA — avoids OFI MR registration EFAULT
+                                             # (GDR_LEVEL=3 caused Bad address RC:-14 on NCCL 2.28)
+export NCCL_CROSS_NIC=1                      # Allow NIC crossover for large All-Reduce messages
 export NCCL_DEBUG=WARN
 
 # NUMA pinning for MAXIMUM PCIe contention:
@@ -111,6 +111,7 @@ echo ""
 echo "--- Run 2: CONTENTION (with background I/O stress) ---"
 
 srun \
+    --overlap \
     --ntasks-per-node=1 \
     --cpu-bind=map_cpu:0 \
     --export=ALL,NUMA_NODE=${NUMA_NODE_FOR_IO},IO_SIZE=8g,BLOCK_SIZE=4m,NUM_JOBS=8,RUNTIME=300,DUMMY_SIZE_MB=2048,LOG_DIR=logs \
@@ -123,6 +124,7 @@ echo "Waiting 5s for I/O to reach PCIe saturation..."
 sleep 5
 
 srun \
+    --overlap \
     --ntasks-per-node=4 \
     --cpu-bind=cores \
     python phase1/train_llm_profiling.py \

@@ -154,16 +154,21 @@ async def run_experiment(args: argparse.Namespace) -> None:
     print(f"         tensor_parallel   = {args.tp}", flush=True)
     print(f"         concurrency       = {args.concurrency}", flush=True)
 
-    engine_args = AsyncEngineArgs(
+    import inspect as _inspect
+    _valid_params = set(_inspect.signature(AsyncEngineArgs.__init__).parameters)
+
+    _candidate_kwargs = dict(
         model=args.model,
         tensor_parallel_size=args.tp,
         gpu_memory_utilization=args.gpu_util,
-        swap_space=args.swap_space_gb,      # GiB of CPU swap — enables CPU offload path
         max_num_seqs=args.concurrency,
         max_model_len=args.max_model_len,
+        swap_space=args.swap_space_gb,      # GiB of CPU swap — may not exist in new vLLM
         disable_log_requests=True,
         enable_chunked_prefill=True,        # mix prefill+decode → more contention
     )
+    engine_kwargs = {k: v for k, v in _candidate_kwargs.items() if k in _valid_params}
+    engine_args = AsyncEngineArgs(**engine_kwargs)
     engine = AsyncLLMEngine.from_engine_args(engine_args)
 
     sampling_params = SamplingParams(

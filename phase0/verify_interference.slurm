@@ -36,7 +36,8 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 module load pytorch/2.8.0
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="${SLURM_SUBMIT_DIR:-/pscratch/sd/s/sgkim/Skim-Tempo}"
+[[ "$(basename "$REPO_DIR")" == "phase0" ]] && REPO_DIR="$(dirname "$REPO_DIR")"
 cd "$REPO_DIR"
 
 export PHASE0_OUTPUT="${REPO_DIR}/results/phase0"
@@ -73,7 +74,7 @@ export SHAREGPT_PATH
 # Model selection
 # ---------------------------------------------------------------------------
 # Use a smaller model for quick verification; swap to 13B/70B for paper-quality results
-MODEL="${TEMPO_MODEL:-meta-llama/Llama-2-7b-hf}"
+MODEL="${TEMPO_MODEL:-facebook/opt-6.7b}"
 echo "[PHASE0] Model: ${MODEL}"
 
 # Tensor parallel = number of GPUs (all 4 A100s)
