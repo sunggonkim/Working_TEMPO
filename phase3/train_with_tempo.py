@@ -236,7 +236,7 @@ def main():
     comm_state = _TimedCommState(
         world_size    = world_size,
         phase_monitor = tempo.phase_monitor if args.mode == "tempo" else None,
-        process_group = model.process_group,
+        process_group = None,   # None = default process group (dist.group.WORLD)
     )
     model.register_comm_hook(comm_state, timed_pacing_hook)
 
