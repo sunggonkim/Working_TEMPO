@@ -25,6 +25,10 @@ set -euo pipefail
 
 # ---------- Environment -----------------------------------------------------
 module load pytorch/2.8.0
+export FI_CXI_DISABLE_HMEM_MODES=1
+export NCCL_DEBUG=WARN
+export NCCL_NET_GDR_LEVEL=2
+export NCCL_SOCKET_IFNAME=hsn
 
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)
 export MASTER_PORT=29600

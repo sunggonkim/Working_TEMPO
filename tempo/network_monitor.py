@@ -333,3 +333,291 @@ class NetworkMonitor:
             time.sleep(self.poll_interval_s)
 
         logger.debug("[NetworkMonitor] poll loop stopped")
+
+
+# ============================================================================
+# CassiniHWCounters — HPE Slingshot-11 Cassini NIC Performance Counters
+# ============================================================================
+#
+# HPE Slingshot-11 (Cassini ASIC) exposes per-NIC hardware performance
+# counters via sysfs at:
+#   /sys/class/net/hsn{n}/device/
+#   /sys/bus/cxi/devices/cxi{n}/ports/p1/
+#
+# The counters relevant to TEMPO routing decisions are:
+#
+#   CxiCongestion       — number of NACK/ECN congestion signals received
+#                         from the fabric in the last polling window.
+#                         Non-zero → global links are saturated.
+#
+#   CxiLinkReliability  — raw retransmit count.  >0 indicates fabric stress.
+#
+#   CxiHWMark           — High-watermark counter for the FLIT buffer.
+#                         Near-full (>90%) means the NIC's inbound queue is
+#                         backing up — a leading indicator of congestion.
+#
+#   tx_stall_ns         — Nanoseconds the NIC TX engine was stalled waiting
+#                         for fabric credits.  >0 is the first symptom of
+#                         global link pressure.
+#
+# Sysfs path convention (varies by Cassini firmware version):
+#   /sys/bus/cxi/devices/cxi{n}/stats/
+#   /sys/class/net/hsn{n}/device/infiniband/... (Mellanox-style symlink)
+#
+# libfabric telemetry alternative:
+#   fi_cxi provider exposes per-CQ stats via fi_getopt(FI_OPT_CXI_*).
+#   We do NOT use the libfabric path here because it requires the process
+#   to have an open endpoint, which conflicts with background monitor
+#   threads.  The sysfs path is read-only and available to any UID.
+#
+# Perlmutter firmware note (as of 2025Q4):
+#   Cassini firmware >= 2.3.0 exposes additional congestion counters under
+#   /sys/bus/cxi/devices/cxi{n}/stats/flit_cntr/
+#   Earlier firmware only exposes tx/rx_bytes (handled by NetworkMonitor).
+#
+# OSDI artifact note:
+#   On Perlmutter nodes allocated via SLURM, we typically see 2 Cassini NICs
+#   (cxi0, cxi1) per node mapped to hsn0, hsn1.  Both should be monitored
+#   and their congestion counters OR'd.
+
+_CXI_SYSFS_ROOTS = [
+    "/sys/bus/cxi/devices/cxi{n}/stats",          # Cassini >= 2.3.0
+    "/sys/class/net/hsn{n}/device/stats",          # symlink fallback
+]
+
+_CASSINI_COUNTERS = {
+    # counter_name           : (sysfs_subpath, scale_factor, description)
+    "congestion_flits":       ("flit_cntr/congestion",    1,   "NACK/ECN flit count"),
+    "reliability_retx":       ("link/reliability_retx",   1,   "retransmit count"),
+    "tx_stall_ns":            ("performance/tx_stall_ns", 1,   "TX stall time (ns)"),
+    "hwmark_pct":             ("buffer/hwmark_pct",       0.01, "HW buffer watermark %"),
+}
+
+
+def _read_cassini_counter(cxi_idx: int, subpath: str) -> Optional[int]:
+    """
+    Attempt to read a Cassini hardware counter for NIC cxi{cxi_idx}.
+    Tries all known sysfs root patterns in order.  Returns None if not
+    accessible (no Cassini firmware, no permission, or older kernel).
+    """
+    for root_tmpl in _CXI_SYSFS_ROOTS:
+        root = root_tmpl.format(n=cxi_idx)
+        full = os.path.join(root, subpath)
+        val  = _read_sysfs_counter(full)
+        if val is not None:
+            return val
+    return None
+
+
+class CassiniHWCounters:
+    """
+    Reader for HPE Slingshot-11 (Cassini ASIC) hardware performance counters.
+
+    This is the ground-truth congestion signal for TEMPO's TopologyRouter.
+    When CxiCongestion > 0 (even a single NACK from the fabric), the
+    TopologyRouter should immediately switch from LUSTRE_REMOTE to
+    LUSTRE_LOCAL or DEFERRED placement to stop injecting traffic into the
+    already-saturated global links.
+
+    Parameters
+    ----------
+    n_nics : int
+        Number of Cassini NICs to monitor (default: auto-detect up to 4).
+    poll_interval_s : float
+        How often to refresh the counters (default 10 ms — counters are
+        monotonically increasing so we diff them between polls).
+    congestion_threshold : int
+        Number of new congestion flits per polling interval that triggers
+        the congestion flag (default 1 — any congestion is flagged).
+
+    Usage
+    -----
+        hw = CassiniHWCounters()
+        hw.start()
+        ...
+        if hw.is_fabric_congested():
+            router.set_global_link_saturated(True)
+        stats = hw.get_stats()
+        hw.stop()
+    """
+
+    def __init__(
+        self,
+        n_nics:               int   = 0,    # 0 = auto-detect
+        poll_interval_s:      float = 0.010,
+        congestion_threshold: int   = 1,
+    ) -> None:
+        self.poll_interval_s      = poll_interval_s
+        self.congestion_threshold = congestion_threshold
+
+        # Auto-detect CXI device count
+        if n_nics == 0:
+            n_nics = self._detect_cxi_count()
+        self.n_nics = n_nics
+
+        self._available = (n_nics > 0)
+        if not self._available:
+            logger.warning(
+                "[CassiniHWCounters] No CXI devices found under /sys/bus/cxi/. "
+                "Hardware congestion counters unavailable — routing will rely "
+                "on sysfs BW counters only (NetworkMonitor)."
+            )
+        else:
+            logger.info(
+                "[CassiniHWCounters] Found %d CXI NIC(s). "
+                "Monitoring Cassini hardware congestion counters.", n_nics
+            )
+
+        # Per-NIC previous counter values (for delta computation)
+        self._prev: Dict[int, Dict[str, int]] = {
+            i: {k: 0 for k in _CASSINI_COUNTERS} for i in range(n_nics)
+        }
+        # Per-NIC deltas (counts in last interval)
+        self._delta: Dict[int, Dict[str, int]] = {
+            i: {k: 0 for k in _CASSINI_COUNTERS} for i in range(n_nics)
+        }
+
+        self._congested    = False
+        self._lock         = threading.Lock()
+        self._stop_evt     = threading.Event()
+        self._thread:       Optional[threading.Thread] = None
+
+        # Cumulative stats
+        self._total_congestion_events = 0
+        self._total_retx              = 0
+        self._total_stall_ns          = 0
+
+    # ----------------------------------------------------------------
+    # Lifecycle
+    # ----------------------------------------------------------------
+
+    def start(self) -> "CassiniHWCounters":
+        """Start the background counter-polling thread."""
+        if not self._available:
+            return self
+        self._stop_evt.clear()
+        self._thread = threading.Thread(
+            target=self._poll_loop,
+            name="cassini-hw-ctr",
+            daemon=True,
+        )
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        """Stop the background polling thread."""
+        self._stop_evt.set()
+        if self._thread:
+            self._thread.join(timeout=2)
+
+    # ----------------------------------------------------------------
+    # Public queries
+    # ----------------------------------------------------------------
+
+    def is_fabric_congested(self) -> bool:
+        """
+        Return True if ANY Cassini NIC reported congestion in the last
+        polling interval.
+
+        This is the authoritative signal for TopologyRouter to stop using
+        global Dragonfly links.  Unlike sysfs BW counters (which are
+        reactive), CxiCongestion is a *proactive* signal — the fabric
+        ECN/NACK mechanism fires before the link is fully saturated.
+        """
+        with self._lock:
+            return self._congested
+
+    def congestion_flit_rate(self) -> float:
+        """
+        Return total congestion flit count per second across all NICs
+        (averaged over the last polling interval).
+        """
+        with self._lock:
+            total = sum(
+                self._delta[i].get("congestion_flits", 0)
+                for i in range(self.n_nics)
+            )
+        return total / max(1e-6, self.poll_interval_s)
+
+    def retransmit_rate(self) -> float:
+        """Return retransmit events per second (leading indicator of link stress)."""
+        with self._lock:
+            total = sum(
+                self._delta[i].get("reliability_retx", 0)
+                for i in range(self.n_nics)
+            )
+        return total / max(1e-6, self.poll_interval_s)
+
+    def get_stats(self) -> dict:
+        """Return a snapshot of all hardware counter statistics."""
+        with self._lock:
+            deltas = {
+                f"cxi{i}": dict(self._delta[i])
+                for i in range(self.n_nics)
+            }
+        return {
+            "available":                  self._available,
+            "n_nics":                     self.n_nics,
+            "congested":                  self._congested,
+            "total_congestion_events":    self._total_congestion_events,
+            "total_retx":                 self._total_retx,
+            "total_stall_ns":             self._total_stall_ns,
+            "per_nic_deltas":             deltas,
+            "congestion_flit_rate":       self.congestion_flit_rate(),
+            "retransmit_rate":            self.retransmit_rate(),
+        }
+
+    # ----------------------------------------------------------------
+    # Private helpers
+    # ----------------------------------------------------------------
+
+    @staticmethod
+    def _detect_cxi_count() -> int:
+        """Count available /sys/bus/cxi/devices/cxi{n} entries."""
+        base = Path("/sys/bus/cxi/devices")
+        if not base.exists():
+            return 0
+        return sum(1 for d in base.iterdir()
+                   if d.name.startswith("cxi") and d.name[3:].isdigit())
+
+    def _read_nic_counters(self, cxi_idx: int) -> Dict[str, int]:
+        """Read all tracked counters for one NIC; return 0 for unavailable ones."""
+        result = {}
+        for name, (subpath, _scale, _desc) in _CASSINI_COUNTERS.items():
+            val = _read_cassini_counter(cxi_idx, subpath)
+            result[name] = val if val is not None else self._prev[cxi_idx].get(name, 0)
+        return result
+
+    def _poll_loop(self) -> None:
+        """Background thread: read hardware counters, compute deltas."""
+        # Initialise previous values
+        for i in range(self.n_nics):
+            self._prev[i] = self._read_nic_counters(i)
+
+        while not self._stop_evt.is_set():
+            time.sleep(self.poll_interval_s)
+            total_congestion_flits = 0
+
+            with self._lock:
+                for i in range(self.n_nics):
+                    curr = self._read_nic_counters(i)
+                    for name in _CASSINI_COUNTERS:
+                        delta = max(0, curr.get(name, 0) - self._prev[i].get(name, 0))
+                        self._delta[i][name] = delta
+                        if name == "congestion_flits":
+                            total_congestion_flits += delta
+                        elif name == "reliability_retx":
+                            self._total_retx += delta
+                        elif name == "tx_stall_ns":
+                            self._total_stall_ns += delta
+                    self._prev[i] = curr
+
+                new_congested = total_congestion_flits >= self.congestion_threshold
+                if new_congested and not self._congested:
+                    self._total_congestion_events += 1
+                    logger.debug(
+                        "[CassiniHW] Fabric congestion detected: "
+                        "%d congestion flits across %d NICs",
+                        total_congestion_flits, self.n_nics,
+                    )
+                self._congested = new_congested

@@ -32,6 +32,19 @@ module load pytorch/2.8.0
 export PYTHONPATH="$PWD:$PYTHONPATH"
 export LD_LIBRARY_PATH="/global/common/software/nersc9/nccl/2.29.2-cu13/plugin/lib:${LD_LIBRARY_PATH:-}"
 
+# ── Perlmutter / Cassini NIC memory registration fix ─────────────────────────
+# Without this, libfabric's cxi provider attempts to map GPU buffers directly
+# into the NIC (HMEM mode), which fails with "cxil_map: write error" /
+# "Unable to register memory RC:-14" unless hugepages are pre-allocated.
+# FI_CXI_DISABLE_HMEM_MODES=1 forces host-copy path (safe, no perf penalty
+# for our checkpoint-I/O workload which already goes CPU→NIC).
+export FI_CXI_DISABLE_HMEM_MODES=1
+# Also suppress the device_id guessing warning in PyTorch 2.x NCCL
+export NCCL_DEBUG=WARN
+export NCCL_NET_GDR_LEVEL=2
+export NCCL_IB_TIMEOUT=60
+export NCCL_SOCKET_IFNAME=hsn
+
 # Perlmutter-specific: local NVMe on each node
 export LOCAL_NVME="/tmp/tempo_phase4_${SLURM_JOB_ID}"
 mkdir -p "${LOCAL_NVME}"

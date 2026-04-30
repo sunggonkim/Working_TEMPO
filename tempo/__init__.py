@@ -46,7 +46,7 @@ Usage:
 from tempo.phase_monitor import PhaseMonitor, TrainingPhase
 from tempo.checkpoint_manager import CheckpointManager
 from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2, TEMPOSchedulerV3, TEMPOSchedulerV4
-from tempo.network_monitor import NetworkMonitor
+from tempo.network_monitor import NetworkMonitor, CassiniHWCounters
 from tempo.service_gain import ServiceGainScheduler, TokenBucket, FlushPriority
 from tempo.interleaving_engine import InterleavingEngine, PhaseDurationPredictor
 from tempo.topology_router import TopologyRouter, PlacementDecision, PlacementTier
@@ -54,6 +54,7 @@ from tempo.qos_mapper import QoSMapper, TC, TrafficClass
 from tempo.sparse_transfer import SparseTransferFilter, SparseKVBlock
 from tempo.p2p_cache import P2PCacheStore
 from tempo.nano_overlap import NanoOverlapController, LayerTiming, StepMetrics
+from tempo.trace_loader import TraceLoader, Request, TraceStats
 
 __version__ = "0.4.0"
 __all__ = [
@@ -73,4 +74,7 @@ __all__ = [
     "SparseTransferFilter", "SparseKVBlock",
     "P2PCacheStore",
     "NanoOverlapController", "LayerTiming", "StepMetrics",
+    # Real hardware + workload (OSDI AE requirements)
+    "CassiniHWCounters",
+    "TraceLoader", "Request", "TraceStats",
 ]

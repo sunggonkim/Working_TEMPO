@@ -13,6 +13,10 @@
 set -euo pipefail
 
 module load pytorch/2.8.0
+export FI_CXI_DISABLE_HMEM_MODES=1
+export NCCL_DEBUG=WARN
+export NCCL_NET_GDR_LEVEL=2
+export NCCL_SOCKET_IFNAME=hsn
 
 export LD_LIBRARY_PATH="/global/common/software/nersc9/nccl/2.29.2-cu13/plugin/lib:${LD_LIBRARY_PATH:-}"
 export NCCL_DEBUG=WARN

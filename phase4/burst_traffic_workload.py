@@ -57,6 +57,7 @@ from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from tempo import TEMPOScheduler, TEMPOSchedulerV2
 from tempo.phase_monitor import PhaseMonitor
+from tempo.trace_loader import TraceLoader
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,7 +83,10 @@ def parse_args():
     p.add_argument("--batch-size",  type=int, default=1)
     p.add_argument("--seq-len",     type=int, default=2048)
     p.add_argument("--burst-rate",  type=float, default=3.0,
-                   help="Pareto burst scale (higher = more bursty traffic)")
+                   help="Pareto burst scale (ignored when --trace-path given)")
+    p.add_argument("--trace-path",  type=str, default=None,
+                   help="Path to BurstGPT CSV (e.g. data/traces/gpt_3.5_turbo.csv). "
+                        "If omitted, falls back to synthetic BurstGPT-calibrated generator.")
     p.add_argument("--slo-itl-ms",  type=float, default=200.0,
                    help="ITL SLO threshold in ms (default 200 ms)")
     p.add_argument("--output-dir",  type=str, default="results/phase4")
@@ -107,9 +111,11 @@ def init_dist():
     os.environ.setdefault("MASTER_PORT", "29501")
     num_gpus   = torch.cuda.device_count()
     cuda_local = local_rank if local_rank < num_gpus else 0
+    device = torch.device(f"cuda:{cuda_local}")
     torch.cuda.set_device(cuda_local)
     dist.init_process_group(backend="nccl", init_method="env://",
-                            rank=rank, world_size=world_size)
+                            rank=rank, world_size=world_size,
+                            device_id=device)
     return rank, cuda_local, world_size
 
 
@@ -177,65 +183,76 @@ import functools
 
 
 # ============================================================================
-# BurstGPT Traffic Generator
+# BurstGPT Traffic Wrapper (uses tempo.TraceLoader for real traces)
 # ============================================================================
 
 class BurstGPTWorkload:
     """
-    Generates BurstGPT-faithful token arrival events.
+    Replays real BurstGPT arrival times and response lengths.
 
-    Models:
-      - Inter-arrival times: Pareto distribution (α=1.2, realistic burst)
-      - Response lengths: log-normal (μ=5.5, σ=1.2) tokens
-      - KV eviction events: triggered when GPU VRAM > threshold
+    When ``trace_path`` is supplied, loads a real BurstGPT CSV via
+    ``tempo.TraceLoader``.  Otherwise falls back to the synthetic
+    calibrated generator built into TraceLoader (emits WARNING in logs).
 
-    Each event produces a simulated ITL (inter-token latency) that represents
-    the delay experienced by a real serving request.
+    IAT → ITL mapping:
+      Short IATs (burst) → high nic_util_pct → higher ITL penalty.
+      Long IATs (slack)  → low  nic_util_pct → near-baseline ITL.
     """
 
-    def __init__(self, burst_rate: float = 3.0, rng_seed: int = 42):
-        self._rng        = np.random.default_rng(rng_seed)
-        self._burst_rate = burst_rate        # Pareto scale parameter
-        self._alpha      = 1.2               # Pareto shape (heavy tail)
-        self._queue: List[float] = []        # pending token generation times
-        self._base_itl_ms = 15.0             # baseline ITL under no contention
+    def __init__(
+        self,
+        trace_path:   Optional[str] = None,
+        n_requests:   int           = 2000,
+        burst_rate:   float         = 3.0,
+        rng_seed:     int           = 42,
+    ):
+        loader = TraceLoader(
+            trace_path   = trace_path,
+            trace_type   = "burstgpt" if trace_path else "synthetic",
+            burst_rate   = burst_rate,
+            rng_seed     = rng_seed,
+        )
+        requests = loader.load(n_requests=n_requests)
+        stats    = loader.statistics()
+        log.info(
+            "BurstGPTWorkload: loaded %d requests  mean_rps=%.1f "
+            "peak_rps=%.1f burst_ratio=%.2f cv_iat=%.2f",
+            stats.n_requests, stats.mean_rps, stats.peak_rps,
+            stats.burst_ratio, stats.cv_iat,
+        )
+        self._iats: List[float] = loader.inter_arrival_times()
+        self._cursor  = 0
+        self._rng     = np.random.default_rng(rng_seed)
+        self._base_itl_ms = 15.0   # baseline ITL under no contention
 
     def next_arrival(self) -> float:
-        """Sample next inter-arrival time (ms)."""
-        u = self._rng.uniform()
-        # Pareto quantile: t = scale * (1-u)^{-1/α}
-        return self._burst_rate * (1.0 - u) ** (-1.0 / self._alpha) * 1.0
-
-    def sample_response_length(self) -> int:
-        """Sample response length (tokens) from log-normal."""
-        return max(1, int(self._rng.lognormal(5.5, 1.2)))
+        """Return next inter-arrival time (ms), cycling through the trace."""
+        if not self._iats:
+            return 50.0
+        iat_s = self._iats[self._cursor % len(self._iats)]
+        self._cursor += 1
+        return iat_s * 1000.0   # seconds → ms
 
     def simulate_itl(
         self,
-        io_active: bool,
+        io_active:    bool,
         nic_util_pct: float,
-        nccl_bw_gbs: float,
-        base_bw_gbs: float = 8.0,
+        nccl_bw_gbs:  float,
+        base_bw_gbs:  float = 8.0,
     ) -> float:
         """
         Simulate inter-token latency given current system state.
 
         Physics:
-          ITL = base_itl × (1 + io_penalty) × (1 + nic_penalty)
-          io_penalty:  if I/O is flushing, PCIe contention adds ~40% ITL
-          nic_penalty: if NIC is saturated, NCCL stalls add proportional ITL
+          ITL = base_itl × (1 + io_penalty) × (1 + nic_penalty) × (1 + bw_penalty)
         """
         io_penalty  = 0.40 if io_active else 0.0
-        # NIC saturation penalty: at 100% util → +100% ITL (quadratic)
         nic_sat     = min(1.0, nic_util_pct / 100.0)
-        nic_penalty = nic_sat ** 2 * 1.0
-        # BW degradation penalty
+        nic_penalty = nic_sat ** 2
         bw_ratio    = max(0.1, nccl_bw_gbs / max(0.1, base_bw_gbs))
         bw_penalty  = max(0.0, 1.0 - bw_ratio)
-
         itl = self._base_itl_ms * (1 + io_penalty) * (1 + nic_penalty) * (1 + bw_penalty)
-        # Add Gaussian jitter ±10%
-        itl *= self._rng.normal(1.0, 0.1)
+        itl *= float(self._rng.normal(1.0, 0.1))
         return max(1.0, itl)
 
 
@@ -320,7 +337,11 @@ def main():
     model = build_model(args.model_size, device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
     tempo = build_tempo(args, rank, world_size, device)
-    workload = BurstGPTWorkload(burst_rate=args.burst_rate)
+    workload = BurstGPTWorkload(
+        trace_path  = args.trace_path,
+        n_requests  = max(500, args.num_steps * 4),
+        burst_rate  = args.burst_rate,
+    )
 
     # Register FSDP comm hook
     model.register_comm_hook(tempo.phase_monitor, PhaseMonitor.fsdp_comm_hook)

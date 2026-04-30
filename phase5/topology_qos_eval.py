@@ -308,10 +308,14 @@ def main() -> None:
     args = ap.parse_args()
 
     # ── Distributed init ────────────────────────────────────────────────
-    dist.init_process_group(backend="nccl")
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    _n_gpus    = torch.cuda.device_count()
+    cuda_local = local_rank if local_rank < _n_gpus else 0
+    device = torch.device(f"cuda:{cuda_local}")
+    torch.cuda.set_device(cuda_local)
+    dist.init_process_group(backend="nccl", device_id=device)
     rank       = dist.get_rank()
     world_size = dist.get_world_size()
-    torch.cuda.set_device(rank % torch.cuda.device_count())
 
     out_dir = Path(args.out) / args.exp / args.mode
 

@@ -168,9 +168,11 @@ def main():
     os.environ.setdefault("MASTER_PORT", "29502")
     num_gpus   = torch.cuda.device_count()
     cuda_local = local_rank if local_rank < num_gpus else 0
+    device = torch.device(f"cuda:{cuda_local}")
     torch.cuda.set_device(cuda_local)
     dist.init_process_group(backend="nccl", init_method="env://",
-                            rank=rank, world_size=world_size)
+                            rank=rank, world_size=world_size,
+                            device_id=device)
 
     logger = log(f"probe.r{rank}")
     out_dir = Path(args.output_dir)

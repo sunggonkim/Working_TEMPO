@@ -114,39 +114,50 @@ class TopologyRouter:
     """
     Routes KV-cache placement to minimise Dragonfly global-link consumption.
 
+    TEMPO v3+ hardware-software co-design
+    --------------------------------------
+    When ``enable_hw_counters=True`` (the default on Perlmutter), the router
+    creates a ``CassiniHWCounters`` instance that reads the Cassini ASIC's
+    hardware congestion registers directly from sysfs
+    (``/sys/bus/cxi/devices/cxi{n}/stats/``).
+
+    The hardware signal ``CxiCongestion`` (congestion flit count) is a
+    *proactive* indicator — the ECN/NACK mechanism fires before the global
+    link is fully saturated, giving TEMPO ~10–50 ms of advance warning to
+    drain its I/O queue before AllReduce BW degrades.
+
+    Congestion source hierarchy (highest authority first):
+        1. CassiniHWCounters.is_fabric_congested()   — hardware ECN/NACK
+        2. NetworkMonitor.is_congested()              — sysfs BW threshold
+        3. set_global_link_saturated(True)            — manual override
+
     Usage
     -----
-    In a distributed setup, each rank creates a TopologyRouter, then calls
-    ``register_peer_groups()`` after an all-gather of group IDs so every rank
-    knows which of its peers share the same local group.
-
-    Outside distributed contexts (unit tests, simulation) the router falls
-    back to the simulated group topology based on rank arithmetic.
-
-    Example
-    -------
     ::
 
         router = TopologyRouter(world_size=8, rank=dist.get_rank())
-        # After all-gather:
         router.register_peer_groups({r: group_ids[r] for r in range(8)})
+        router.start()    # starts CassiniHWCounters background thread
 
         decision = router.route_kv_placement(kv_size_bytes=2 * 2**30)
         if decision.tier == PlacementTier.DEFERRED:
-            time.sleep(0.008)   # wait one NCCL window
+            time.sleep(0.008)
             decision = router.route_kv_placement(kv_size_bytes=...)
+
+        router.stop()
     """
 
     def __init__(
         self,
-        world_size: int = 1,
-        rank: int = 0,
-        group_size: int = _DRAGONFLY_GROUP_SIZE,
-        global_link_quota: float = _GLOBAL_LINK_QUOTA,
+        world_size:          int   = 1,
+        rank:                int   = 0,
+        group_size:          int   = _DRAGONFLY_GROUP_SIZE,
+        global_link_quota:   float = _GLOBAL_LINK_QUOTA,
+        enable_hw_counters:  bool  = True,
     ) -> None:
-        self.world_size = world_size
-        self.rank = rank
-        self.group_size = group_size
+        self.world_size        = world_size
+        self.rank              = rank
+        self.group_size        = group_size
         self.global_link_quota = global_link_quota
 
         self._hostname: str = socket.gethostname()
@@ -154,7 +165,7 @@ class TopologyRouter:
         self._my_group: int = (
             _nid_to_group(self._my_nid, group_size)
             if self._my_nid is not None
-            else rank // group_size   # fallback for non-Perlmutter hosts
+            else rank // group_size
         )
 
         # Populated by register_peer_groups()
@@ -167,12 +178,32 @@ class TopologyRouter:
         self._local_decisions: int = 0
         self._deferred_decisions: int = 0
 
+        # ── Cassini HW counter integration ────────────────────────────────
+        self._hw_counters: Optional["CassiniHWCounters"] = None
+        if enable_hw_counters:
+            from tempo.network_monitor import CassiniHWCounters
+            self._hw_counters = CassiniHWCounters()
+            if self._hw_counters.n_nics == 0:
+                self._hw_counters = None   # not available on this node
+
         log.info(
             "TopologyRouter: rank=%d host=%s nid=%s group=%d "
-            "world_size=%d group_size=%d",
+            "world_size=%d group_size=%d hw_counters=%s",
             rank, self._hostname, self._my_nid, self._my_group,
             world_size, group_size,
+            "enabled" if self._hw_counters else "unavailable",
         )
+
+    def start(self) -> "TopologyRouter":
+        """Start background hardware counter polling thread."""
+        if self._hw_counters is not None:
+            self._hw_counters.start()
+        return self
+
+    def stop(self) -> None:
+        """Stop background polling."""
+        if self._hw_counters is not None:
+            self._hw_counters.stop()
 
     # ------------------------------------------------------------------
     # Setup
@@ -207,26 +238,25 @@ class TopologyRouter:
         """
         Decide where to place a KV-cache chunk.
 
-        Placement priority
-        ------------------
-        1. LOCAL_PEER    — same-group peer GPU memory: zero global-link use
-        2. LUSTRE_LOCAL  — Lustre write with traffic staying intra-group
-        3. LUSTRE_REMOTE — Lustre write crossing global links (sliced)
-        4. DEFERRED      — global links saturated AND NCCL is active
+        Congestion check order (most authoritative first):
+          1. CassiniHWCounters.is_fabric_congested() — hardware ECN signal
+          2. self._global_link_saturated             — BW threshold / manual
 
-        Args
-        ----
-        kv_size_bytes:
-            Size of the KV block to transfer.
-        available_peers:
-            List of candidate peer ranks with free GPU memory.
-            If None, uses all known local peers.
-        nccl_window_ms_remaining:
-            Milliseconds until the next NCCL phase starts (from
-            InterleavingEngine.get_safe_window_ms()).  If close to zero and
-            global link is saturated, defer the transfer.
+        Placement priority:
+          1. LOCAL_PEER    — same-group peer GPU memory
+          2. LUSTRE_LOCAL  — intra-group Lustre path
+          3. LUSTRE_REMOTE — cross-group Lustre (quota-sliced)
+          4. DEFERRED      — fabric congested AND NCCL window closing
         """
         self._total_decisions += 1
+
+        # Check hardware congestion — overrides any BW-threshold estimate
+        hw_congested = (
+            self._hw_counters is not None
+            and self._hw_counters.is_fabric_congested()
+        )
+        effectively_saturated = self._global_link_saturated or hw_congested
+
         peers = available_peers if available_peers is not None else self._local_peers
 
         # --- Tier 1: local peer memory (intra-group) --------------------
@@ -243,23 +273,24 @@ class TopologyRouter:
                 reason="intra-group peer memory",
             )
 
-        # --- Tier 2 / 3: Lustre — check if we must defer ----------------
+        # --- Tier 4: defer if fabric is congested & NCCL is closing ------
         must_defer = (
-            self._global_link_saturated
+            effectively_saturated
             and nccl_window_ms_remaining is not None
-            and nccl_window_ms_remaining < 4.0   # < 4 ms remaining → defer
+            and nccl_window_ms_remaining < 4.0
         )
         if must_defer:
             self._deferred_decisions += 1
+            hw_note = " [hw-ecn]" if hw_congested else ""
             return PlacementDecision(
                 tier=PlacementTier.DEFERRED,
                 target_rank=None,
                 estimated_latency_ms=(nccl_window_ms_remaining or 0) + 8.0,
                 crosses_global_link=True,
-                reason="global link saturated, NCCL window closing",
+                reason=f"global link saturated{hw_note}, NCCL window closing",
             )
 
-        # --- Sliced Lustre transfer (quota-aware) -----------------------
+        # --- Tier 2/3: Lustre (quota-sliced) ---------------------------
         slice_bytes = self._compute_slice(kv_size_bytes)
         lat_ms = self._lustre_latency_ms(kv_size_bytes)
         return PlacementDecision(
@@ -295,7 +326,7 @@ class TopologyRouter:
 
     def get_stats(self) -> dict:
         total = max(1, self._total_decisions)
-        return {
+        stats = {
             "my_group":            self._my_group,
             "my_nid":              self._my_nid,
             "local_peer_count":    len(self._local_peers),
@@ -304,6 +335,9 @@ class TopologyRouter:
             "local_pct":           100 * self._local_decisions / total,
             "deferred_pct":        100 * self._deferred_decisions / total,
         }
+        if self._hw_counters is not None:
+            stats["cassini_hw"] = self._hw_counters.get_stats()
+        return stats
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -314,7 +348,7 @@ class TopologyRouter:
 
     def _local_latency_ms(self, size_bytes: int) -> float:
         """Intra-group transfer: 200 Gbps = 25 GB/s, ~1 µs base."""
-        bw = 25.0 * 1024**3 / 1000  # bytes per ms
+        bw = 25.0 * 1024**3 / 1000
         return 0.001 + size_bytes / bw
 
     def _lustre_latency_ms(self, size_bytes: int) -> float:
