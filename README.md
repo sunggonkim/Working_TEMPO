@@ -3,7 +3,8 @@
 [![Platform](https://img.shields.io/badge/platform-NERSC%20Perlmutter-0075A2)](https://docs.nersc.gov/systems/perlmutter/)
 [![Phase 0](https://img.shields.io/badge/Phase%200-%E2%9C%85%20335%C3%97%20Spike%20Confirmed-brightgreen)](#phase-0-results--kv-eviction--itl-spike)
 [![Phase 1](https://img.shields.io/badge/Phase%201-%E2%9C%85%202.9%C3%97%20Scale%20Amplification-brightgreen)](#phase-1-results--pcie-contention-at-scale)
-[![Phase 2](https://img.shields.io/badge/Phase%202-%F0%9F%94%A8%20In%20Progress-yellow)](#phase-2-tempo-pacing-scheduler)
+[![Phase 3](https://img.shields.io/badge/Phase%203-%E2%9C%85%20+47%25%20NCCL%20BW%20at%20Ckpt-brightgreen)](#phase-3-tempo-evaluation-baseline-vs-tempo)
+[![Sweep](https://img.shields.io/badge/Sweep-%F0%9F%94%84%20Adaptive%20Chunk-blue)](#phase-3-optimization-adaptive-chunk-size-sweep)
 
 > **가설 검증 먼저, 솔루션 설계는 그 다음.**
 
@@ -11,12 +12,12 @@
 
 ## 실험 결과 요약
 
-| | Phase 0 | Phase 1 |
-|---|---|---|
-| **가설** | KV eviction → ITL 스파이크 | PCIe contention → NCCL BW 저하 |
-| **결과** | ✅ **335×** 스파이크 확인 | ✅ **2.9×** 스케일 증폭 확인 |
-| **핵심 수치** | TTFT P99: 23ms → 2,759ms | 8N BW 저하: 3.3% (2N 대비 3× 악화) |
-| **플랫폼** | Perlmutter 1N / 4×A100 40GB | Perlmutter 2N / 4N / 8N |
+| | Phase 0 | Phase 1 | Phase 3 | Phase 3 (최적화) |
+|---|---|---|---|---|
+| **가설** | KV eviction → ITL 스파이크 | PCIe contention → NCCL BW 저하 | TEMPO pacing → BW 회복 | Adaptive chunk → 더 나은 gating |
+| **결과** | ✅ **335×** 스파이크 확인 | ✅ **2.9×** 스케일 증폭 확인 | ✅ **+47%** BW at ckpt steps | 🔄 job 52239908 실행중 |
+| **핵심 수치** | TTFT P99: 23ms → 2,759ms | 8N BW 저하: 3.3% (2N 대비 3× 악화) | Baseline 4.94 → TEMPO 7.26 GB/s | 16/64/128/256MB + adaptive 비교 |
+| **플랫폼** | Perlmutter 1N / 4×A100 | Perlmutter 2N / 4N / 8N | Perlmutter 2N (8 GPU) | Perlmutter 2N (8 GPU) |
 
 ---
 
@@ -106,11 +107,47 @@ concurrency=64, 300 requests, NERSC Perlmutter 1 node (job 52217192)
 | 컴포넌트 | 상태 | 파일 |
 |---|---|---|
 | PhaseMonitor | ✅ 완성 | `tempo/phase_monitor.py` |
-| CheckpointManager | ✅ 완성 | `tempo/checkpoint_manager.py` |
+| CheckpointManager | ✅ 완성 (adaptive chunk 추가) | `tempo/checkpoint_manager.py` |
 | TEMPOScheduler | ✅ 완성 | `tempo/scheduler.py` |
 | FSDP comm hook | ✅ 완성 | `phase3/train_with_tempo.py` |
+| Adaptive chunk sizing | ✅ 신규 구현 | `tempo/checkpoint_manager.py` |
+| Flush overlap tracking | ✅ 신규 구현 | `tempo/checkpoint_manager.py` |
 | SpikeAbsorber (C++) | 📋 설계 완료 | `src/spike_absorber/` |
 | PacingDaemon (C++) | 📋 설계 완료 | `src/pacing_daemon/` |
+
+---
+
+## Phase 3 Optimization: Adaptive Chunk Size Sweep
+
+**동기** (논문 분석 기반):
+> 고정 chunk size는 trade-off 존재.  
+> 너무 크면 → NCCL 페이즈 경계를 뛰어넘어 contention 발생  
+> 너무 작면 → gate check 오버헤드로 flush throughput 저하  
+> **Adaptive chunk** → 관측된 NCCL 페이즈 지속시간의 50%를 target으로 실시간 자동 조정
+
+**실험 조건**: Perlmutter 2N × 4×A100, Llama-1B FSDP, 60 steps, ckpt_every=20  
+**Job**: 52239908 (실행 중)
+
+| 모드 | Chunk Size | 설명 |
+|------|-----------|------|
+| Baseline | — | Greedy flush (no gating) |
+| TEMPO 16 MB | 16 MB | 매우 세밀한 gating |
+| TEMPO 64 MB | 64 MB | 세밀한 gating |
+| TEMPO 128 MB | 128 MB | 기본값 (기존 실험) |
+| TEMPO 256 MB | 256 MB | 거친 gating |
+| TEMPO Adaptive | 자동 조정 | NCCL 페이즈 지속시간 기반 실시간 조정 |
+
+**Adaptive Chunk 알고리즘** (`tempo/checkpoint_manager.py`):
+```python
+avg_nccl_ms = phase_monitor.get_avg_nccl_duration_ms()
+est_bw_bytes_per_ms = recent_write_bytes / recent_write_ms
+target_chunk = 0.5 × avg_nccl_ms × est_bw_bytes_per_ms
+chunk_bytes = clamp(target_chunk, 16 MB, 512 MB)
+```
+
+**그림** (job 완료 후 자동 생성):
+
+![TEMPO Chunk Size Sensitivity Sweep](results/figures/fig6_chunk_sweep.png)
 
 ---
 
@@ -119,14 +156,16 @@ concurrency=64, 300 requests, NERSC Perlmutter 1 node (job 52217192)
 ```bash
 # Phase 0 재현
 sbatch phase0/verify_interference.slurm
-python3 phase0/plot_inference_interference.py \
-    --itl results/phase0/itl_profile.csv \
-    --io  results/phase0/io_profile.csv
 
 # Phase 1 재현 (8 node)
 sbatch phase1/run_phase1_8node.slurm
-python3 phase3/plot_killer_graph.py --scale-compare \
-    --results-root results --output-dir results/figures
+
+# Phase 3: Baseline vs TEMPO 평가
+sbatch phase3/run_evaluation.slurm
+
+# Phase 3 최적화: Chunk size sweep (6 modes 비교)
+sbatch phase3/run_chunk_sweep.slurm
+python3 scripts/make_figures.py --chunk-sweep
 
 # SLURM 계정: -A m5320, pytorch/2.8.0
 ```

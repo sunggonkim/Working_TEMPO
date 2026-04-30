@@ -72,6 +72,11 @@ class PhaseMonitor:
         self._compute_total_s: float = 0.0
         self._step: int = 0
 
+        # ---- Rolling NCCL duration window (for adaptive chunk sizing) ----
+        # Stores the last N observed NCCL phase durations in milliseconds.
+        self._nccl_window_size: int = 16
+        self._nccl_durations_ms: list = []   # circular buffer (deque semantics)
+
         # ---- I/O gating Event ----
         # SET   = background I/O is allowed to proceed
         # CLEAR = background I/O must pause (NCCL is active)
@@ -128,6 +133,10 @@ class PhaseMonitor:
             if old_phase == TrainingPhase.NCCL_COMM:
                 elapsed = now - self._nccl_enter_time
                 self._nccl_total_s += elapsed
+                # Record for adaptive chunk sizing
+                self._nccl_durations_ms.append(elapsed * 1e3)
+                if len(self._nccl_durations_ms) > self._nccl_window_size:
+                    self._nccl_durations_ms.pop(0)
                 self._io_allowed.set()   # ← Resume I/O flush
                 if self.on_nccl_end:
                     self.on_nccl_end()
@@ -266,7 +275,19 @@ class PhaseMonitor:
                 "compute_total_s":    round(self._compute_total_s, 4),
                 "nccl_fraction":      round(self._nccl_total_s / total, 4),
                 "io_allowed":         self._io_allowed.is_set(),
+                "avg_nccl_ms":        round(self.get_avg_nccl_duration_ms(), 2),
             }
+
+    def get_avg_nccl_duration_ms(self) -> float:
+        """
+        Returns the rolling average of observed NCCL phase durations (ms).
+        Used by CheckpointManager for adaptive chunk sizing.
+        Returns 0.0 if no NCCL phases have been observed yet.
+        """
+        with self._lock:
+            if not self._nccl_durations_ms:
+                return 0.0
+            return sum(self._nccl_durations_ms) / len(self._nccl_durations_ms)
 
     def reset_stats(self) -> None:
         with self._lock:

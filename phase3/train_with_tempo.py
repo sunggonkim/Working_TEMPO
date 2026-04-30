@@ -75,6 +75,8 @@ def parse_args():
                    default=os.environ.get("PSCRATCH", "/tmp/lustre_mock") + "/tempo_eval")
     p.add_argument("--flush-chunk-mb", type=int, default=128,
                    help="Chunk size (MB) for paced flush (default 128)")
+    p.add_argument("--adaptive-chunk", action="store_true",
+                   help="Automatically tune chunk size based on NCCL phase duration")
     p.add_argument("--verbose", action="store_true")
     return p.parse_args()
 
@@ -194,11 +196,11 @@ def timed_pacing_hook(
         state.phase_monitor.set_phase(TrainingPhase.COMPUTE)
 
     state.records.append({
-        "step":       state.step,
-        "latency_ms": round(lat_ms, 4),
-        "algbw_GBs":  round(algbw,  4),
-        "busbw_GBs":  round(busbw,  4),
-        "timestamp":  round(time.time(), 3),
+        "step":         state.step,
+        "latency_ms":   round(lat_ms, 4),
+        "algbw_GBs":    round(algbw,  4),
+        "busbw_GBs":    round(busbw,  4),
+        "timestamp":    round(time.time(), 3),
     })
 
 
@@ -227,6 +229,7 @@ def main():
         lustre_dir     = args.lustre_dir,
         mode           = args.mode,
         flush_chunk_mb = args.flush_chunk_mb,
+        adaptive_chunk = args.adaptive_chunk,
         verbose        = args.verbose,
     )
 
@@ -272,6 +275,14 @@ def main():
         optimizer.zero_grad()
         step_ms = tempo.on_step_end()
 
+        # ---- VRAM tracking ----
+        vram_used_gb = torch.cuda.memory_allocated(device) / 1e9
+        # Annotate the last NCCL record for this step with vram + chunk_mb
+        if comm_state.records and comm_state.records[-1]["step"] == comm_state.step:
+            comm_state.records[-1]["vram_used_gb"] = round(vram_used_gb, 3)
+            chunk_mb = tempo.ckpt_manager.chunk_bytes // (1024 * 1024)
+            comm_state.records[-1]["chunk_mb"] = chunk_mb
+
         # ---- Checkpoint ----
         is_measurement = step >= args.warmup_steps
         if is_measurement and ((step - args.warmup_steps) % args.ckpt_every == 0):
@@ -284,7 +295,7 @@ def main():
         if rank == 0 and step % 20 == 0:
             tag = "(warmup)" if step < args.warmup_steps else ""
             logger.info(f"  Step {step:4d} {tag}  loss={loss.item():.4f}  "
-                        f"step_ms={step_ms:.0f}")
+                        f"step_ms={step_ms:.0f}  vram={vram_used_gb:.2f}GB")
 
     # ---- Save CSV ----
     if rank == 0:

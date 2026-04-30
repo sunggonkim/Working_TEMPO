@@ -6,11 +6,14 @@ Generate all TEMPO paper figures:
   fig3_phase_timeline.png     — Phase-gated flush timeline (Gantt)
   fig4_phase1_barchart.png    — Phase 1 NCCL BW degradation bar chart
   fig5_phase3_comparison.png  — Phase 3 TEMPO vs baseline step BW
+  fig6_chunk_sweep.png        — Chunk size sensitivity sweep (new)
 
 Run from repo root:
-  python3 scripts/make_figures.py
+  python3 scripts/make_figures.py            # all figures except fig6
+  python3 scripts/make_figures.py --chunk-sweep  # also generate fig6
 """
 
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -523,11 +526,139 @@ def fig5_phase3_comparison():
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# Fig 6 — Chunk Size Sensitivity Sweep
+# ═════════════════════════════════════════════════════════════════════════════
+def fig6_chunk_sweep():
+    sweep_root = Path("results/chunk_sweep")
+    # Each mode sub-folder must have nccl_bw_rank0.csv
+    modes = [
+        ("baseline",       "Baseline\n(greedy)", RED,    "baseline"),
+        ("tempo-16mb",     "TEMPO\n16 MB",       "#9B72CF", "tempo"),
+        ("tempo-64mb",     "TEMPO\n64 MB",       "#5B9BD5", "tempo"),
+        ("tempo-128mb",    "TEMPO\n128 MB",      BLUE,   "tempo"),
+        ("tempo-256mb",    "TEMPO\n256 MB",      "#1A6B54", "tempo"),
+        ("tempo-adaptive", "TEMPO\nAdaptive",    GREEN,  "tempo"),
+    ]
+
+    ckpt_steps = [20, 40, 60]
+
+    results = []
+    for folder, label, color, kind in modes:
+        csv_path = sweep_root / folder / "nccl_bw_rank0.csv"
+        if not csv_path.exists():
+            print(f"[fig6] Missing {csv_path}, skipping")
+            continue
+        df = pd.read_csv(csv_path)
+        ckpt_bw  = df[df["step"].isin(ckpt_steps)]["algbw_GBs"].mean()
+        other_bw = df[~df["step"].isin(ckpt_steps)]["algbw_GBs"].mean()
+        overall  = df["algbw_GBs"].mean()
+        results.append({
+            "folder": folder, "label": label, "color": color, "kind": kind,
+            "ckpt_bw": ckpt_bw, "other_bw": other_bw, "overall": overall,
+        })
+
+    if not results:
+        print("[fig6] No chunk_sweep CSVs found — skipping")
+        return
+
+    # ── Figure layout: grouped bar + line overlay ──
+    fig, (ax_bar, ax_line) = plt.subplots(1, 2, figsize=(13, 5),
+                                           gridspec_kw={"width_ratios": [5, 4]})
+
+    # ── Left: bar chart — ckpt steps BW vs non-ckpt steps BW ──
+    n = len(results)
+    x = np.arange(n)
+    w = 0.38
+    bars_ckpt  = [r["ckpt_bw"]  for r in results]
+    bars_other = [r["other_bw"] for r in results]
+    colors     = [r["color"]    for r in results]
+    labels     = [r["label"]    for r in results]
+
+    b1 = ax_bar.bar(x - w/2, bars_ckpt,  width=w, color=colors, alpha=0.90,
+                    label="At ckpt steps", zorder=3, edgecolor="white", lw=0.8)
+    b2 = ax_bar.bar(x + w/2, bars_other, width=w, color=colors, alpha=0.45,
+                    label="Other steps",  zorder=3, edgecolor="white", lw=0.8,
+                    hatch="//")
+
+    # BW labels on top of bars
+    for bar in list(b1) + list(b2):
+        h = bar.get_height()
+        ax_bar.text(bar.get_x() + bar.get_width()/2, h + 0.08,
+                    f"{h:.2f}", ha="center", va="bottom", fontsize=7.5,
+                    color=DARK, fontweight="bold")
+
+    # Baseline annotation
+    if results:
+        base_ckpt = results[0]["ckpt_bw"]
+        ax_bar.axhline(base_ckpt, color=RED, lw=1.2, linestyle=":",
+                       alpha=0.7, zorder=2, label=f"Baseline ckpt BW")
+        for i, r in enumerate(results[1:], 1):
+            pct = (r["ckpt_bw"] / base_ckpt - 1) * 100
+            y   = r["ckpt_bw"] + 0.42
+            ax_bar.text(x[i] - w/2, y, f"+{pct:.0f}%",
+                        ha="center", va="bottom", fontsize=8,
+                        color=r["color"], fontweight="bold")
+
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels(labels, fontsize=8.5)
+    ax_bar.set_ylabel("NCCL algbw (GB/s)", fontsize=11)
+    ax_bar.set_title("NCCL BW by Chunk Size\nat Checkpoint vs. Non-Checkpoint Steps",
+                     fontsize=11, fontweight="bold", color=DARK)
+    ax_bar.grid(axis="y", alpha=0.25, linestyle="--")
+    ax_bar.legend(fontsize=8.5, loc="lower right", framealpha=0.9)
+    ymax = max(bars_ckpt + bars_other) * 1.18
+    ax_bar.set_ylim(0, ymax)
+
+    # ── Right: line plot — per-step median BW for all modes ──
+    for r in results:
+        csv_path = sweep_root / r["folder"] / "nccl_bw_rank0.csv"
+        if not csv_path.exists():
+            continue
+        df   = pd.read_csv(csv_path)
+        med  = df.groupby("step")["algbw_GBs"].median()
+        steps = med.index
+        ls = "--" if r["kind"] == "baseline" else "-"
+        lw = 2.2 if r["folder"] in ("baseline", "tempo-128mb", "tempo-adaptive") else 1.4
+        ax_line.plot(steps, med, color=r["color"], lw=lw, linestyle=ls,
+                     label=r["label"].replace("\n", " "), zorder=3)
+
+    for cs in ckpt_steps:
+        ax_line.axvline(cs, color=GREEN, lw=1.0, linestyle="--", alpha=0.6)
+
+    ax_line.set_xlabel("Training Step", fontsize=11)
+    ax_line.set_ylabel("NCCL algbw (GB/s)", fontsize=11)
+    ax_line.set_title("Per-Step BW: All Chunk Sizes",
+                       fontsize=11, fontweight="bold", color=DARK)
+    ax_line.legend(fontsize=8, loc="lower left", framealpha=0.9,
+                   ncol=2)
+    ax_line.grid(alpha=0.20, linestyle="--")
+
+    fig.suptitle(
+        "TEMPO Chunk Size Sensitivity: Adaptive Sizing vs. Fixed (2N × 4×A100, Llama-1B FSDP)",
+        fontsize=12, fontweight="bold", color=DARK, y=1.01,
+    )
+
+    plt.tight_layout()
+    path = OUT / "fig6_chunk_sweep.png"
+    fig.savefig(path)
+    fig.savefig(str(path).replace(".png", ".pdf"))
+    plt.close(fig)
+    print(f"[fig6] {path}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--chunk-sweep", action="store_true",
+                    help="Also generate fig6 (requires results/chunk_sweep/ CSVs)")
+    args = ap.parse_args()
+
     print("Generating TEMPO figures...")
     fig0_pcie_contention()
     fig2_tempo_arch()
     fig3_phase_timeline()
     fig4_phase1_barchart()
     fig5_phase3_comparison()
+    if args.chunk_sweep:
+        fig6_chunk_sweep()
     print(f"\nAll figures saved to {OUT}/")

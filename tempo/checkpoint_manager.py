@@ -68,12 +68,19 @@ class CheckpointManager:
     flush_chunk_bytes : int
         Number of bytes written per flush iteration.  Smaller = finer-grained
         throttling response to NCCL phase changes; larger = higher throughput.
+    adaptive_chunk : bool
+        If True, automatically tune chunk size each flush cycle based on the
+        rolling-average NCCL phase duration reported by phase_monitor.
+        Target: write ~50% of an NCCL window per chunk so each phase boundary
+        is respected within one half-window.  Clamped to [16 MB, 512 MB].
     phase_monitor : PhaseMonitor or None
         If provided, the flush thread pauses during NCCL phases.
         If None, the flush is greedy (reproduces "Contention" baseline).
     """
 
-    DEFAULT_CHUNK = 256 * 1024 * 1024   # 256 MB
+    DEFAULT_CHUNK   = 128 * 1024 * 1024   # 128 MB (previous default was 256 MB)
+    MIN_CHUNK_BYTES =  16 * 1024 * 1024   #  16 MB
+    MAX_CHUNK_BYTES = 512 * 1024 * 1024   # 512 MB
 
     def __init__(
         self,
@@ -83,13 +90,16 @@ class CheckpointManager:
         world_size:     int        = 1,
         max_pending:    int        = 3,
         flush_chunk_bytes: int     = DEFAULT_CHUNK,
+        adaptive_chunk: bool       = False,
         phase_monitor              = None,
     ):
-        self.rank        = rank
-        self.world_size  = world_size
-        self.max_pending = max_pending
-        self.chunk_bytes = flush_chunk_bytes
-        self.phase_monitor = phase_monitor
+        self.rank           = rank
+        self.world_size     = world_size
+        self.max_pending    = max_pending
+        self.chunk_bytes    = flush_chunk_bytes
+        self._base_chunk    = flush_chunk_bytes   # fixed chunk when not adaptive
+        self.adaptive_chunk = adaptive_chunk
+        self.phase_monitor  = phase_monitor
 
         self.local_dir  = Path(local_nvme_dir) / f"rank{rank}"
         self.lustre_dir = Path(lustre_dir) if lustre_dir else None
@@ -102,12 +112,15 @@ class CheckpointManager:
         self._stop  = threading.Event()
 
         # Statistics (protected by _stats_lock)
-        self._stats_lock   = threading.Lock()
-        self._bytes_local  = 0    # total written to local NVMe
-        self._bytes_lustre = 0    # total flushed to Lustre
-        self._bytes_pending= 0    # queued but not yet flushed
-        self._flush_count  = 0
-        self._throttle_waits = 0  # times flush thread paused for NCCL
+        self._stats_lock      = threading.Lock()
+        self._bytes_local     = 0    # total written to local NVMe
+        self._bytes_lustre    = 0    # total flushed to Lustre
+        self._bytes_pending   = 0    # queued but not yet flushed
+        self._flush_count     = 0
+        self._throttle_waits  = 0    # times flush thread paused for NCCL
+        # Overlap efficiency tracking
+        self._flush_write_ms  = 0.0  # ms actively writing (compute phase)
+        self._flush_block_ms  = 0.0  # ms blocked waiting for NCCL to end
 
         self._flush_thread = threading.Thread(
             target=self._flush_worker,
@@ -116,7 +129,8 @@ class CheckpointManager:
         )
         self._flush_thread.start()
         logger.info(f"[CkptMgr] Rank {rank}: local={self.local_dir}  "
-                    f"lustre={self.lustre_dir}  chunk={flush_chunk_bytes//1024//1024}MB")
+                    f"lustre={self.lustre_dir}  chunk={flush_chunk_bytes//1024//1024}MB"
+                    f"{'  adaptive=ON' if adaptive_chunk else ''}")
 
     # ------------------------------------------------------------------
     # Public API
@@ -208,12 +222,19 @@ class CheckpointManager:
 
     def get_stats(self) -> dict:
         with self._stats_lock:
+            total_io_ms = self._flush_write_ms + self._flush_block_ms + 1e-6
+            overlap_pct = 100.0 * self._flush_write_ms / total_io_ms
             return {
                 "bytes_local_GB":    round(self._bytes_local   / 1e9, 3),
                 "bytes_lustre_GB":   round(self._bytes_lustre  / 1e9, 3),
                 "bytes_pending_GB":  round(self._bytes_pending / 1e9, 3),
                 "flush_count":       self._flush_count,
                 "throttle_waits":    self._throttle_waits,
+                "flush_overlap_pct": round(overlap_pct, 1),
+                "flush_write_ms":    round(self._flush_write_ms, 1),
+                "flush_block_ms":    round(self._flush_block_ms, 1),
+                "chunk_mb":          self.chunk_bytes // (1024 * 1024),
+                "adaptive_chunk":    self.adaptive_chunk,
             }
 
     def shutdown(self, wait: bool = True) -> None:
@@ -248,6 +269,10 @@ class CheckpointManager:
         Copy job.local_path → job.remote_path in chunks, pausing
         before each chunk if an NCCL collective is active.
         Atomically renames .tmp → final path on completion.
+
+        Adaptive mode: adjusts chunk_bytes each cycle based on the
+        rolling-average NCCL phase duration so the I/O window is
+        ~50 % of one NCCL phase, keeping gating responsive.
         """
         src = Path(job.local_path)
         dst = Path(job.remote_path)
@@ -262,37 +287,74 @@ class CheckpointManager:
         tmp_dst = dst.with_suffix(".tmp")
 
         t0 = time.perf_counter()
-        bytes_copied = 0
+        bytes_copied  = 0
+        write_ms_acc  = 0.0   # ms spent actually writing
+        block_ms_acc  = 0.0   # ms spent blocked on NCCL gate
+        # Track observed write bandwidth for adaptive sizing
+        _write_samples: list = []
 
         with open(str(src), "rb") as fsrc, open(str(tmp_dst), "wb") as fdst:
             while True:
-                # --- TEMPO pacing gate ---
+                # ---- Adaptive chunk resizing ----
+                if self.adaptive_chunk and self.phase_monitor is not None:
+                    avg_nccl_ms = self.phase_monitor.get_avg_nccl_duration_ms()
+                    if avg_nccl_ms > 0 and _write_samples:
+                        # Estimate write bandwidth from recent samples
+                        est_bw_bytes_per_ms = (
+                            sum(s[0] for s in _write_samples) /
+                            sum(s[1] for s in _write_samples)
+                        )
+                        # Target chunk = 50% of avg NCCL window
+                        target = int(0.5 * avg_nccl_ms * est_bw_bytes_per_ms)
+                        self.chunk_bytes = max(
+                            self.MIN_CHUNK_BYTES,
+                            min(self.MAX_CHUNK_BYTES, target),
+                        )
+
+                # ---- TEMPO pacing gate ----
                 if self.phase_monitor is not None:
+                    gate_t0 = time.perf_counter()
                     while not self.phase_monitor.wait_for_io_allowed(timeout=0.02):
                         with self._stats_lock:
                             self._throttle_waits += 1
                         if self._stop.is_set():
                             return
+                    block_ms_acc += (time.perf_counter() - gate_t0) * 1e3
 
                 chunk = fsrc.read(self.chunk_bytes)
                 if not chunk:
                     break
+                w_t0 = time.perf_counter()
                 fdst.write(chunk)
-                bytes_copied += len(chunk)
+                w_ms = (time.perf_counter() - w_t0) * 1e3
+                bytes_copied  += len(chunk)
+                write_ms_acc  += w_ms
+                _write_samples.append((len(chunk), w_ms + 1e-6))
+                if len(_write_samples) > 8:
+                    _write_samples.pop(0)
 
         # Atomic replace
         tmp_dst.rename(dst)
 
-        elapsed    = time.perf_counter() - t0
-        flush_bw   = bytes_copied / elapsed / 1e9
+        elapsed  = time.perf_counter() - t0
+        flush_bw = bytes_copied / elapsed / 1e9
+        # overlap_pct: fraction of total flush time spent writing (vs. blocked)
+        overlap_pct = 100.0 * write_ms_acc / (write_ms_acc + block_ms_acc + 1e-6)
 
         with self._stats_lock:
             self._bytes_lustre  += bytes_copied
             self._bytes_pending -= job.size_bytes
             self._flush_count   += 1
+            self._flush_write_ms += write_ms_acc
+            self._flush_block_ms += block_ms_acc
 
-        logger.info(f"[CkptMgr Flush] Step {job.step}: Lustre flush done "
-                    f"({bytes_copied/1e9:.2f} GB, {elapsed:.2f} s, {flush_bw:.2f} GB/s)")
+        logger.info(
+            f"[CkptMgr Flush] Step {job.step}: Lustre flush done "
+            f"({bytes_copied/1e9:.2f} GB, {elapsed:.2f} s, {flush_bw:.2f} GB/s, "
+            f"overlap={overlap_pct:.0f}%"
+            + (f", chunk={self.chunk_bytes//1024//1024}MB" if self.adaptive_chunk else "")
+            + ")"
+        )
 
         # Remove local copy after successful flush
         src.unlink(missing_ok=True)

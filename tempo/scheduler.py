@@ -83,7 +83,8 @@ class TEMPOScheduler:
         local_nvme_dir: str  = "/tmp/tempo_ckpts",
         lustre_dir:     Optional[str] = None,
         mode:           str  = "tempo",
-        flush_chunk_mb: int  = 256,
+        flush_chunk_mb: int  = 128,
+        adaptive_chunk: bool = False,
         verbose:        bool = False,
     ):
         if mode not in ("tempo", "baseline"):
@@ -110,6 +111,7 @@ class TEMPOScheduler:
             rank              = rank,
             world_size        = world_size,
             flush_chunk_bytes = flush_chunk_mb * 1024 * 1024,
+            adaptive_chunk    = adaptive_chunk,
             # In "tempo" mode, pass the monitor so flush is paced.
             # In "baseline" mode, pass None so flush is greedy.
             phase_monitor     = self.phase_monitor if mode == "tempo" else None,
