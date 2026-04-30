@@ -1,0 +1,533 @@
+#!/usr/bin/env python3
+"""
+Generate all TEMPO paper figures:
+  fig0_pcie_contention.png    — PCIe Root Complex contention path
+  fig2_tempo_arch.png         — TEMPO system architecture
+  fig3_phase_timeline.png     — Phase-gated flush timeline (Gantt)
+  fig4_phase1_barchart.png    — Phase 1 NCCL BW degradation bar chart
+  fig5_phase3_comparison.png  — Phase 3 TEMPO vs baseline step BW
+
+Run from repo root:
+  python3 scripts/make_figures.py
+"""
+
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import matplotlib.patheffects as pe
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+from pathlib import Path
+
+OUT = Path("results/figures")
+OUT.mkdir(parents=True, exist_ok=True)
+
+# ── style ─────────────────────────────────────────────────────────────────────
+plt.rcParams.update({
+    "font.family":      "DejaVu Sans",
+    "font.size":        11,
+    "axes.spines.top":  False,
+    "axes.spines.right":False,
+    "figure.dpi":       150,
+    "savefig.dpi":      200,
+    "savefig.bbox":     "tight",
+    "savefig.pad_inches": 0.15,
+})
+
+BLUE   = "#2E86AB"
+RED    = "#E84855"
+GREEN  = "#3BB273"
+ORANGE = "#F4A261"
+GRAY   = "#8E9AAF"
+DARK   = "#1B2432"
+LIGHT  = "#F0F4F8"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Fig 0 — PCIe Contention Path
+# ═════════════════════════════════════════════════════════════════════════════
+def fig0_pcie_contention():
+    fig, ax = plt.subplots(figsize=(11, 6))
+    ax.set_xlim(0, 11)
+    ax.set_ylim(0, 6.5)
+    ax.axis("off")
+
+    def box(x, y, w, h, label, sub="", color=BLUE, alpha=0.92, fontsize=10):
+        rect = FancyBboxPatch((x, y), w, h,
+                              boxstyle="round,pad=0.08",
+                              linewidth=1.5,
+                              edgecolor=color,
+                              facecolor=(*matplotlib.colors.to_rgb(color), alpha * 0.18),
+                              zorder=2)
+        ax.add_patch(rect)
+        cy = y + h / 2 + (0.12 if sub else 0)
+        ax.text(x + w/2, cy, label, ha="center", va="center",
+                fontsize=fontsize, fontweight="bold", color=color, zorder=3)
+        if sub:
+            ax.text(x + w/2, y + h/2 - 0.28, sub, ha="center", va="center",
+                    fontsize=8, color=GRAY, zorder=3)
+
+    def arrow(x0, y0, x1, y1, color=DARK, lw=2, label="", style="->"):
+        ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
+                    arrowprops=dict(arrowstyle=style, color=color,
+                                   lw=lw, connectionstyle="arc3,rad=0"))
+        if label:
+            mx, my = (x0+x1)/2, (y0+y1)/2
+            ax.text(mx, my + 0.18, label, ha="center", va="bottom",
+                    fontsize=8, color=color,
+                    bbox=dict(fc="white", ec="none", pad=1))
+
+    # GPU row (top)
+    for i, (lbl, sub) in enumerate([("GPU 0", "A100 40GB"), ("GPU 1", "A100 40GB"),
+                                    ("GPU 2", "A100 40GB"), ("GPU 3", "A100 40GB")]):
+        box(0.1 + i*2.65, 4.8, 2.2, 1.1, lbl, sub, BLUE)
+
+    # NVMe row (bottom left)
+    box(0.1, 0.4, 2.2, 1.1, "NVMe SSD", "PCIe 4.0 x4\n7 GB/s", GREEN)
+
+    # Slingshot NIC (bottom right)
+    box(7.5, 0.4, 3.2, 1.1, "Slingshot 11 NIC", "200 Gbps", ORANGE)
+
+    # CPU / PCIe Root Complex (center)
+    rect_cpu = FancyBboxPatch((3.2, 2.0), 4.6, 1.8,
+                              boxstyle="round,pad=0.12",
+                              linewidth=2.5,
+                              edgecolor=RED,
+                              facecolor=(*matplotlib.colors.to_rgb(RED), 0.08),
+                              zorder=2)
+    ax.add_patch(rect_cpu)
+    ax.text(5.5, 3.1, "AMD EPYC 7763", ha="center", va="center",
+            fontsize=12, fontweight="bold", color=RED, zorder=3)
+    ax.text(5.5, 2.62, "PCIe Root Complex  ⚡ CONTENTION POINT", ha="center",
+            va="center", fontsize=9, color=RED, zorder=3,
+            style="italic")
+
+    # GPU → CPU arrows
+    gpu_cx = [1.2, 3.85, 6.5, 9.15]
+    for gx in gpu_cx:
+        arrow(gx, 4.8, 5.5, 3.8, color=BLUE, lw=1.6)
+
+    # NVMe → CPU arrow (BLUE = I/O path)
+    arrow(1.2, 1.5, 3.5, 2.5, color=GREEN, lw=2.2, label="Checkpoint\nFlush")
+
+    # CPU → Slingshot (NCCL)
+    arrow(7.8, 2.5, 8.5, 1.5, color=ORANGE, lw=2.5, label="NCCL\nAllReduce")
+
+    # Contention annotation
+    ax.annotate("",
+                xy=(5.5, 2.0), xytext=(5.5, 1.0),
+                arrowprops=dict(arrowstyle="-|>", color=RED,
+                                lw=1.5, linestyle="dashed"))
+    ax.text(5.5, 0.75, "Both compete for\nPCIe Root Complex bandwidth",
+            ha="center", va="center", fontsize=9, color=RED, fontweight="bold",
+            bbox=dict(fc="#fff3f3", ec=RED, boxstyle="round,pad=0.3",
+                      linewidth=1.2))
+
+    ax.set_title("PCIe Root Complex Contention: Checkpoint I/O vs NCCL AllReduce",
+                 fontsize=13, fontweight="bold", color=DARK, pad=12)
+
+    path = OUT / "fig0_pcie_contention.png"
+    fig.savefig(path)
+    fig.savefig(str(path).replace(".png", ".pdf"))
+    plt.close(fig)
+    print(f"[fig0] {path}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Fig 2 — TEMPO System Architecture
+# ═════════════════════════════════════════════════════════════════════════════
+def fig2_tempo_arch():
+    fig, ax = plt.subplots(figsize=(14, 7.5))
+    ax.set_xlim(0, 14)
+    ax.set_ylim(0, 7.5)
+    ax.axis("off")
+
+    def box(x, y, w, h, title, body=(), color=BLUE, fontsize=10):
+        rect = FancyBboxPatch((x, y), w, h,
+                              boxstyle="round,pad=0.1",
+                              linewidth=1.8,
+                              edgecolor=color,
+                              facecolor=(*matplotlib.colors.to_rgb(color), 0.10),
+                              zorder=2)
+        ax.add_patch(rect)
+        ty = y + h - 0.32
+        ax.text(x + w/2, ty, title, ha="center", va="top",
+                fontsize=fontsize, fontweight="bold", color=color, zorder=3)
+        for i, line in enumerate(body):
+            ax.text(x + 0.18, ty - 0.42 - i*0.38, line, ha="left", va="top",
+                    fontsize=8.5, color=DARK, zorder=3)
+
+    def arr(x0, y0, x1, y1, label="", color=DARK, lw=1.8, rad=0,
+            lox=0.05, loy=0.15):
+        ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
+                    arrowprops=dict(arrowstyle="-|>", color=color,
+                                   lw=lw,
+                                   connectionstyle=f"arc3,rad={rad}"))
+        if label:
+            mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+            ax.text(mx + lox, my + loy, label, ha="center",
+                    fontsize=8, color=color)
+
+    # ── Training Loop (left) ──
+    box(0.2, 3.8, 2.9, 3.2, "FSDP Training Loop",
+        ("for step in range(steps):",
+         "  forward(batch)",
+         "  loss.backward()  <- hook",
+         "  optimizer.step()",
+         "  tempo.on_step_begin()"),
+        color=DARK, fontsize=9.5)
+
+    # ── PhaseMonitor ──
+    box(3.7, 5.2, 3.0, 1.9, "PhaseMonitor",
+        ("set_phase(NCCL_COMM)",
+         "set_phase(COMPUTE)",
+         "_io_allowed: threading.Event"),
+        color=BLUE)
+
+    # ── FSDP Comm Hook ──
+    box(3.7, 2.9, 3.0, 2.0, "FSDP Comm Hook",
+        ("timed_pacing_hook()",
+         "reduce_scatter_tensor()",
+         "-> record latency / BW"),
+        color=ORANGE)
+
+    # ── TEMPOScheduler ──
+    box(7.5, 4.0, 3.0, 2.9, "TEMPOScheduler",
+        ("on_step_begin(step)",
+         "on_ckpt_trigger(step)",
+         "mode: baseline | tempo",
+         "-> CheckpointManager"),
+        color=GREEN)
+
+    # ── CheckpointManager ──
+    box(11.0, 4.4, 2.7, 2.4, "CheckpointManager",
+        ("save_local(NVMe)",
+         "  O(1) latency",
+         "flush_lustre() in bg",
+         "  gated by PhaseMonitor"),
+        color=GREEN)
+
+    # ── Storage row ──
+    box(7.5, 0.6, 3.0, 1.5, "Local NVMe /tmp",
+        ("/tmp/tempo_eval/",
+         "PCIe 4.0, 7 GB/s"),
+        color=GRAY)
+    box(11.0, 0.6, 2.7, 1.5, "Lustre $PSCRATCH",
+        ("Slingshot 11 NIC",
+         "200 Gbps shared"),
+        color=GRAY)
+
+    # arrows — loop -> PhaseMonitor
+    arr(3.1, 6.0, 3.7, 6.1, "set_phase()", BLUE, lox=0.0, loy=0.18)
+    # loop -> hook
+    arr(3.1, 4.2, 3.7, 4.0, "register_hook", ORANGE, lox=0.0, loy=0.20)
+    # PhaseMonitor -> hook (phase state) vertical
+    arr(5.2, 5.2, 5.2, 4.9, "NCCL/COMPUTE\nphase", BLUE, lw=1.5,
+        lox=-0.85, loy=0.05)
+    # PhaseMonitor -> Scheduler
+    arr(6.7, 6.1, 7.5, 5.5, "phase signal", BLUE, lox=0.0, loy=0.18)
+    # hook -> Scheduler
+    arr(6.7, 3.9, 7.5, 4.6, "ckpt trigger", GREEN, lox=0.0, loy=0.18)
+    # Scheduler -> CkptMgr
+    arr(10.5, 5.5, 11.0, 5.6, "flush()", GREEN, lox=0.0, loy=0.20)
+    # Scheduler -> NVMe (vertical)
+    arr(9.0, 4.0, 9.0, 2.1, "save_local()", GRAY, lox=0.65, loy=0.0)
+    # CkptMgr -> Lustre (vertical)
+    arr(12.35, 4.4, 12.35, 2.1, "flush_lustre()", GRAY, lox=0.72, loy=0.0)
+    # Lustre -> CkptMgr gating (curved left) — no text
+    arr(11.0, 1.35, 11.0, 4.4, "", RED, lw=1.8, rad=-0.45)
+
+    # Gate label — inside the curve (not clipped)
+    ax.text(9.85, 3.0, "wait_for_io_allowed()\n[PAUSED during NCCL]",
+            ha="center", va="center", fontsize=8.5, color=RED,
+            bbox=dict(fc="#fff0f0", ec=RED, boxstyle="round,pad=0.3", lw=1.2))
+
+    ax.set_title("TEMPO System Architecture: Phase-Aware Checkpoint I/O Gating",
+                 fontsize=13, fontweight="bold", color=DARK, pad=12)
+
+    path = OUT / "fig2_tempo_arch.png"
+    fig.savefig(path)
+    fig.savefig(str(path).replace(".png", ".pdf"))
+    plt.close(fig)
+    print(f"[fig2] {path}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Fig 3 — Phase-Gated Flush Timeline (Gantt style)
+# ═════════════════════════════════════════════════════════════════════════════
+def fig3_phase_timeline():
+    fig, axes = plt.subplots(2, 1, figsize=(13, 5.5), sharex=True)
+    fig.subplots_adjust(hspace=0.08)
+
+    # Simulated timeline for one step with checkpoint flush
+    # t axis in ms (0 → 2000ms)
+    t_total = 2000
+
+    # ── Compute phases (same for both) ──
+    phases = [
+        # (start, dur, label, row, color)
+        (0,    120, "FFN/Forward",   0, BLUE),
+        (120,  200, "Attention",     0, ORANGE),
+        (320,  100, "FFN/Forward",   0, BLUE),
+        (420,  180, "Attention",     0, ORANGE),
+        (600,   80, "FFN/Backward",  0, BLUE),
+        (680,  160, "NCCL reduce_scatter", 0, RED),
+        (840,   80, "FFN/Backward",  0, BLUE),
+        (920,  160, "NCCL reduce_scatter", 0, RED),
+        (1080, 200, "Optimizer step",0, GREEN),
+        (1280, 120, "FFN/Forward",   0, BLUE),
+        (1400, 180, "Attention",     0, ORANGE),
+        (1580, 200, "FFN/Backward",  0, BLUE),
+        (1780, 160, "NCCL reduce_scatter", 0, RED),
+    ]
+
+    titles = ["Baseline (Greedy Flush)", "TEMPO (Phase-Gated Flush)"]
+    flush_colors = [GREEN, GREEN]
+
+    for ax_i, ax in enumerate(axes):
+        ax.set_xlim(0, t_total)
+        ax.set_ylim(-0.5, 2.5)
+        ax.set_yticks([0.5, 1.5])
+        ax.set_yticklabels(["Compute", "Checkpoint\nFlush"], fontsize=10)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        # Draw compute phases
+        seen = set()
+        for (t0, dur, lbl, _, color) in phases:
+            rect = mpatches.FancyBboxPatch((t0, 0.05), dur, 0.9,
+                                           boxstyle="round,pad=0.5",
+                                           linewidth=0.5,
+                                           edgecolor="white",
+                                           facecolor=color, alpha=0.85,
+                                           zorder=2)
+            ax.add_patch(rect)
+            if dur > 100:
+                short = lbl.split("/")[0].split(" ")[0]
+                ax.text(t0 + dur/2, 0.5, short, ha="center", va="center",
+                        fontsize=7.5, color="white", fontweight="bold", zorder=3)
+
+        # Draw flush bar
+        if ax_i == 0:
+            # Baseline: full greedy flush during NCCL (680ms to 1680ms — overlaps NCCL)
+            flush_segs = [(680, 1000)]  # 1000ms flush overlapping both NCCL phases
+        else:
+            # TEMPO: flush only during non-NCCL windows
+            flush_segs = [
+                (0,   680),   # flush before first NCCL
+                (840, 920),   # gap between NCCL
+                (1080, 1780), # flush during optimizer / forward / attention
+            ]
+
+        for (fs, fe) in flush_segs:
+            rect = mpatches.FancyBboxPatch((fs, 1.05), fe - fs, 0.9,
+                                           boxstyle="round,pad=0.5",
+                                           linewidth=0.5,
+                                           edgecolor="white",
+                                           facecolor=GREEN, alpha=0.75,
+                                           zorder=2)
+            ax.add_patch(rect)
+            if (fe - fs) > 80:
+                ax.text(fs + (fe-fs)/2, 1.5, "Lustre Flush",
+                        ha="center", va="center",
+                        fontsize=7.5, color="white", fontweight="bold", zorder=3)
+
+        # NCCL markers (vertical dashed lines)
+        nccl_phases = [(680, 840), (920, 1080), (1780, 1940)]
+        for ns, ne in nccl_phases:
+            ax.axvspan(ns, ne, alpha=0.08, color=RED, zorder=0)
+            if ax_i == 0:
+                ax.text(ns + (ne-ns)/2, 2.2, "NCCL", ha="center", va="center",
+                        fontsize=7.5, color=RED, fontweight="bold")
+
+        # Contention annotation for baseline
+        if ax_i == 0:
+            ax.annotate("",
+                        xy=(750, 1.05), xytext=(750, 0.95),
+                        arrowprops=dict(arrowstyle="<->", color=RED, lw=2.0))
+            ax.text(900, -0.25, "!!! PCIe contention: flush + NCCL overlap",
+                    ha="center", fontsize=9, color=RED, fontweight="bold")
+        else:
+            ax.text(900, -0.25, "[OK] I/O paused during NCCL (throttle_waits=220)",
+                    ha="center", fontsize=9, color=GREEN, fontweight="bold")
+
+        ax.set_title(titles[ax_i], fontsize=11, fontweight="bold",
+                     color=RED if ax_i == 0 else GREEN, loc="left")
+
+    axes[-1].set_xlabel("Time (ms) — one training step with checkpoint", fontsize=10)
+
+    # Legend
+    legend_items = [
+        mpatches.Patch(color=BLUE, label="FFN / Backward"),
+        mpatches.Patch(color=ORANGE, label="Attention"),
+        mpatches.Patch(color=RED, alpha=0.8, label="NCCL reduce_scatter"),
+        mpatches.Patch(color=GREEN, label="Checkpoint Flush (Lustre)"),
+    ]
+    axes[0].legend(handles=legend_items, loc="upper right",
+                   fontsize=8.5, framealpha=0.9, ncol=4)
+
+    fig.suptitle("TEMPO Phase-Gated Flush: I/O Separated from NCCL Collective",
+                 fontsize=13, fontweight="bold", color=DARK, y=1.01)
+
+    path = OUT / "fig3_phase_timeline.png"
+    fig.savefig(path)
+    fig.savefig(str(path).replace(".png", ".pdf"))
+    plt.close(fig)
+    print(f"[fig3] {path}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Fig 4 — Phase 1 NCCL BW Degradation Bar Chart
+# ═════════════════════════════════════════════════════════════════════════════
+def fig4_phase1_barchart():
+    scales    = ["2 Node\n(8 GPU)", "4 Node\n(16 GPU)", "8 Node\n(32 GPU)"]
+    baseline  = [17.98, 16.75, 16.20]
+    contention= [17.78, 16.34, 15.66]
+    drop_pct  = [1.1, 2.4, 3.3]
+    amplif    = [1.0, 2.2, 2.9]
+
+    x = np.arange(len(scales))
+    w = 0.35
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    bars_b = ax.bar(x - w/2, baseline,   w, label="Baseline",   color=BLUE,
+                    alpha=0.88, edgecolor="white", linewidth=0.8)
+    bars_c = ax.bar(x + w/2, contention, w, label="Contention", color=RED,
+                    alpha=0.88, edgecolor="white", linewidth=0.8)
+
+    # Value labels on bars
+    for bar in bars_b:
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.08,
+                f"{bar.get_height():.2f}", ha="center", va="bottom",
+                fontsize=9, fontweight="bold", color=BLUE)
+    for bar, pct, amp in zip(bars_c, drop_pct, amplif):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.08,
+                f"{bar.get_height():.2f}", ha="center", va="bottom",
+                fontsize=9, fontweight="bold", color=RED)
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() - 0.55,
+                f"−{pct}%", ha="center", va="top",
+                fontsize=8.5, color="white", fontweight="bold")
+
+    # Amplification annotations
+    for i, (xi, amp) in enumerate(zip(x, amplif)):
+        ax.annotate(f"{amp}×\namplif.",
+                    xy=(xi + w/2, contention[i]),
+                    xytext=(xi + w/2 + 0.42, contention[i] + 0.5),
+                    fontsize=8, color=DARK,
+                    arrowprops=dict(arrowstyle="-", color=GRAY, lw=0.8),
+                    bbox=dict(fc=LIGHT, ec=GRAY, boxstyle="round,pad=0.2",
+                              linewidth=0.8))
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(scales, fontsize=11)
+    ax.set_ylabel("NCCL AllReduce Bandwidth (GB/s)", fontsize=11)
+    ax.set_ylim(14.5, 19.5)
+    ax.set_title("Phase 1: PCIe Contention Degrades NCCL BW at Scale\n"
+                 "(NCCL 1 GB tensor + concurrent NVMe I/O, Perlmutter)",
+                 fontsize=12, fontweight="bold", color=DARK)
+    ax.legend(fontsize=10, loc="upper right", framealpha=0.9)
+    ax.grid(axis="y", alpha=0.3, linestyle="--")
+
+    path = OUT / "fig4_phase1_barchart.png"
+    fig.savefig(path)
+    fig.savefig(str(path).replace(".png", ".pdf"))
+    plt.close(fig)
+    print(f"[fig4] {path}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Fig 5 — Phase 3 TEMPO vs Baseline BW Over Steps
+# ═════════════════════════════════════════════════════════════════════════════
+def fig5_phase3_comparison():
+    base_path  = Path("results/baseline/nccl_bw_rank0.csv")
+    tempo_path = Path("results/tempo/nccl_bw_rank0.csv")
+    if not base_path.exists() or not tempo_path.exists():
+        print("[fig5] CSV files not found, skipping")
+        return
+
+    baseline = pd.read_csv(base_path)
+    tempo    = pd.read_csv(tempo_path)
+
+    # Per-step median BW (across all ranks sampled)
+    def per_step(df):
+        return df.groupby("step")["algbw_GBs"].agg(["median", "quantile",
+                                                       lambda x: x.quantile(0.25),
+                                                       lambda x: x.quantile(0.75)])
+
+    b_med = baseline.groupby("step")["algbw_GBs"].median()
+    t_med = tempo.groupby("step")["algbw_GBs"].median()
+    b_p25 = baseline.groupby("step")["algbw_GBs"].quantile(0.25)
+    b_p75 = baseline.groupby("step")["algbw_GBs"].quantile(0.75)
+    t_p25 = tempo.groupby("step")["algbw_GBs"].quantile(0.25)
+    t_p75 = tempo.groupby("step")["algbw_GBs"].quantile(0.75)
+
+    steps = b_med.index
+
+    fig, ax = plt.subplots(figsize=(11, 5))
+
+    ax.plot(steps, b_med, color=RED,  lw=2.0, label="Baseline (greedy flush)", zorder=3)
+    ax.fill_between(steps, b_p25, b_p75, color=RED, alpha=0.15, zorder=2)
+
+    ax.plot(steps, t_med, color=BLUE, lw=2.0, label="TEMPO (paced flush)", zorder=3)
+    ax.fill_between(steps, t_p25, t_p75, color=BLUE, alpha=0.15, zorder=2)
+
+    # Checkpoint step markers + clean ckpt step labels at top
+    ckpt_steps = [20, 40, 60]
+    ymax = max(b_p75.max(), t_p75.max()) * 1.05
+    for cs in ckpt_steps:
+        if cs in steps:
+            ax.axvline(cs, color=GREEN, lw=1.2, linestyle="--", alpha=0.7, zorder=1)
+            ax.text(cs, ymax * 0.97, f"ckpt\nstep {cs}", fontsize=7.5,
+                    color=GREEN, ha="center", va="top",
+                    bbox=dict(fc="white", ec=GREEN, boxstyle="round,pad=0.2",
+                              linewidth=0.8, alpha=0.85))
+
+    # Annotate mean improvement over ALL ckpt steps (single callout)
+    b_ckpt = baseline[baseline["step"].isin(ckpt_steps)]["algbw_GBs"].mean()
+    t_ckpt = tempo[tempo["step"].isin(ckpt_steps)]["algbw_GBs"].mean()
+    overall_imp = (t_ckpt / b_ckpt - 1) * 100
+    # Place annotation between step 20 and 40
+    ax.annotate(f"TEMPO +{overall_imp:.0f}%\nat ckpt steps\n(mean {t_ckpt:.2f} vs {b_ckpt:.2f} GB/s)",
+                xy=(40, t_med.get(40, t_ckpt)),
+                xytext=(28, t_ckpt + 3.5),
+                fontsize=9, color=BLUE, fontweight="bold",
+                ha="center",
+                arrowprops=dict(arrowstyle="-|>", color=BLUE, lw=1.3),
+                bbox=dict(fc="#f0f8ff", ec=BLUE, boxstyle="round,pad=0.3",
+                          linewidth=1.0, alpha=0.92))
+
+    ax.set_xlabel("Training Step", fontsize=11)
+    ax.set_ylabel("NCCL Bandwidth — algbw (GB/s)", fontsize=11)
+    ax.set_title("Phase 3: TEMPO Improves NCCL BW at Checkpoint Steps (+47%)\n"
+                 "(Llama-1B FSDP FULL_SHARD, 2 nodes × 4×A100, world_size=8)",
+                 fontsize=12, fontweight="bold", color=DARK)
+    ax.legend(fontsize=10, loc="upper left", framealpha=0.9)
+    ax.grid(alpha=0.25, linestyle="--")
+    ax.set_xlim(-1, steps.max() + 2)
+
+    summary = (f"At ckpt steps — Baseline: {b_ckpt:.2f} GB/s │ "
+               f"TEMPO: {t_ckpt:.2f} GB/s │ Δ = +{(t_ckpt/b_ckpt-1)*100:.0f}%")
+    ax.text(0.5, 0.02, summary, transform=ax.transAxes,
+            ha="center", va="bottom", fontsize=9.5, color=DARK,
+            bbox=dict(fc=LIGHT, ec=GRAY, boxstyle="round,pad=0.4",
+                      linewidth=1.0))
+
+    path = OUT / "fig5_phase3_comparison.png"
+    fig.savefig(path)
+    fig.savefig(str(path).replace(".png", ".pdf"))
+    plt.close(fig)
+    print(f"[fig5] {path}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+if __name__ == "__main__":
+    print("Generating TEMPO figures...")
+    fig0_pcie_contention()
+    fig2_tempo_arch()
+    fig3_phase_timeline()
+    fig4_phase1_barchart()
+    fig5_phase3_comparison()
+    print(f"\nAll figures saved to {OUT}/")

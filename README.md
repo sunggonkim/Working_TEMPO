@@ -27,27 +27,7 @@ concurrency=64, 300 requests, NERSC Perlmutter 1 node (job 52217192)
 
 ### Time-to-First-Token (TTFT) 실측 패턴
 
-```
- TTFT / ITL (ms)
-  2800 |##
-       |##  <-- KV cache 압박 최고조 (t=0~1s)
-       |##     64개 동시 요청이 제한된 HBM 쟁탈
-  2000 |##     gpu_util=0.60 -> KV eviction 즉시 발생
-       |##
-       |##
-  1000 |##
-       |##
-   500 |##~~
-       |##~~
-    18 |##~~::::::::::::::::
-     8 |##~~::::::::::::::::  <-- steady-state P99 ~8ms
-       +--------------------------------------------> Time (s)
-        0  1  2  3  4  5  6  7  8  9  10
-
-  ## t=0-1s:  P50=2,758ms  P99=2,759ms  [335x spike]
-  ~~ t=1-2s:  P50=    7ms  P99=  492ms  [완화 중]
-  :: t=2-10s: P50=    7ms  P99=  8-18ms [steady-state]
-```
+![Phase 0: ITL Spike vs KV Eviction](results/figures/fig1_itl_vs_kv_eviction.png)
 
 ### 측정 통계 (65,210 토큰 레코드 / job 52217192)
 
@@ -65,17 +45,7 @@ concurrency=64, 300 requests, NERSC Perlmutter 1 node (job 52217192)
 
 ### 인과관계
 
-```
-gpu_util=0.60 -> HBM KV cache 한도 도달
-     |
-     v  vLLM이 KV blocks -> CPU RAM -> /tmp (NVMe) 로 evict
-     |
-     v  PCIe DMA가 GPU <-> NVMe 대역폭 점유
-     |
-     v  새 요청은 KV space 확보될 때까지 대기
-     |
-     v  TTFT: 23ms -> 2,759ms  (335x 증폭)
-```
+![PCIe Root Complex Contention](results/figures/fig0_pcie_contention.png)
 
 **결론**: KV eviction이 발생하는 순간, 새 요청의 첫 토큰 생성이 최대 **335배** 느려진다.
 
@@ -88,22 +58,7 @@ gpu_util=0.60 -> HBM KV cache 한도 도달
 
 ### NCCL AllReduce 대역폭 저하 (실측)
 
-```
-  BW (GB/s)
-  18.0 |[===][---]
-       |           [===][--]
-  16.0 |                     [===][-]
-       |
-       |  [===] Baseline  [---]/[-] Contention 저하
-       +----------------------------------------> Scale
-          2 Node    4 Node    8 Node
-
-  2 Node:  17.98 -> 17.78 GB/s  (-1.1%,  -0.20 GB/s)
-  4 Node:  16.75 -> 16.34 GB/s  (-2.4%,  -0.41 GB/s)
-  8 Node:  16.20 -> 15.66 GB/s  (-3.3%,  -0.54 GB/s)
-
-  Scale-out 증폭: 1.0x -> 2.2x -> 2.9x  (scale-out hypothesis CONFIRMED)
-```
+![Phase 1: NCCL BW Degradation at Scale](results/figures/fig4_phase1_barchart.png)
 
 ### 수치 요약
 
@@ -136,30 +91,15 @@ gpu_util=0.60 -> HBM KV cache 한도 도달
 \* 전체 평균이 낮은 것은 TEMPO step time이 길어지기 때문(background flush 대기)  
 \* 체크포인트 단계에서 NCCL BW는 47% 개선 — TEMPO의 핵심 가설 증명
 
+![Phase 3: TEMPO vs Baseline NCCL BW](results/figures/fig5_phase3_comparison.png)
+
 ### 핵심 메커니즘 확인
 
-```
-Baseline: NCCL all-reduce 중 5.12 GB checkpoint flush 동시 진행
-  → PCIe Root Complex 경쟁 → NCCL BW 4.94 GB/s
-
-TEMPO:    NCCL phase 감지 → flush thread에 220회 pause 신호
-  → NCCL I/O 분리 → NCCL BW 7.26 GB/s (+47%)
-  → flush는 COMPUTE phase에서만 진행 (0.26 GB/s, throttled)
-```
+![TEMPO System Architecture](results/figures/fig2_tempo_arch.png)
 
 ### Phase-Gated Flush 아이디어
 
-```
-LLM Forward Pass:
-  +-- FFN (GEMM) --+  +-- Attention -----------------+  +-- FFN --+
-  |  compute-bound  |  |  HBM + PCIe bandwidth-bound  |  |         |
-  |  [FLUSH HERE]   |  |  [TEMPO BLOCKS I/O HERE]     |  | [FLUSH] |
-  +-----------------+  +------------------------------+  +---------+
-
-  Detection: FSDP comm hook (reduce_scatter timing + PhaseMonitor)
-    NCCL_COMM phase -> I/O paused  (throttle_waits += 1 per 20ms)
-    COMPUTE  phase  -> I/O allowed
-```
+![TEMPO Phase-Gated Flush Timeline](results/figures/fig3_phase_timeline.png)
 
 ### 구현 현황
 
