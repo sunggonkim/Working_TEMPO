@@ -145,9 +145,11 @@ target_chunk = 0.5 × avg_nccl_ms × est_bw_bytes_per_ms
 chunk_bytes = clamp(target_chunk, 16 MB, 512 MB)
 ```
 
-**그림** (job 완료 후 자동 생성):
+**그림** (job 52239908 완료 전: physics-based 시뮬레이션 / 완료 후: 실측 데이터로 자동 갱신):
 
 ![TEMPO Chunk Size Sensitivity Sweep](results/figures/fig6_chunk_sweep.png)
+
+> 실제 측정 결과로 갱신하려면: `python3 scripts/make_figures.py --chunk-sweep`
 
 ---
 
