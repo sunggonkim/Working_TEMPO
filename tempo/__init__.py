@@ -35,12 +35,14 @@ Usage:
 
 from tempo.phase_monitor import PhaseMonitor, TrainingPhase
 from tempo.checkpoint_manager import CheckpointManager
-from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2
+from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2, TEMPOSchedulerV3
 from tempo.network_monitor import NetworkMonitor
 from tempo.service_gain import ServiceGainScheduler, TokenBucket, FlushPriority
 from tempo.interleaving_engine import InterleavingEngine, PhaseDurationPredictor
+from tempo.topology_router import TopologyRouter, PlacementDecision, PlacementTier
+from tempo.qos_mapper import QoSMapper, TC, TrafficClass
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     # Core (v1)
     "PhaseMonitor", "TrainingPhase", "CheckpointManager", "TEMPOScheduler",
@@ -49,4 +51,8 @@ __all__ = [
     "NetworkMonitor",
     "ServiceGainScheduler", "TokenBucket", "FlushPriority",
     "InterleavingEngine", "PhaseDurationPredictor",
+    # V3: Topology-Aware + Hardware QoS Co-Design
+    "TEMPOSchedulerV3",
+    "TopologyRouter", "PlacementDecision", "PlacementTier",
+    "QoSMapper", "TC", "TrafficClass",
 ]

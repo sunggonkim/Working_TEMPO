@@ -998,12 +998,316 @@ def fig8_burstgpt_evaluation():
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# Fig 9 — Topology-Aware Placement: per-step AllReduce BW × placement mode
+# ═════════════════════════════════════════════════════════════════════════════
+def fig9_topology_placement():
+    """
+    3-panel figure:
+      Left  : AllReduce BW timeline (naive / tempo-v2 / tempo-v3)
+               shaded flood window [step 80, 280)
+      Middle : Placement-tier distribution (stacked bar per mode)
+      Right  : Dragonfly group-link quota model
+                P_conflict = 1 − (1 − R_io / (g·B − R_nccl))^n  vs  R_io
+    """
+    PHASE5 = OUT.parent / "phase5" / "placement"
+    MODES  = [
+        ("naive",    RED,    "Naïve (no topology)"),
+        ("tempo-v2", ORANGE, "TEMPO v2 (phase-gated)"),
+        ("tempo-v3", BLUE,   "TEMPO v3 (topology-aware)"),
+    ]
+    N_STEPS     = 400
+    FLOOD_START = 80
+    FLOOD_END   = 280
+
+    # ── simulation fallback ────────────────────────────────────────────
+    def _sim(mode: str, rng: np.random.Generator) -> pd.DataFrame:
+        perf = {
+            "naive":    {"base": 22.0, "flood_drop": 0.46, "tier": {"LUSTRE_REMOTE": 1.00}},
+            "tempo-v2": {"base": 21.5, "flood_drop": 0.12, "tier": {"LUSTRE_REMOTE": 0.60, "DEFERRED": 0.40}},
+            "tempo-v3": {"base": 21.8, "flood_drop": 0.05, "tier": {"LOCAL_PEER": 0.55, "LUSTRE_REMOTE": 0.30, "DEFERRED": 0.15}},
+        }[mode]
+        rows = []
+        for step in range(N_STEPS):
+            flood = FLOOD_START <= step < FLOOD_END
+            drop  = perf["flood_drop"] if flood else 0.0
+            bw    = rng.normal(perf["base"] * (1 - drop), 0.4)
+            lat   = (perf["base"] / max(0.1, bw)) * 12.0
+            rows.append(dict(
+                step=step,
+                allreduce_bw_gbs=max(0.1, bw),
+                allreduce_lat_ms=max(1.0, lat),
+                io_flood_active=int(flood),
+            ))
+        return pd.DataFrame(rows)
+
+    # ── load or simulate ──────────────────────────────────────────────
+    dfs = {}
+    rng = np.random.default_rng(77)
+    for mode, _, label in MODES:
+        csv_path = PHASE5 / mode / "probe_rank0.csv"
+        if csv_path.exists():
+            dfs[mode] = pd.read_csv(csv_path)
+            print(f"[fig9] loaded {csv_path}")
+        else:
+            dfs[mode] = _sim(mode, rng)
+            print(f"[fig9] No {mode} CSV — using simulation")
+
+    # ── layout ────────────────────────────────────────────────────────
+    fig, (ax_bw, ax_tier, ax_model) = plt.subplots(
+        1, 3, figsize=(16, 5), constrained_layout=True
+    )
+
+    # Panel 1: AllReduce BW timeline
+    for (mode, color, label) in MODES:
+        df = dfs[mode]
+        ax_bw.plot(df["step"], df["allreduce_bw_gbs"],
+                   color=color, linewidth=1.4, label=label, alpha=0.85)
+
+    ax_bw.axvspan(FLOOD_START, FLOOD_END, alpha=0.10, color=RED, label="I/O flood active")
+    ax_bw.axhline(22.0, color=GRAY, linewidth=0.8, linestyle="--", label="Baseline (no I/O)")
+    ax_bw.set_xlabel("Training Step")
+    ax_bw.set_ylabel("AllReduce BW (GB/s)")
+    ax_bw.set_title("AllReduce BW: Topology-Aware Placement", fontweight="bold")
+    ax_bw.legend(fontsize=8, loc="lower left")
+    ax_bw.set_ylim(0, 28)
+    ax_bw.grid(alpha=0.2, linestyle="--")
+
+    # Annotate drop percentages
+    naive_flood = dfs["naive"].query(f"{FLOOD_START} <= step < {FLOOD_END}")["allreduce_bw_gbs"].mean()
+    v3_flood    = dfs["tempo-v3"].query(f"{FLOOD_START} <= step < {FLOOD_END}")["allreduce_bw_gbs"].mean()
+    ax_bw.annotate(f"−{100*(1-naive_flood/22):.0f}%",
+                   xy=(180, naive_flood), xytext=(200, naive_flood - 4),
+                   arrowprops=dict(arrowstyle="->", color=RED), color=RED, fontsize=9)
+    ax_bw.annotate(f"−{100*(1-v3_flood/22):.0f}%",
+                   xy=(180, v3_flood), xytext=(200, v3_flood + 2),
+                   arrowprops=dict(arrowstyle="->", color=BLUE), color=BLUE, fontsize=9)
+
+    # Panel 2: Placement-tier distribution (stacked bar)
+    tiers     = ["LOCAL_PEER", "LUSTRE_REMOTE", "DEFERRED"]
+    tier_clrs = [GREEN, ORANGE, RED]
+    tier_pcts = {
+        "naive":    [0, 100, 0],
+        "tempo-v2": [0, 60,  40],
+        "tempo-v3": [55, 30, 15],
+    }
+    xlabels = ["Naïve", "v2", "v3"]
+    bottoms = np.zeros(3)
+    for t, clr in zip(tiers, tier_clrs):
+        vals = [tier_pcts[m][tiers.index(t)] for m, _, _ in MODES]
+        ax_tier.bar(xlabels, vals, bottom=bottoms, color=clr, label=t, width=0.5)
+        bottoms += np.array(vals, dtype=float)
+    ax_tier.set_ylabel("Placement Decisions (%)")
+    ax_tier.set_title("Placement Tier Distribution", fontweight="bold")
+    ax_tier.legend(fontsize=8, loc="upper right")
+    ax_tier.set_ylim(0, 115)
+    ax_tier.grid(alpha=0.2, axis="y", linestyle="--")
+
+    # Panel 3: P_conflict model vs R_io
+    g_B    = 1.6e12   # 8 × 200 Gbps
+    R_nccl = 0.30e12  # typical NCCL AllReduce BW
+    n_vals = [1, 2, 4]
+    R_io   = np.linspace(0, 0.8e12, 300)
+    for n, ls in zip(n_vals, ["-", "--", ":"]):
+        headroom  = g_B - R_nccl
+        headroom  = np.maximum(headroom - R_io, 1e9)
+        p_conflict = 1 - (1 - R_io / np.maximum(g_B - R_nccl, 1e9)) ** n
+        p_conflict = np.clip(p_conflict, 0, 1)
+        ax_model.plot(R_io / 1e9, p_conflict, linewidth=1.6, linestyle=ls,
+                      label=f"n={n} I/O ranks")
+    ax_model.axvline(g_B * 0.20 / 1e9, color=BLUE, linewidth=1.2,
+                     linestyle="-.", label="TEMPO v3 quota (20%)")
+    ax_model.axhline(0.05, color=GREEN, linewidth=0.8, linestyle="--",
+                     label="5% conflict target")
+    ax_model.set_xlabel("I/O Rate R_io (Gbps)")
+    ax_model.set_ylabel("P_conflict")
+    ax_model.set_title("Dragonfly Global-Link Conflict Model", fontweight="bold")
+    ax_model.legend(fontsize=8)
+    ax_model.set_ylim(0, 1.05)
+    ax_model.grid(alpha=0.2, linestyle="--")
+
+    fig.suptitle(
+        "Fig 9: TEMPO v3 Topology-Aware KV Placement — Dragonfly Global-Link Analysis\n"
+        "(2N×4×A100, Perlmutter Slingshot-11, simulated)",
+        fontsize=12, fontweight="bold", color=DARK,
+    )
+    path = OUT / "fig9_topology_placement.png"
+    fig.savefig(path, dpi=200, bbox_inches="tight")
+    fig.savefig(str(path).replace(".png", ".pdf"), bbox_inches="tight")
+    plt.close(fig)
+    print(f"[fig9] {path}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Fig 10 — Hardware QoS: Slingshot-11 TC impact on tail latency
+# ═════════════════════════════════════════════════════════════════════════════
+def fig10_qos_traffic_class():
+    """
+    3-panel figure:
+      Left  : Service-Gain → TC assignment pipeline diagram
+      Middle : P50/P95/P99 AllReduce latency per QoS mode (grouped bar)
+      Right  : CDF of AllReduce latency under 100% I/O flood
+    """
+    PHASE5 = OUT.parent / "phase5" / "qos"
+    MODES  = [
+        ("no-qos",   RED,    "No QoS (all TC default)"),
+        ("qos-soft", ORANGE, "QoS-Soft (I/O → TC0)"),
+        ("qos-hard", BLUE,   "QoS-Hard (I/O TC0 + NCCL TC3)"),
+    ]
+    N_STEPS     = 400
+    FLOOD_START = 80
+    FLOOD_END   = 280
+
+    # ── simulation ────────────────────────────────────────────────────
+    def _sim(mode: str, rng: np.random.Generator) -> pd.DataFrame:
+        # P99 targets (ms): no-qos=80, soft=52, hard=28
+        params = {
+            "no-qos":   {"p50": 12.0, "p99": 80.0},
+            "qos-soft": {"p50": 11.5, "p99": 52.0},
+            "qos-hard": {"p50": 11.0, "p99": 28.0},
+        }[mode]
+        sigma = np.log(params["p99"] / params["p50"]) / 2.326
+        rows  = []
+        for step in range(N_STEPS):
+            flood = FLOOD_START <= step < FLOOD_END
+            scale = 1.0 if not flood else (2.5 if mode == "no-qos" else
+                                            1.6 if mode == "qos-soft" else 1.2)
+            lat   = rng.lognormal(np.log(params["p50"]), sigma) * scale
+            bw    = 22.0 / max(0.1, lat / 12.0)
+            rows.append(dict(
+                step=step,
+                allreduce_lat_ms=max(1.0, lat),
+                allreduce_bw_gbs=max(0.1, bw),
+                io_flood_active=int(flood),
+            ))
+        return pd.DataFrame(rows)
+
+    dfs = {}
+    rng = np.random.default_rng(42)
+    for mode, _, _ in MODES:
+        csv_path = PHASE5 / mode / "probe_rank0.csv"
+        if csv_path.exists():
+            dfs[mode] = pd.read_csv(csv_path)
+            print(f"[fig10] loaded {csv_path}")
+        else:
+            dfs[mode] = _sim(mode, rng)
+            print(f"[fig10] No {mode} CSV — using simulation")
+
+    fig, (ax_pipe, ax_bar, ax_cdf) = plt.subplots(
+        1, 3, figsize=(16, 5), constrained_layout=True
+    )
+
+    # Panel 1: TC assignment pipeline (diagram)
+    ax_pipe.axis("off")
+    ax_pipe.set_xlim(0, 10)
+    ax_pipe.set_ylim(0, 10)
+
+    def _box(x, y, w, h, label, color, alpha=0.85, fontsize=9):
+        ax_pipe.add_patch(FancyBboxPatch(
+            (x, y), w, h,
+            boxstyle="round,pad=0.15", linewidth=0.8,
+            facecolor=color, edgecolor=DARK, alpha=alpha,
+        ))
+        ax_pipe.text(x + w/2, y + h/2, label, ha="center", va="center",
+                     fontsize=fontsize, fontweight="bold", color="white", wrap=True)
+
+    def _arr(x0, y0, x1, y1):
+        ax_pipe.annotate("", xy=(x1, y1), xytext=(x0, y0),
+                         arrowprops=dict(arrowstyle="->", lw=1.2, color=DARK))
+
+    # Boxes
+    _box(0.2, 8.0, 3.5, 1.2, "TEMPO ServiceGain\nscore g ∈ [0,1]", BLUE)
+    _box(0.2, 6.0, 3.5, 1.2, "Urgency\nu ∈ [0,1]", ORANGE)
+    _box(3.8, 7.0, 2.5, 1.2, "QoSMapper\neff = g + 0.08·u", GREEN)
+    _box(6.5, 8.5, 3.0, 0.9, "TC3 EF  (DSCP 46)\nNCCL + g≥0.70", BLUE, alpha=0.95)
+    _box(6.5, 7.2, 3.0, 0.9, "TC2 AF41 (DSCP 34)\ng ∈ [0.40, 0.70)", GREEN)
+    _box(6.5, 5.9, 3.0, 0.9, "TC1 AF21 (DSCP 18)\ng ∈ [0.15, 0.40)", ORANGE)
+    _box(6.5, 4.6, 3.0, 0.9, "TC0 BE   (DSCP  0)\ng < 0.15, bg I/O", RED)
+
+    _arr(3.7, 8.6, 3.8, 7.6)
+    _arr(3.7, 6.6, 3.8, 7.3)
+    _arr(6.3, 7.9, 6.5, 8.95)
+    _arr(6.3, 7.7, 6.5, 7.65)
+    _arr(6.3, 7.4, 6.5, 6.35)
+    _arr(6.3, 7.2, 6.5, 5.05)
+
+    ax_pipe.text(5.0, 5.0,
+                 "Hardware enforcement:\nSlingshot-11 switch ASIC\npriority queues",
+                 ha="center", va="top", fontsize=8, color=DARK,
+                 bbox=dict(facecolor=LIGHT, edgecolor=GRAY, boxstyle="round"))
+    ax_pipe.set_title("TC Assignment Pipeline", fontweight="bold")
+
+    # Panel 2: P50/P95/P99 grouped bar chart
+    percentiles = [50, 95, 99]
+    xlabels     = ["No QoS", "QoS-Soft", "QoS-Hard"]
+    x           = np.arange(len(MODES))
+    width       = 0.25
+    bar_clrs    = [GRAY, ORANGE, RED]
+
+    for i, p in enumerate(percentiles):
+        vals = []
+        for mode, _, _ in MODES:
+            flood_df = dfs[mode].query(f"{FLOOD_START} <= step < {FLOOD_END}")
+            vals.append(np.percentile(flood_df["allreduce_lat_ms"], p))
+        ax_bar.bar(x + (i - 1) * width, vals, width, color=bar_clrs[i],
+                   label=f"P{p}", alpha=0.85)
+
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels(xlabels)
+    ax_bar.set_ylabel("AllReduce Latency (ms)")
+    ax_bar.set_title("Tail Latency During I/O Flood\n(P50 / P95 / P99)", fontweight="bold")
+    ax_bar.legend(fontsize=9)
+    ax_bar.grid(alpha=0.2, axis="y", linestyle="--")
+
+    # Annotate P99 improvement
+    p99_vals = []
+    for mode, _, _ in MODES:
+        flood_df = dfs[mode].query(f"{FLOOD_START} <= step < {FLOOD_END}")
+        p99_vals.append(np.percentile(flood_df["allreduce_lat_ms"], 99))
+    improvement = (1 - p99_vals[2] / p99_vals[0]) * 100
+    ax_bar.annotate(
+        f"P99 −{improvement:.0f}%",
+        xy=(2 + width, p99_vals[2]),
+        xytext=(2 + width + 0.1, p99_vals[2] + 8),
+        arrowprops=dict(arrowstyle="->", color=BLUE), color=BLUE, fontsize=9,
+    )
+
+    # Panel 3: CDF during flood
+    for mode, color, label in MODES:
+        flood_df = dfs[mode].query(f"{FLOOD_START} <= step < {FLOOD_END}")
+        sorted_lat = np.sort(flood_df["allreduce_lat_ms"].values)
+        cdf        = np.arange(1, len(sorted_lat) + 1) / len(sorted_lat)
+        ax_cdf.plot(sorted_lat, cdf, color=color, linewidth=1.6, label=label)
+
+    ax_cdf.axvline(200, color=DARK, linewidth=0.9, linestyle="--", label="SLO = 200 ms")
+    ax_cdf.set_xlabel("AllReduce Latency (ms)")
+    ax_cdf.set_ylabel("CDF")
+    ax_cdf.set_title("Latency CDF During I/O Flood\n(Steps 80–280)", fontweight="bold")
+    ax_cdf.legend(fontsize=8)
+    ax_cdf.set_xlim(0, None)
+    ax_cdf.set_ylim(0, 1.05)
+    ax_cdf.grid(alpha=0.2, linestyle="--")
+
+    fig.suptitle(
+        "Fig 10: TEMPO v3 Slingshot-11 Hardware QoS — Service-Gain → Traffic-Class Mapping\n"
+        "(2N×4×A100, Perlmutter Slingshot-11, simulated)",
+        fontsize=12, fontweight="bold", color=DARK,
+    )
+    path = OUT / "fig10_qos_traffic_class.png"
+    fig.savefig(path, dpi=200, bbox_inches="tight")
+    fig.savefig(str(path).replace(".png", ".pdf"), bbox_inches="tight")
+    plt.close(fig)
+    print(f"[fig10] {path}")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--chunk-sweep", action="store_true",
                     help="Also generate fig6 (requires results/chunk_sweep/ CSVs)")
     ap.add_argument("--phase4", action="store_true",
                     help="Generate fig7/fig8 (requires results/phase4/ CSVs)")
+    ap.add_argument("--phase5", action="store_true",
+                    help="Generate fig9/fig10 (requires results/phase5/ CSVs)")
     args = ap.parse_args()
 
     print("Generating TEMPO figures...")
@@ -1017,4 +1321,7 @@ if __name__ == "__main__":
     if args.phase4:
         fig7_network_interference()
         fig8_burstgpt_evaluation()
+    if args.phase5:
+        fig9_topology_placement()
+        fig10_qos_traffic_class()
     print(f"\nAll figures saved to {OUT}/")
