@@ -161,6 +161,32 @@ if(TEMPO_BUILD_TESTS)
 endif()
 
 # ============================================================================
+# libcassini_ctr.so — zero-overhead Cassini NIC sysfs counter reader
+#
+# Pure C library (no CUDA dependency) that keeps sysfs counter fds open
+# across calls and uses mmap when the kernel supports it.
+# Python uses this via ctypes in tempo/network_monitor.py.
+# ============================================================================
+
+add_library(cassini_ctr SHARED
+    src/c_api/cassini_counters.c
+)
+
+set_target_properties(cassini_ctr PROPERTIES
+    C_STANDARD 11
+    OUTPUT_NAME "cassini_ctr"
+    SOVERSION   1
+    VERSION     ${PROJECT_VERSION}
+    COMPILE_FLAGS "-O2 -fPIC"
+)
+
+target_link_libraries(cassini_ctr PRIVATE)
+
+install(TARGETS cassini_ctr
+    LIBRARY DESTINATION lib
+)
+
+# ============================================================================
 # Install targets
 # ============================================================================
 

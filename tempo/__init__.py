@@ -53,7 +53,7 @@ from tempo.topology_router import TopologyRouter, PlacementDecision, PlacementTi
 from tempo.qos_mapper import QoSMapper, TC, TrafficClass
 from tempo.sparse_transfer import SparseTransferFilter, SparseKVBlock
 from tempo.p2p_cache import P2PCacheStore
-from tempo.nano_overlap import NanoOverlapController, LayerTiming, StepMetrics
+from tempo.nano_overlap import NanoOverlapController, LayerTiming, StepMetrics, PinnedBufferPool
 from tempo.trace_loader import TraceLoader, Request, TraceStats
 
 __version__ = "0.4.0"
@@ -73,7 +73,7 @@ __all__ = [
     "TEMPOSchedulerV4",
     "SparseTransferFilter", "SparseKVBlock",
     "P2PCacheStore",
-    "NanoOverlapController", "LayerTiming", "StepMetrics",
+    "NanoOverlapController", "LayerTiming", "StepMetrics", "PinnedBufferPool",
     # Real hardware + workload (OSDI AE requirements)
     "CassiniHWCounters",
     "TraceLoader", "Request", "TraceStats",

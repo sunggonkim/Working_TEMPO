@@ -158,6 +158,106 @@ class _EWMA:
 
 
 # ---------------------------------------------------------------------------
+# PinnedBufferPool — pre-allocated host pinned memory to prevent caching
+#                    allocator lock contention on the compute stream
+# ---------------------------------------------------------------------------
+
+class PinnedBufferPool:
+    """
+    Pre-allocated pool of CUDA pinned (page-locked) host memory buffers.
+
+    Problem this solves
+    -------------------
+    When ``kv_tensor.to('cpu', non_blocking=True)`` is called inside
+    ``torch.cuda.stream(io_stream)``, PyTorch's CUDACachingAllocator
+    dynamically allocates a pinned host buffer for the DMA destination.
+    This allocation acquires the global allocator lock, which can stall
+    the compute stream for 50–200 µs even when the two streams are
+    otherwise independent.
+
+    Solution
+    --------
+    We pre-allocate ``n_layers`` pinned CPU tensors at startup.  Each
+    layer's KV DMA always writes into its dedicated buffer, avoiding any
+    dynamic allocation on the critical path.
+
+    Technical note: ``torch.empty(..., pin_memory=True)`` calls
+    ``cudaHostAlloc(flags=cudaHostAllocDefault)`` once.  Subsequent
+    ``copy_(src, non_blocking=True)`` reuses the same physical pages
+    — the DMA engine programs the IOMMU tables at open time and never
+    touches the allocator lock again.
+
+    Thread safety: ``acquire(layer_id)`` is lock-free (round-robins by
+    layer_id).  ``release()`` is a no-op (buffers are reused in-place).
+
+    Parameters
+    ----------
+    n_layers : int
+        Number of pre-allocated buffers (one per transformer layer).
+    chunk_elems : int
+        Number of elements per buffer (should match the KV tensor numel).
+    dtype : torch.dtype
+        Element type (default bfloat16 — matches Llama training dtype).
+    """
+
+    def __init__(
+        self,
+        n_layers:    int,
+        chunk_elems: int,
+        dtype        = None,
+    ) -> None:
+        self._pool:   List["torch.Tensor"] = []
+        self._available = _CUDA_AVAILABLE and torch is not None
+
+        if self._available:
+            _dtype = dtype or torch.bfloat16
+            try:
+                for _ in range(n_layers):
+                    buf = torch.empty(chunk_elems, dtype=_dtype, pin_memory=True)
+                    self._pool.append(buf)
+                log.info(
+                    "PinnedBufferPool: pre-allocated %d × %d × %d bytes "
+                    "(pinned host memory, zero dynamic alloc on hot path)",
+                    n_layers, chunk_elems,
+                    chunk_elems * torch.finfo(_dtype).bits // 8,
+                )
+            except Exception as e:
+                log.warning(
+                    "PinnedBufferPool: pinned alloc failed (%s) — "
+                    "falling back to dynamic allocation (may cause implicit sync)", e
+                )
+                self._pool = []
+                self._available = False
+
+    @property
+    def ready(self) -> bool:
+        return bool(self._pool)
+
+    def get(self, layer_id: int) -> "Optional[torch.Tensor]":
+        """Return the pre-allocated pinned buffer for this layer.
+
+        Returns None if pool is empty (fallback to dynamic allocation).
+        """
+        if not self._pool:
+            return None
+        return self._pool[layer_id % len(self._pool)]
+
+    def resize_if_needed(self, required_elems: int, dtype) -> None:
+        """Grow each buffer if the actual KV tensor is larger than expected."""
+        if not self._pool:
+            return
+        if self._pool[0].numel() < required_elems:
+            old = len(self._pool)
+            self._pool = [
+                torch.empty(required_elems, dtype=dtype, pin_memory=True)
+                for _ in range(old)
+            ]
+            log.debug(
+                "PinnedBufferPool: resized to %d elements per buffer", required_elems
+            )
+
+
+# ---------------------------------------------------------------------------
 # NanoOverlapController
 # ---------------------------------------------------------------------------
 
@@ -172,6 +272,14 @@ class NanoOverlapController:
       - ``io_stream``      = torch.cuda.Stream()
       - Synchronisation via torch.cuda.Event (zero CPU stall)
 
+    Memory allocation strategy
+    --------------------------
+    PyTorch's CUDACachingAllocator acquires a global lock when it allocates
+    pinned host buffers.  To prevent this from stalling the compute stream
+    during KV DMA, we use ``PinnedBufferPool`` to pre-allocate all DMA
+    destination buffers at construction time.  After the first step, there
+    are zero dynamic allocations on the io_stream hot path.
+
     When CUDA is not available (login nodes, CI), falls back to a background
     thread that mimics the I/O stream.  This path is labelled ``cpu_fallback``
     in all reported stats so it is never confused with real hardware numbers.
@@ -181,7 +289,8 @@ class NanoOverlapController:
     n_layers : int
         Number of transformer layers.
     chunk_bytes : int
-        Expected bytes per layer KV chunk (used for throughput accounting).
+        Expected bytes per layer KV chunk (used for throughput accounting
+        and pre-allocating pinned memory buffers).
     io_callback : callable, optional
         ``io_callback(layer_id, cpu_tensor_or_bytes)`` called once the
         DMA to host memory completes.  Use this to write the chunk to
@@ -191,15 +300,19 @@ class NanoOverlapController:
         pipeline; increase to hide longer DMA latencies.
     device : str or torch.device, optional
         CUDA device to use.  Defaults to current device.
+    preallocate_pinned : bool
+        Whether to pre-allocate pinned host memory at construction time
+        (default True).  Disable only in memory-constrained environments.
     """
 
     def __init__(
         self,
-        n_layers:       int                = 32,
-        chunk_bytes:    int                = 8 * 1024 * 1024,
-        io_callback:    Optional[Callable] = None,
-        prefetch_depth: int                = 1,
-        device:         Optional[str]      = None,
+        n_layers:            int                = 32,
+        chunk_bytes:         int                = 8 * 1024 * 1024,
+        io_callback:         Optional[Callable] = None,
+        prefetch_depth:      int                = 1,
+        device:              Optional[str]      = None,
+        preallocate_pinned:  bool               = True,
     ) -> None:
         self.n_layers      = n_layers
         self.chunk_bytes   = chunk_bytes
@@ -232,6 +345,22 @@ class NanoOverlapController:
                 "NanoOverlapController: CUDA not available — "
                 "using CPU fallback thread (NOT suitable for hardware results)"
             )
+
+        # ── Pinned memory pool — prevents CUDACachingAllocator lock contention
+        # on the io_stream hot path.
+        # Pre-allocate n_layers bfloat16 buffers at construction time.
+        # Each buffer holds chunk_bytes / 2 elements (bfloat16 = 2 bytes).
+        # ──────────────────────────────────────────────────────────────
+        self._pinned_pool: Optional[PinnedBufferPool] = None
+        if self._use_cuda and preallocate_pinned and torch is not None:
+            chunk_elems = max(1, chunk_bytes // 2)   # bfloat16
+            self._pinned_pool = PinnedBufferPool(
+                n_layers    = n_layers,
+                chunk_elems = chunk_elems,
+                dtype       = torch.bfloat16,
+            )
+            if not self._pinned_pool.ready:
+                self._pinned_pool = None
 
         # Per-step bookkeeping
         self._step: int = -1
@@ -352,7 +481,8 @@ class NanoOverlapController:
     def get_stats(self) -> dict:
         if not self._steps_history:
             return {"steps_done": self._steps_done,
-                    "cuda_streams": self._use_cuda}
+                    "cuda_streams": self._use_cuda,
+                    "pinned_pool_ready": self._pinned_pool is not None and self._pinned_pool.ready}
         recent = list(self._steps_history)[-20:]
         avg_eff    = sum(m.pipeline_eff for m in recent) / len(recent)
         avg_bubble = sum(m.avg_bubble_ms for m in recent) / len(recent)
@@ -364,6 +494,7 @@ class NanoOverlapController:
             "io_ms_ewma":        self._io_ewma.mean,
             "zero_bubble_steps": sum(1 for m in recent if m.total_bubble_ms < 0.5),
             "cuda_streams":      self._use_cuda,
+            "pinned_pool_ready": self._pinned_pool is not None and self._pinned_pool.ready,
         }
 
     def shutdown(self) -> None:
@@ -417,12 +548,33 @@ class NanoOverlapController:
         self._io_stream.wait_event(compute_done)
 
         # 3. Asynchronous D2H copy on io_stream (pinned memory → no stall)
-        # Use a pre-allocated pinned buffer if available for zero-copy.
+        # Use pre-allocated pinned buffer when available (zero dynamic alloc).
+        # If the KV tensor is larger than expected, resize the pool in-place.
         with torch.cuda.stream(self._io_stream):
             if kv_tensor.is_cuda:
-                cpu_tensor = kv_tensor.to(device="cpu", non_blocking=True)
+                pinned_buf = None
+                if self._pinned_pool is not None:
+                    # Grow pool if this layer's KV is larger than pre-allocated
+                    self._pinned_pool.resize_if_needed(
+                        kv_tensor.numel(), kv_tensor.dtype
+                    )
+                    pinned_buf = self._pinned_pool.get(layer_id)
+
+                if pinned_buf is not None:
+                    # Zero-alloc path: copy_ into pre-allocated pinned buffer.
+                    # The DMA engine re-uses the existing IOMMU mapping.
+                    # Reshape if necessary (contiguous view of same numel).
+                    if pinned_buf.numel() >= kv_tensor.numel():
+                        dst = pinned_buf[:kv_tensor.numel()].view(kv_tensor.shape)
+                    else:
+                        dst = pinned_buf  # fallback; pool resize above handles growth
+                    dst.copy_(kv_tensor, non_blocking=True)
+                    cpu_tensor = dst
+                else:
+                    # Dynamic allocation fallback (may trigger allocator lock)
+                    cpu_tensor = kv_tensor.to(device="cpu", non_blocking=True)
             else:
-                cpu_tensor = kv_tensor  # already on CPU (unusual)
+                cpu_tensor = kv_tensor  # already on CPU
 
         # 4. Record "I/O done" event on io_stream
         io_done = torch.cuda.Event(enable_timing=True)

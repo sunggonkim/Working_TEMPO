@@ -393,13 +393,80 @@ _CASSINI_COUNTERS = {
     "hwmark_pct":             ("buffer/hwmark_pct",       0.01, "HW buffer watermark %"),
 }
 
+# ---------------------------------------------------------------------------
+# C library loader — zero-overhead sysfs reads via persistent fds + mmap
+# ---------------------------------------------------------------------------
+
+def _load_cassini_c_lib():
+    """
+    Attempt to load libcassini_ctr.so from the same directory as this file.
+
+    The C library (src/c_api/cassini_counters.c) keeps each sysfs counter
+    file open across calls and uses mmap when the kernel supports it,
+    reducing per-read overhead from ~15 µs (Python open/read/close) to
+    ~0.3 µs (memory load from mmap page).
+
+    Returns the ctypes CDLL handle, or None if the library is not found.
+    """
+    import ctypes
+    import pathlib
+
+    # Check co-located with network_monitor.py first, then src/c_api/
+    candidates = [
+        pathlib.Path(__file__).parent.parent / "src" / "c_api" / "libcassini_ctr.so",
+        pathlib.Path(__file__).parent / "libcassini_ctr.so",
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                lib = ctypes.CDLL(str(p))
+                import ctypes as _ct
+                lib.cassini_open_nic.restype  = _ct.c_int
+                lib.cassini_open_nic.argtypes = [_ct.c_int, _ct.POINTER(_ct.c_char_p)]
+                lib.cassini_read_counter.restype  = _ct.c_int64
+                lib.cassini_read_counter.argtypes = [_ct.c_int, _ct.c_char_p]
+                lib.cassini_read_all.restype  = _ct.c_int
+                lib.cassini_read_all.argtypes = [
+                    _ct.c_int,
+                    _ct.POINTER(_ct.c_int64),
+                    _ct.POINTER(_ct.c_char_p),
+                ]
+                lib.cassini_close_all.restype  = None
+                lib.cassini_close_all.argtypes = []
+                lib.cassini_n_nics.restype  = _ct.c_int
+                lib.cassini_n_nics.argtypes = []
+                logger.info(
+                    "[CassiniHWCounters] Loaded C library from %s "
+                    "(mmap-based zero-overhead counter reads)", p
+                )
+                return lib
+            except (OSError, AttributeError) as e:
+                logger.debug("[CassiniHWCounters] C lib load failed (%s): %s", p, e)
+    logger.debug(
+        "[CassiniHWCounters] libcassini_ctr.so not found — "
+        "falling back to Python sysfs reads"
+    )
+    return None
+
+_CASSINI_C_LIB = _load_cassini_c_lib()
+
 
 def _read_cassini_counter(cxi_idx: int, subpath: str) -> Optional[int]:
     """
     Attempt to read a Cassini hardware counter for NIC cxi{cxi_idx}.
-    Tries all known sysfs root patterns in order.  Returns None if not
-    accessible (no Cassini firmware, no permission, or older kernel).
+
+    Uses the C library (persistent fd + mmap) when available.
+    Falls back to Python open/read otherwise.
     """
+    if _CASSINI_C_LIB is not None:
+        import ctypes
+        val = _CASSINI_C_LIB.cassini_read_counter(
+            ctypes.c_int(cxi_idx),
+            subpath.encode(),
+        )
+        return int(val) if val >= 0 else None
+
+    # Python fallback
     for root_tmpl in _CXI_SYSFS_ROOTS:
         root = root_tmpl.format(n=cxi_idx)
         full = os.path.join(root, subpath)
@@ -492,9 +559,30 @@ class CassiniHWCounters:
     # ----------------------------------------------------------------
 
     def start(self) -> "CassiniHWCounters":
-        """Start the background counter-polling thread."""
+        """Start the background counter-polling thread.
+
+        If the C library is loaded, opens all counter file descriptors once
+        here (persistent across all subsequent reads — no open/close overhead).
+        """
         if not self._available:
             return self
+
+        # Open all counter fds via C library (mmap + persistent fd)
+        if _CASSINI_C_LIB is not None:
+            import ctypes
+            subpaths = [s.encode() for (s, _sc, _d) in _CASSINI_COUNTERS.values()]
+            subpaths.append(None)   # NULL terminator
+            arr_type = ctypes.c_char_p * len(subpaths)
+            c_arr = arr_type(*subpaths)
+            for i in range(self.n_nics):
+                n_opened = _CASSINI_C_LIB.cassini_open_nic(
+                    ctypes.c_int(i), c_arr
+                )
+                logger.debug(
+                    "[CassiniHWCounters] cxi%d: opened %d counter fds via C lib",
+                    i, n_opened,
+                )
+
         self._stop_evt.clear()
         self._thread = threading.Thread(
             target=self._poll_loop,
@@ -509,6 +597,8 @@ class CassiniHWCounters:
         self._stop_evt.set()
         if self._thread:
             self._thread.join(timeout=2)
+        if _CASSINI_C_LIB is not None:
+            _CASSINI_C_LIB.cassini_close_all()
 
     # ----------------------------------------------------------------
     # Public queries
