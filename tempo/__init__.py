@@ -35,7 +35,18 @@ Usage:
 
 from tempo.phase_monitor import PhaseMonitor, TrainingPhase
 from tempo.checkpoint_manager import CheckpointManager
-from tempo.scheduler import TEMPOScheduler
+from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2
+from tempo.network_monitor import NetworkMonitor
+from tempo.service_gain import ServiceGainScheduler, TokenBucket, FlushPriority
+from tempo.interleaving_engine import InterleavingEngine, PhaseDurationPredictor
 
-__version__ = "0.1.0"
-__all__ = ["PhaseMonitor", "TrainingPhase", "CheckpointManager", "TEMPOScheduler"]
+__version__ = "0.2.0"
+__all__ = [
+    # Core (v1)
+    "PhaseMonitor", "TrainingPhase", "CheckpointManager", "TEMPOScheduler",
+    # V2: Communication & I/O-Aware Co-Scheduling
+    "TEMPOSchedulerV2",
+    "NetworkMonitor",
+    "ServiceGainScheduler", "TokenBucket", "FlushPriority",
+    "InterleavingEngine", "PhaseDurationPredictor",
+]
