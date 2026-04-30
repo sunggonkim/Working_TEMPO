@@ -250,7 +250,6 @@ async def run_vllm_experiment(args) -> List[TokenRecord]:
         gpu_memory_utilization=args.gpu_util,
         max_model_len=4096,
         trust_remote_code=True,
-        disable_log_requests=True,
         dtype="bfloat16",
     )
 
