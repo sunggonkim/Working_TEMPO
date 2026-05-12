@@ -8,7 +8,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0%20FSDP-EE4C2C?logo=pytorch)](https://pytorch.org)
 [![AllReduce](https://img.shields.io/badge/AllReduce%20Latency-−50.2%25-brightgreen)](#31-pcie-contention-isolation)
 [![DMA](https://img.shields.io/badge/DMA%20Time-−21.7%25-green)](#31-pcie-contention-isolation)
-[![E2E](https://img.shields.io/badge/E2E%20ckpt--step%20BW-%2B9.9%25-orange)](#32-end-to-end-training-timeline)
+[![E2E](https://img.shields.io/badge/E2E%20ckpt--step%20BW-%2B3.4%25-orange)](#32-end-to-end-training-timeline)
 
 ---
 
@@ -260,8 +260,8 @@ ReduceScatter BW over training steps  [median per step, rank 0]
 
 | | Baseline | TEMPO | Δ |
 |---|---:|---:|---:|
-| BW at ckpt steps (mean) | 5.102 GB/s | 5.606 GB/s | **+9.9%** |
-| BW at non-ckpt steps    | 6.105 GB/s | 5.487 GB/s | ±noise |
+| BW at ckpt steps (mean) | 4.788 GB/s | 4.952 GB/s | **+3.4%** |
+| BW at non-ckpt steps    | 4.921 GB/s | 4.869 GB/s | ±noise |
 | Adaptive chunk size     | —          | 9–11 MB    | auto-tuned |
 
 ---
