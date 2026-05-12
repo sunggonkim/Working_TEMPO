@@ -45,7 +45,10 @@ Usage:
 
 from tempo.phase_monitor import PhaseMonitor, TrainingPhase
 from tempo.checkpoint_manager import CheckpointManager
-from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2, TEMPOSchedulerV3, TEMPOSchedulerV4, TEMPOSchedulerV5
+from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2, TEMPOSchedulerV3, TEMPOSchedulerV4, TEMPOSchedulerV5, TEMPOSchedulerV6
+from tempo.gpu_driven import GpuDrivenEndpoint, GpuDrivenPool, FI_TC_STORAGE, FI_TC_LOW_LATENCY
+from tempo.nvlink_router import NVLinkRouter
+from tempo.libfabric_qos import FabricQoSManager, CXIEndpointQoS, CXI_TC, gain_to_cxi_tc
 from tempo.network_monitor import NetworkMonitor, CassiniHWCounters
 from tempo.service_gain import ServiceGainScheduler, TokenBucket, FlushPriority
 from tempo.interleaving_engine import InterleavingEngine, PhaseDurationPredictor
@@ -57,7 +60,7 @@ from tempo.nano_overlap import NanoOverlapController, LayerTiming, StepMetrics, 
 from tempo.trace_loader import TraceLoader, Request, TraceStats
 from tempo.nexus_coordinator import NexusCoordinator, LayerMicroGate, CheckpointWindow
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 __all__ = [
     # Core (v1)
     "PhaseMonitor", "TrainingPhase", "CheckpointManager", "TEMPOScheduler",
@@ -78,6 +81,12 @@ __all__ = [
     # V5: Nexus — Distributed Staggered Checkpoint Protocol (OSDI-level)
     "TEMPOSchedulerV5",
     "NexusCoordinator", "LayerMicroGate", "CheckpointWindow",
+    # V6: GPU-Driven NIC + NVLink Multipath + libfabric CXI TC (OSDI head-to-head)
+    "TEMPOSchedulerV6",
+    "GpuDrivenEndpoint", "GpuDrivenPool",
+    "FI_TC_STORAGE", "FI_TC_LOW_LATENCY",
+    "NVLinkRouter",
+    "FabricQoSManager", "CXIEndpointQoS", "CXI_TC", "gain_to_cxi_tc",
     # Real hardware + workload (OSDI AE requirements)
     "CassiniHWCounters",
     "TraceLoader", "Request", "TraceStats",
