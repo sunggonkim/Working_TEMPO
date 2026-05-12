@@ -8,7 +8,7 @@
 [![NCCL](https://img.shields.io/badge/NCCL-2.29.2--cu13%20Slingshot--11-76B900)](https://developer.nvidia.com/nccl)
 [![AllReduce](https://img.shields.io/badge/AllReduce%20Latency-−50.1%25-brightgreen)](#311-allreduce-지연-분포)
 [![DMA](https://img.shields.io/badge/DMA%20Time-−21.7%25-green)](#312-dma-처리-시간)
-[![Flood Min BW](https://img.shields.io/badge/Min%20NCCL%20BW%20during%20flood-%2B33.8%25-blue)](#32-네트워크-flood-견고성)
+[![Flood Min BW](https://img.shields.io/badge/Min%20NCCL%20BW%20during%20flood-%2B27.2%25-blue)](#32-네트워크-flood-견고성)
 
 ---
 
@@ -28,7 +28,7 @@
 | AllReduce 평균 지연 | 24.976 ms | 12.464 ms | **−50.1%** |
 | AllReduce p99 지연 | 27.797 ms | 14.270 ms | **−48.7%** |
 | DMA 처리 시간 (평균) | 26.052 ms | 20.388 ms | **−21.7%** |
-| Flood 중 최소 NCCL BW | 11.02 GB/s | 14.74 GB/s | **+33.8%** |
+| Flood 중 최소 NCCL BW | 11.14 GB/s | 14.17 GB/s | **+27.2%** |
 
 ---
 
@@ -175,7 +175,7 @@ Perlmutter의 네트워크 토폴로지:
 │  ...노드 5,6,7 (flood) ──┘  → NCCL BW: 21 GB/s → 11 GB/s 급락      │
 │                                                                      │
 │  TEMPO-v2: NetworkMonitor가 hsn{0,1} util 75% 초과 감지 →           │
-│            flush throttle → 링크 headroom 확보 → 14.7 GB/s 유지     │
+│            flush throttle → 링크 headroom 확보 → 14.2 GB/s 유지     │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -193,20 +193,20 @@ Perlmutter의 네트워크 토폴로지:
 ![Slingshot-11 네트워크 간섭 실측](results/figures/readme_fig_motivation_network.png)
 
 **▲ Fig 2. Slingshot-11 네트워크 간섭 실측 (4,000 samples/mode, Perlmutter 8 nodes).**  
-왼쪽 시계열: rank 0의 AllReduce 대역폭. 주황 배경 = flood 구간 (step 100–299). Baseline(빨강)은 flood 직후 BW가 11.02 GB/s까지 급락하는 sawtooth 패턴. TEMPO-v2(파랑)는 NetworkMonitor가 hsn0/1 NIC 이용률을 5 ms마다 EMA 폴링하여 flush throttle, BW 14.74 GB/s 이상 유지 (붕괴 차단).  
-오른쪽 Violin plot: flood 이전(회색)과 flood 중(색상) 분포 비교, 8 랭크 전체. Baseline의 하단 꼬리가 11 GB/s까지 내려가는 반면 TEMPO-v2의 최악 케이스는 14.7 GB/s에서 멈춘다.
+왼쪽 시계열: rank 0의 AllReduce 대역폭. 주황 배경 = flood 구간 (step 100–299). Baseline(빨강)은 flood 직후 BW가 11.14 GB/s까지 급락하는 sawtooth 패턴. TEMPO-v2(파랑)는 NetworkMonitor가 hsn0/1 NIC 이용률을 5 ms마다 EMA 폴링하여 flush throttle, BW 14.17 GB/s 이상 유지 (붕괴 차단).  
+오른쪽 Violin plot: flood 이전(회색)과 flood 중(색상) 분포 비교, 8 랭크 전체. Baseline의 하단 꼬리가 11 GB/s까지 내려가는 반면 TEMPO-v2의 최악 케이스는 14.2 GB/s에서 멈춘다.
 
 | 측정 구간 | 지표 | Baseline | TEMPO-v2 | Δ |
 |---|---|---:|---:|---:|
 | Flood 이전 | 평균 BW | 20.40 GB/s | 20.50 GB/s | +0.5% |
-| **Flood 중** | **최솟값 BW** | **11.02 GB/s** | **14.74 GB/s** | **+33.8%** |
+| **Flood 중** | **최솟값 BW** | **11.14 GB/s** | **14.17 GB/s** | **+27.2%** |
 | Flood 중 | p10 BW | 16.70 GB/s | 16.98 GB/s | +1.7% |
 | Flood 중 | 평균 BW | 19.38 GB/s | 19.52 GB/s | +0.7% |
 
 > **왜 최솟값이 중요한가**: AllReduce는 전체 랭크가 완료되어야 다음 스텝으로 진행하는 **global barrier**다.  
 > 가장 느린 랭크의 BW가 전체 학습 속도를 결정한다. Baseline의 11 GB/s 급락은  
 > 전 노드 학습을 11 GB/s 기준으로 대기시키는 "straggler spike"를 의미한다.  
-> TEMPO-v2는 이 하단 꼬리를 14.74 GB/s로 끌어올려 straggler 문제를 완화한다.
+> TEMPO-v2는 이 하단 꼬리를 14.17 GB/s로 끌어올려 straggler 문제를 완화한다.
 
 ---
 
@@ -436,12 +436,12 @@ TEMPO:     ──────────|
 | 측정 구간 | 지표 | Baseline | TEMPO-v2 | Δ |
 |---|---|---:|---:|---:|
 | **Flood 이전** | 평균 BW | 20.40 GB/s | 20.50 GB/s | +0.5% |
-| **Flood 중** | **최솟값 BW** | **11.02 GB/s** | **14.74 GB/s** | **+33.8%** |
+| **Flood 중** | **최솟값 BW** | **11.14 GB/s** | **14.17 GB/s** | **+27.2%** |
 | **Flood 중** | p10 BW | 16.70 GB/s | 16.98 GB/s | +1.7% |
 | **Flood 중** | 평균 BW | 19.38 GB/s | 19.52 GB/s | +0.7% |
 
 TEMPO-v2 오버헤드: Flood 이전 평균 BW에서 +0.5% 향상 (throttle 없이 PCIe 정상 사용).  
-Flood 시 최솟값은 11.02 → 14.74 GB/s (+33.8%) — straggler rank 개선이 핵심.
+Flood 시 최솟값은 11.14 → 14.17 GB/s (+27.2%) — straggler rank 개선이 핵심.
 
 ---
 

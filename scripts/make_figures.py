@@ -454,11 +454,10 @@ def fig5_phase3_comparison():
     baseline = pd.read_csv(base_path)
     tempo    = pd.read_csv(tempo_path)
 
-    # Per-step median BW (across all ranks sampled)
-    def per_step(df):
-        return df.groupby("step")["algbw_GBs"].agg(["median", "quantile",
-                                                       lambda x: x.quantile(0.25),
-                                                       lambda x: x.quantile(0.75)])
+    # Guard: need enough data in both CSVs to plot
+    if len(baseline) < 5 or len(tempo) < 5:
+        print(f"[fig5] Not enough data (baseline={len(baseline)} rows, tempo={len(tempo)} rows), skipping")
+        return
 
     b_med = baseline.groupby("step")["algbw_GBs"].median()
     t_med = tempo.groupby("step")["algbw_GBs"].median()
@@ -467,21 +466,20 @@ def fig5_phase3_comparison():
     t_p25 = tempo.groupby("step")["algbw_GBs"].quantile(0.25)
     t_p75 = tempo.groupby("step")["algbw_GBs"].quantile(0.75)
 
-    steps = b_med.index
-
     fig, ax = plt.subplots(figsize=(11, 5))
 
-    ax.plot(steps, b_med, color=RED,  lw=2.0, label="Baseline (greedy flush)", zorder=3)
-    ax.fill_between(steps, b_p25, b_p75, color=RED, alpha=0.15, zorder=2)
+    ax.plot(b_med.index, b_med.values, color=RED,  lw=2.0, label="Baseline (greedy flush)", zorder=3)
+    ax.fill_between(b_med.index, b_p25.values, b_p75.values, color=RED, alpha=0.15, zorder=2)
 
-    ax.plot(steps, t_med, color=BLUE, lw=2.0, label="TEMPO (paced flush)", zorder=3)
-    ax.fill_between(steps, t_p25, t_p75, color=BLUE, alpha=0.15, zorder=2)
+    ax.plot(t_med.index, t_med.values, color=BLUE, lw=2.0, label="TEMPO (paced flush)", zorder=3)
+    ax.fill_between(t_med.index, t_p25.values, t_p75.values, color=BLUE, alpha=0.15, zorder=2)
 
     # Checkpoint step markers + clean ckpt step labels at top
     ckpt_steps = [20, 40, 60]
+    all_steps = b_med.index.union(t_med.index)
     ymax = max(b_p75.max(), t_p75.max()) * 1.05
     for cs in ckpt_steps:
-        if cs in steps:
+        if cs in all_steps:
             ax.axvline(cs, color=GREEN, lw=1.2, linestyle="--", alpha=0.7, zorder=1)
             ax.text(cs, ymax * 0.97, f"ckpt\nstep {cs}", fontsize=7.5,
                     color=GREEN, ha="center", va="top",
@@ -509,7 +507,7 @@ def fig5_phase3_comparison():
                  fontsize=12, fontweight="bold", color=DARK)
     ax.legend(fontsize=10, loc="upper left", framealpha=0.9)
     ax.grid(alpha=0.25, linestyle="--")
-    ax.set_xlim(-1, steps.max() + 2)
+    ax.set_xlim(-1, all_steps.max() + 2)
 
     summary = (f"At ckpt steps — Baseline: {b_ckpt:.2f} GB/s │ "
                f"TEMPO: {t_ckpt:.2f} GB/s │ Δ = +{(t_ckpt/b_ckpt-1)*100:.0f}%")

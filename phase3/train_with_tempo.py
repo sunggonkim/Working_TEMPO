@@ -301,8 +301,11 @@ def main():
     if rank == 0:
         good = [r for r in comm_state.records if r["step"] >= 0]
         if good:
+            # Collect union of all keys (some rows get extra fields like vram_used_gb)
+            all_keys: list = list(dict.fromkeys(k for r in good for k in r.keys()))
             with open(csv_path, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=list(good[0].keys()))
+                writer = csv.DictWriter(f, fieldnames=all_keys, extrasaction="ignore",
+                                        restval="")
                 writer.writeheader()
                 writer.writerows(good)
             avg = sum(r["algbw_GBs"] for r in good) / len(good)
