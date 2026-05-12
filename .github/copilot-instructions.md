@@ -1,5 +1,31 @@
 # TEMPO: AI Coding Agent Instructions
 
+---
+
+## ⛔ Research Integrity — ABSOLUTE RULES (No Exceptions)
+
+Violating these rules = research misconduct. These apply to every file, README, paper draft, and comment.
+
+1. **Never fabricate or estimate numbers.** Every metric in README.md, paper drafts, or comments MUST be computed directly from raw CSV files in `results/`. Before writing any number, run a verification script like:
+   ```python
+   import csv, statistics
+   rows = list(csv.DictReader(open("results/pcie_contention/timeline_baseline.csv")))
+   print(statistics.mean(float(r["allreduce_ms"]) for r in rows))
+   ```
+   If the CSV does not exist, write `[NOT YET MEASURED]` — never invent a plausible-sounding value.
+
+2. **SLURM job IDs are mandatory provenance.** Every table or figure in the README must cite the exact SLURM job ID that produced the data (e.g., `job 52848625`). If the job ID is unknown, mark it `[job ID unknown — re-run required]`.
+
+3. **Never adjust results to match a hypothesis.** If measured improvement is +3.4%, write +3.4%. Do not round up to +9.9% or reframe as something else. Negative results are publishable; fabricated results end careers.
+
+4. **Before every README or paper number edit:** Open the source CSV, compute the statistic, confirm it matches. If there is a discrepancy, fix the README to match the data — never the reverse.
+
+5. **Simulation / synthetic data must be clearly labelled.** Any number from `scripts/simulate_chunk_sweep.py` or any non-SLURM source must be tagged `[simulated]` or `[synthetic]` everywhere it appears.
+
+6. **v6 Pillar implementations (gpu_driven.py, nvlink_router.py, libfabric_qos.py) are currently PoC/prototype.** Do not claim hardware-measured speedups for these until SLURM benchmarks exist. Use `[not yet benchmarked on Perlmutter]` as the placeholder.
+
+---
+
 ## Research Vision & Positioning
 
 **TEMPO** is evolving from a checkpoint-pacing system into an **async, topology-aware LLM orchestration middleware for HPC clusters** — targeting OSDI/SOSP publication.
@@ -15,13 +41,22 @@ In distributed LLM training on Perlmutter (NERSC), checkpoint I/O competes with 
 
 Existing OSDI/SOSP work (DistServe 2024, Pie SOSP 2025, Aegaeon SOSP 2025, Teola OSDI 2024) targets cloud TCP/IP environments and assumes abstract network topology. **TEMPO's novelty**: software-level exploit of Perlmutter's specific HPC hardware (Multi-rail Slingshot-11, PCIe topology, Lustre) **without any hardware modification**.
 
-Three research pillars being developed:
+Three research pillars (V6 implemented; V7 roadmap below):
 
-| Pillar | Approach | Key File |
-|--------|----------|----------|
-| **Async Multi-rail RDMA** | `libfabric` CXI provider direct control; KV-cache transfer offloaded as background RDMA ops; Slingshot QoS TC mapping | [tempo/qos_mapper.py](tempo/qos_mapper.py) |
-| **Topology-aware PCIe routing** | Dynamic multipath routing; NVLink for intra-node, RDMA via idle NIC for inter-node; PCIe bandwidth look-ahead scheduling | [tempo/network_monitor.py](tempo/network_monitor.py) |
-| **Lightweight analytical prediction** | O(1) look-ahead: given batch size + token length → predict KV-cache bytes and PCIe pressure N ms ahead; no ML model | [tempo/service_gain.py](tempo/service_gain.py) |
+| Pillar | V6 Status | Key File |
+|--------|-----------|----------|
+| **P1: GPU-Driven NIC Doorbell** | PoC implemented; `cudaMemcpyAsync` MMIO trigger; fallback to CPU `fi_send` | [tempo/gpu_driven.py](tempo/gpu_driven.py) |
+| **P2: NVLink PCIe Multipath** | PoC implemented; Active-Standby failover at 80% NIC util; sysfs EMA polling | [tempo/nvlink_router.py](tempo/nvlink_router.py) |
+| **P3: libfabric CXI TC Control** | PoC implemented; `fi_setopt` per-transfer TC mapping; 4 TC levels | [tempo/libfabric_qos.py](tempo/libfabric_qos.py) |
+
+**V7 Roadmap (OSDI/SOSP hardening — not yet implemented):**
+
+| Improvement | Target File | OSDI/SOSP Motivation |
+|-------------|-------------|----------------------|
+| **P1→ GICC Hybrid Progress**: separate lightweight NUMA-pinned host thread for `FI_PROGRESS_MANUAL` + CQ retirement + credit-based PCIe rate control | `tempo/gpu_driven.py` | Fixes CQ stall when GPU triggers but CPU never drains; prevents LLC overflow on high-rate RDMA ingest |
+| **P2→ Slice Spraying (Active-Active multi-rail)**: split single KV chunk into 4 sub-chunks, relay via NVLink to 4 GPUs, egress simultaneously through 4 × hsn NICs | `tempo/nvlink_router.py` | Replaces Active-Standby with true 4-rail aggregation → ~4× node egress BW; vs FuseLink OSDI 2025 |
+| **P3→ Endpoint Multiplexing**: pre-create 4 `fi_endpoint` objects at init (one per TC), route transfers to the correct endpoint at call time | `tempo/libfabric_qos.py` | Eliminates per-transfer `fi_setopt` lock overhead; runtime TC control cost → 0 ns |
+| **New Pillar: Operation-level Nano-batching**: per-layer CUDA stream triggers GPU doorbell immediately after each layer's KV computation completes | `tempo/nano_overlap.py` | GPU SM never idles waiting for bulk transfer to start; vs NanoFlow OSDI 2025 |
 
 ### The Current Solution (Phase-Gate, proven)
 
@@ -71,33 +106,30 @@ Training Loop
 
 Unlike cloud systems (DistServe, Pie, Aegaeon, Teola) that target TCP/IP and abstract topology, TEMPO exploits Perlmutter's **specific HPC hardware** purely in software — no FPGA, no SmartNIC RTL changes.
 
-### Pillar 1 — Async Multi-rail RDMA via `libfabric` CXI + Slingshot QoS
+### Pillar 1 — GPU-Driven NIC Doorbell (V6 PoC → V7 GICC Hybrid)
 
-Perlmutter nodes have **4 GPUs × 4 Slingshot-11 NICs mapped 1:1**. Generic frameworks ignore this and stripe blindly, causing both PCIe and network bottlenecks.
+**V6 (implemented):** `GpuDrivenPool` in `tempo/gpu_driven.py` maps Cassini NIC MMIO page via `cudaHostRegister + cudaHostGetDevicePointer`. GPU kernel triggers RDMA send by writing 8-byte token via `cudaMemcpyAsync`. Falls back to CPU `fi_send` when `libfabric` CXI unavailable.
 
-- **Mechanism**: Use `libfabric` CXI provider API to post KV-cache transfers as non-blocking RDMA ops; GPU proceeds immediately.  
-- **Traffic separation**: Mark I/O sockets with `socket.IP_TOS` (DSCP) to route into Slingshot hardware TC queues. NCCL AllReduce uses TC3 (Expedited Forwarding); checkpoint flush uses TC1/TC0 (Best-Effort). The switch ASIC enforces priority — zero CPU overhead.
-- **Key file**: `tempo/qos_mapper.py` — `QoSMapper.apply(socket_fd, gain_score)` sets DSCP. TC thresholds: TC3 (gain ≥ 0.70), TC2 (0.40–0.70), TC1 (0.15–0.40), TC0 (< 0.15).
+**V7 (roadmap):**
+- Replace `cudaMemcpyAsync` with in-kernel MMIO write (`*doorbell_ptr = token`) for true zero-CPU-involvement.
+- Add lightweight NUMA-pinned host monitor thread (isolated core, `pthread_setaffinity_np`) that calls `fi_progress(domain, FI_PROGRESS_MANUAL)` to drain Completion Queues and retire NIC resources — GPU cannot do this in OFI/CXI.
+- Add credit-based ingress rate control in the monitor thread to prevent LLC overflow when RDMA data arrives faster than the CPU can process.
 
-### Pillar 2 — Topology-Aware PCIe Multipath Routing
+### Pillar 2 — NVLink PCIe Multipath Routing (V6 Active-Standby → V7 Slice Spraying)
 
-- **Mechanism**: Intra-node data (GPU→GPU) forced through NVLink; only inter-node traffic exits via NIC. If NIC 0's PCIe lanes are saturated, orchestrator reroutes through idle NIC 1/2.
-- **Policy**: `NetworkMonitor` polls `/sys/class/net/hsn{0,1}/statistics/tx_bytes` at 5 ms intervals (EMA α=0.25). When util > 75% of 200 Gbps, `wait_for_bw_headroom()` blocks that flush job.
-- **Key file**: `tempo/network_monitor.py` — `CassiniHWCounters` reads Slingshot ASIC performance counters for per-rail utilization.
+**V6 (implemented):** `NVLinkRouter` in `tempo/nvlink_router.py` polls `/sys/class/net/hsn{i}/statistics/tx_bytes` at 5 ms (EMA α=0.3). When primary NIC > 80% utilization, `select_egress_gpu()` redirects to an idle NIC via NVLink P2P copy. O(1) decision, no ML.
 
-### Pillar 3 — O(1) Lightweight Analytical Prediction (no ML)
+**V7 (roadmap):**
+- Replace Active-Standby with **Active-Active Slice Spraying**: split a KV-cache chunk into 4 equal sub-chunks, relay each via NVLink to GPU{0,1,2,3}, egress all 4 simultaneously through hsn{0,1,2,3} → aggregate ~4× single-NIC BW (~212 GB/s node egress).
+- Replace sysfs 5 ms poll with memory-mapped Cassini hardware performance counters (nanosecond granularity) for sub-millisecond saturation detection.
 
-LLM compute is deterministic: batch_size × seq_len → exact KV-cache bytes.
+### Pillar 3 — libfabric CXI TC Control (V6 per-call → V7 endpoint multiplexing)
 
-```python
-# Look-ahead: given a pending request, predict PCIe pressure N ms from now
-kv_bytes = num_layers * num_heads * head_dim * seq_len * 2 * dtype_bytes
-flush_bw_needed = kv_bytes / target_flush_window_s
-# If flush_bw_needed + current_nccl_bw > PCIe_ceiling (64 GB/s):
-#   → micro-delay this job OR route to alternate NIC rail
-```
+**V6 (implemented):** `FabricQoSManager` in `tempo/libfabric_qos.py` calls `fi_setopt(ep, FI_OPT_ENDPOINT, FI_OPT_CXI_TRAFFIC_CLASS, &tc)` per transfer. Gain score → TC mapping: LOW_LATENCY=6 (≥0.70), BULK=4 (0.40–0.70), STORAGE=2 (0.15–0.40), BEST_EFFORT=1 (<0.15). `cxi_dry_run=True` safe on non-Perlmutter.
 
-- **Key file**: `tempo/service_gain.py` — `ServiceGainScheduler` computes per-job gain scores (α·learning_progress + β·recovery_value + γ·urgency) in O(1) and dispatches to a priority heap. Jobs with gain < 0.30 are deferred during network congestion.
+**V7 (roadmap):**
+- Pre-create **4 `fi_endpoint` objects** at init time, one per TC level. Route each transfer to the pre-configured endpoint by TC — eliminates per-transfer `fi_setopt` call and associated libfabric lock overhead (runtime TC cost → 0 ns).
+- Bind all endpoints to the same VNI to maintain application isolation while getting hardware-queue-level prioritization.
 
 ---
 
@@ -106,11 +138,14 @@ flush_bw_needed = kv_bytes / target_flush_window_s
 | System | Venue | Their Assumption | TEMPO Differentiator |
 |--------|-------|-----------------|---------------------|
 | DistServe | OSDI 2024 | Prefill/decode disaggregation on cloud VMs | TEMPO targets intra-step PCIe + Slingshot interference in HPC |
-| Pie | SOSP 2025 | Wasm Inferlets, async I/O during generation | TEMPO is hardware-topology-aware; directly maps to Slingshot TC |
+| Pie | SOSP 2025 | Wasm Inferlets, async I/O during generation | TEMPO maps directly to Slingshot hardware TC; Pie uses SW scheduler only |
 | Aegaeon | SOSP 2025 | Token-level preemption across multiple cloud models | TEMPO is single-workload but exploits physical fabric QoS |
 | Teola | OSDI 2024 | DAG decomposition over TCP/IP clusters | TEMPO uses `libfabric` RDMA + sysfs hardware counters |
+| FuseLink | OSDI 2025 | Multi-rail aggregation for LLM comm | TEMPO achieves same via NVLink relay + Slingshot; no custom switches |
+| NanoFlow | OSDI 2025 | Nano-batch compute/comm overlap | TEMPO targets checkpoint I/O overlap, not only intra-model comm |
+| Blink / ShadowServe | ASPLOS/arXiv 2025 | CPU-bypass via SmartNIC/DPU | TEMPO achieves CPU-bypass in pure SW (libfabric CXI MMIO + CUDA) — no DPU required |
 
-**TEMPO novelty claim**: software middleware that exploits Perlmutter's Multi-rail Slingshot-11 + PCIe topology to achieve hardware-level interference isolation without any hardware modification — something no cloud-targeting system paper does.
+**TEMPO novelty claim**: pure software middleware that exploits Perlmutter's specific topology (Multi-rail Slingshot-11 · NVLink P2P · AMD EPYC PCIe I/O die) without any hardware modification, DPU, or kernel patch — and targets the HPC checkpoint I/O interference problem that all cloud-targeting papers ignore.
 
 ---
 
@@ -291,7 +326,13 @@ logging.basicConfig(
 2. **Thread Safety**: All state in PhaseMonitor uses `RLock`; CheckpointManager uses `queue.Queue`.
 3. **Hardware-Specific Fallbacks**: NetworkMonitor detects Slingshot sysfs; falls back to `/proc/net/dev` on other systems.
 4. **Reproducibility**: All experiments log random seeds, model state, environment; CSV outputs are idempotent.
-5. **Versioning**: Multiple scheduler versions (V1–V5) coexist; add features as new version, not branch.
+5. **Versioning**: Multiple scheduler versions (V1–V6) coexist; add features as new version, not branch.
+6. **Research Integrity (non-negotiable)**:
+   - Every number in README / paper drafts must be verified against raw CSV before being written.
+   - V6 Pillar files (`gpu_driven.py`, `nvlink_router.py`, `libfabric_qos.py`) are PoC until SLURM benchmarks confirm hardware results. Do not claim measured speedups for them.
+   - Simulated or synthetic data must be explicitly labelled `[simulated]` everywhere.
+   - If a benchmark hasn't been run yet, write `[not yet measured]` — never estimate.
+   - SLURM job IDs are mandatory provenance for all performance claims.
 
 ---
 
