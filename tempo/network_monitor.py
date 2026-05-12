@@ -60,8 +60,9 @@ _HSN_SYSFS_PATTERN   = "/sys/class/net/hsn{n}/statistics/{stat}"
 _PROC_NET_DEV        = "/proc/net/dev"
 _LINK_SPEED_GBPS     = 200.0           # Slingshot-11 per-link bandwidth
 _LINK_SPEED_BPS      = _LINK_SPEED_GBPS * 1e9
-_CONGESTION_THRESH   = 0.75            # Pause I/O when util > 75 % of link bw
-_EMA_ALPHA           = 0.25            # EMA smoothing factor (faster = more reactive)
+_CONGESTION_THRESH   = 0.70            # Pause I/O when util > 70 % of link bw
+                                       # (was 0.75 — lowered for earlier NCCL protection)
+_EMA_ALPHA           = 0.30            # EMA smoothing (was 0.25; faster reaction)
 _POLL_INTERVAL_S     = 0.005           # 5 ms poll (practical lower bound for sysfs)
 _WINDOW_SIZE         = 64              # Rolling window for burst detection
 
