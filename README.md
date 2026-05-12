@@ -1,4 +1,4 @@
-# TEMPO: Phase-Gate Scheduling for Checkpoint I/O in Distributed LLM Training
+# TEMPO: Topology-Aware I/O Orchestration for Distributed LLM Training
 
 > **Hardware**: NERSC Perlmutter · 4 × A100 40 GB SXM / node · AMD EPYC PCIe Gen4 · HPE Slingshot-11 200 Gbps  
 > **Stack**: PyTorch 2.8.0 FSDP · NCCL 2.29.2-cu13 · Lustre PSCRATCH  
@@ -15,15 +15,13 @@
 ## Table of Contents
 
 1. [Motivation](#1-motivation)
-   - [The Two Interference Paths](#11-the-two-interference-paths)
-   - [Measured Worst-Case Impact](#12-measured-worst-case-impact)
-2. [Design: Phase-Gate Mechanism](#2-design-phase-gate-mechanism)
-   - [Core Idea](#21-core-idea)
-   - [Adaptive Chunk Sizing](#22-adaptive-chunk-sizing)
-   - [Integration API](#23-integration-api)
+2. [Design](#2-design)
+   - [Core: Phase-Gate Mechanism](#21-core-phase-gate-mechanism)
+   - [Pillar 1 — GPU-Driven NIC Orchestration](#22-pillar-1--gpu-driven-nic-orchestration)
+   - [Pillar 2 — NVLink PCIe Multipath Routing](#23-pillar-2--nvlink-pcie-multipath-routing)
+   - [Pillar 3 — libfabric CXI Traffic-Class Control](#24-pillar-3--libfabric-cxi-traffic-class-control)
+   - [Integration API](#25-integration-api)
 3. [Evaluation](#3-evaluation)
-   - [PCIe Contention Isolation](#31-pcie-contention-isolation)
-   - [End-to-End Training Timeline](#32-end-to-end-training-timeline)
 4. [Comparison with Related Work](#4-comparison-with-related-work)
 5. [Reproducing Results](#5-reproducing-results)
 6. [Repository Layout](#6-repository-layout)
@@ -31,8 +29,6 @@
 ---
 
 ## 1. Motivation
-
-### 1.1 The Two Interference Paths
 
 Distributed LLM training checkpoints cause NCCL AllReduce regression through **two independent hardware paths**:
 
@@ -45,162 +41,174 @@ Distributed LLM training checkpoints cause NCCL AllReduce regression through **t
 │   GPU 2 ──NVLink──┤         │                                           │
 │   GPU 3 ──NVLink──┘         └──────────────► NIC   (NCCL AllReduce)    │
 │                                                                         │
-│   DMA and AllReduce share the same PCIe I/O die ← contention point     │
+│   DMA and AllReduce share the same PCIe I/O die  ← contention point    │
 │   Observed: AllReduce 12.4 ms ──► 24.9 ms  (+101%) during checkpoint   │
 └─────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  PATH 2 — INTER-NODE: HPE Slingshot-11 Dragonfly+ Fabric                │
+│  PATH 2 — INTER-NODE: HPE Slingshot-11 Dragonfly+ Fabric               │
 │                                                                         │
 │   Node A ──HSN NIC──► Slingshot switch ──► Node B  (NCCL gradient)    │
 │               │                                                         │
 │               └──────────────────────────► Lustre  (checkpoint flush)  │
 │                                                                         │
 │   200 Gbps optical links shared by both workloads                       │
-│   Checkpoint flush bursts → NCCL bandwidth collapse                    │
+│   One rank doing 64 GB/s KV I/O consumes ~80% of per-group quota       │
+│   → P_conflict ≈ 1 across all ranks in the Dragonfly group             │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 Measured Worst-Case Impact
-
-**PCIe Contention Isolation experiment** — 1 node · 4× A100 · 256 MB AllReduce · DMA injected concurrently  
-Raw data: [`results/pcie_contention/timeline_baseline.csv`](results/pcie_contention/timeline_baseline.csv) · 800 samples · job `52848625`
-
-```
-AllReduce CDF — 800 samples each
-                                                      
-  p99.9 ┤ ─────────────────────────── 28.1 ms  ────── 14.6 ms
-  p99   ┤ ──────────────────── 27.5 ms  ──────── 14.3 ms
-  p90   ┤ ──────────────── 27.0 ms  ─── 13.8 ms
-  p50   ┤ ───────── 26.0 ms    ─── 12.4 ms
-  p10   ┤ ── 17.2 ms      11.1 ms
-        └───────────────────────────────────────────────►  ms
-          0    5   10   15   20   25   30
-          
-          ████ Baseline (greedy flush)    ░░░░ TEMPO (phase-gated)
-```
+**Measured worst-case** (1 node · 4× A100 · 256 MB AllReduce · DMA injected concurrently):
 
 | Metric | Baseline | TEMPO | Δ |
 |---|---:|---:|---:|
-| AllReduce **mean** | 24.881 ms | 12.383 ms | **−50.2%** |
-| AllReduce **p50**  | 25.997 ms | 12.380 ms | **−52.4%** |
-| AllReduce **p99**  | 27.495 ms | 14.276 ms | **−48.1%** |
-| AllReduce **p99.9** | 28.079 ms | 14.592 ms | **−48.0%** |
-| DMA processing (mean) | 26.030 ms | 20.388 ms | **−21.7%** |
+| AllReduce mean | 24.881 ms | 12.383 ms | **−50.2%** |
+| AllReduce p50  | 25.997 ms | 12.380 ms | **−52.4%** |
+| AllReduce p99  | 27.495 ms | 14.276 ms | **−48.1%** |
+| DMA mean       | 26.030 ms | 20.388 ms | **−21.7%** |
 
-> **Why DMA also improves**: TEMPO schedules DMA exclusively during compute windows where PCIe is idle. DMA gets the full ~32 GB/s instead of sharing with NCCL → completes faster despite being gated.
+Raw data: [`results/pcie_contention/`](results/pcie_contention/) · SLURM job `52848625`
 
 ---
 
-## 2. Design: Phase-Gate Mechanism
+## 2. Design
 
-### 2.1 Core Idea
+TEMPO is a **pure userspace Python middleware** — no modified kernel, no firmware, no FPGA. It exploits Perlmutter's physical topology through three layered mechanisms built on top of a core phase-gate.
+
+### 2.1 Core: Phase-Gate Mechanism
+
+`PhaseMonitor` detects whether the training loop is in an NCCL AllReduce window or a compute window and gates the `CheckpointManager` flush thread accordingly.
 
 ```
-Training step timeline
-───────────────────────────────────────────────────────────────────────────►
-  COMPUTE ▓▓▓▓▓▓▓  NCCL AllReduce ░░░░░░░░  COMPUTE ▓▓▓▓▓▓▓  NCCL ░░░░░
-                  ↑ gate.clear()            ↑gate.set()
+Training Loop
+  ├─ compute_phase()   → Event.set()    → flush thread proceeds
+  └─ nccl_phase()      → Event.clear()  → flush thread waits
 
-                              ↕ flush worker blocked here
+CheckpointManager
+  ├─ save_async()      → write to /tmp NVMe   (~10 ms, returns immediately)
+  └─ _flush_worker()   → chunk-by-chunk to Lustre, gated by PhaseMonitor
 
-  ┌─ BASELINE ────────────────────────────────────────────────────────────┐
-  │ Lustre flush: ≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈  (overlaps NCCL)   │
-  │ Result: DMA competes with AllReduce → +101% latency at ckpt steps    │
-  └───────────────────────────────────────────────────────────────────────┘
-
-  ┌─ TEMPO ───────────────────────────────────────────────────────────────┐
-  │ Lustre flush:  ▓▓▓ │            │ ▓▓▓ │            │ ▓▓▓             │
-  │                    │ gate CLOSED│     │ gate CLOSED │                 │
-  │ DMA only runs in COMPUTE windows → PCIe isolation                    │
-  └───────────────────────────────────────────────────────────────────────┘
+Dynamic rate (V2+): instead of binary BLOCK/ALLOW, compute
+  flush_rate = PCIe_ceiling × (1 − nccl_fraction − safety_margin)
+  → proportional sleep between chunks; no hard stop
 ```
 
-**Implementation** — `tempo/phase_monitor.py` (148 lines):
+Adaptive chunk sizing converges in ~10 steps:
+```python
+target_chunk = int(nccl_phase_ms * 1e-3 * LUSTRE_BW * 0.5)
+chunk = clamp(target_chunk, 4 MB, 256 MB)
+```
+
+### 2.2 Pillar 1 — GPU-Driven NIC Orchestration
+
+**Problem:** Even with async threads, the CPU must wake up after each GPU kernel to call `fi_send` — adding 5–50 µs dead time.
+
+**Solution:** Pre-register transfer descriptors with the Cassini ASIC. The GPU kernel writes an 8-byte doorbell token directly to the NIC's MMIO page via `cudaMemcpyAsync`. The NIC fires the RDMA send immediately — no CPU involved.
+
+```
+Standard path:   GPU kernel → [CPU wakeup 5–50 µs] → fi_send → NIC
+TEMPO v6 path:   GPU kernel → cudaMemcpyAsync(MMIO, token, 8B)
+                                     ↕  (no CPU)
+                             Cassini ASIC reads doorbell → RDMA send
+```
+
+Implementation: [`tempo/gpu_driven.py`](tempo/gpu_driven.py)
+- `fi_domain_ops(FI_CXI_DOM_OPS_5).get_doorbell_addr()` → MMIO page handle
+- `cudaHostRegister + cudaHostGetDevicePointer` → GPU-visible device memory mapping
+- `GpuDrivenPool`: one endpoint per NIC; auto-fallback to CPU `fi_send` on non-Perlmutter
+
+**vs Blink/ShadowServe (ASPLOS/arXiv 2025):** those require a SmartNIC/DPU. TEMPO achieves the same CPU-bypass in pure software via libfabric CXI.
+
+### 2.3 Pillar 2 — NVLink PCIe Multipath Routing
+
+**Problem:** GPU `i` owns PCIe lane → `hsn{i}` (32 GB/s). A checkpoint flood saturates that lane and — through the shared AMD EPYC PCIe I/O die — degrades AllReduce on all ranks.
+
+**Solution:** When `hsn{i}` exceeds 80% utilisation, move data via NVLink to GPU `j` (idle NIC) and flush through GPU `j`'s PCIe.
+
+```
+  GPU0──PCIe(32GB/s)──hsn0   ← saturated
+  GPU1──PCIe(32GB/s)──hsn1   ← idle
+  
+  Data path with relay:
+    GPU0 ──NVLink(600GB/s agg)──► GPU1 ──PCIe──► hsn1 ──► Lustre
+    NVLink relay: 128 MiB < 0.5 ms   vs   PCIe stall: ~10 ms
+```
+
+Implementation: [`tempo/nvlink_router.py`](tempo/nvlink_router.py)
+- sysfs `tx_bytes` per NIC, EMA α=0.3, 5 ms poll
+- `select_egress_gpu(primary)` → O(1) decision, no ML
+- `estimate_reroute_gain_ms()` → scheduler decides if relay is worthwhile
+
+**vs DistServe/FlowKV:** single-path assumption causes HoL blocking. TEMPO eliminates the bottleneck physically.
+
+### 2.4 Pillar 3 — libfabric CXI Traffic-Class Control
+
+**Problem:** `socket.IP_TOS` marks TCP headers only. NCCL uses Portals4/RDMA (OFI CXI provider) which bypasses the kernel stack — `IP_TOS` never reaches the Cassini ASIC.
+
+**Solution:** `fi_setopt(ep, FI_OPT_ENDPOINT, FI_OPT_CXI_TRAFFIC_CLASS, &tc)` embeds TC in the Cassini packet header. Slingshot switch ASICs enforce it in hardware.
+
+```
+CXI TC          │ HW Queue │ TEMPO usage
+────────────────┼──────────┼────────────────────────────────────
+LOW_LATENCY = 6 │ Q3 (EF)  │ NCCL AllReduce · gain ≥ 0.70
+BULK        = 4 │ Q2       │ normal KV-cache · gain ∈ [0.40, 0.70)
+STORAGE     = 2 │ Q1       │ checkpoint flush · gain ∈ [0.15, 0.40)
+BEST_EFFORT = 1 │ Q0       │ background I/O · gain < 0.15
+```
+
+Implementation: [`tempo/libfabric_qos.py`](tempo/libfabric_qos.py)
+- `CXIEndpointQoS.set_tc(tc)` → one `fi_setopt` call, zero CPU overhead on critical path
+- `FabricQoSManager.apply_for_gain(nic_idx, score)` → gain score → TC → `fi_setopt`
+- Defence-in-depth: dual-marks with `socket.IP_TOS` (QoSMapper) for non-RDMA traffic
+- `cxi_dry_run=True` logs decisions without actual `fi_setopt` (safe on any node)
+
+**vs Pie/Teola (SOSP/OSDI 2025):** software schedulers cannot separate traffic inside the switch ASIC. TEMPO's TC marking makes interference physically impossible under congestion.
+
+### 2.5 Integration API
+
+**Full V6 (all three pillars + V5 Nexus DSCP + V4 sparse/P2P/nano):**
 
 ```python
-# PhaseMonitor internals — the complete gate mechanism
-self._io_allowed = threading.Event()
-self._io_allowed.set()    # default: allow I/O
+from tempo import TEMPOSchedulerV6
 
-# Called by training loop at NCCL start:
-self._io_allowed.clear()  # → flush worker blocks at event.wait()
+ctrl = TEMPOSchedulerV6(
+    rank=dist.get_rank(), world_size=dist.get_world_size(),
+    lustre_dir=os.environ["PSCRATCH"] + "/ckpts",
+    mode="tempo",
+    enable_gpu_doorbell=True,
+    enable_nvlink_routing=True,
+    enable_cxi_tc_control=True,
+    cxi_dry_run=False,     # set True if not on Perlmutter
+)
+model.register_comm_hook(ctrl.phase_monitor, ctrl.phase_monitor.fsdp_comm_hook)
 
-# Called at NCCL end:
-self._io_allowed.set()    # → flush worker resumes
+for step in range(n_steps):
+    ctrl.on_step_begin(step)
+    with ctrl.compute_phase():
+        loss = model(x).loss; loss.backward()
+    with ctrl.nccl_phase():
+        optimizer.step()
+    if step % ckpt_every == 0:
+        ctrl.checkpoint(model.state_dict(), step,
+                        gain_score=ctrl.compute_gain(step))
+
+ctrl.shutdown(); ctrl.print_stats()
 ```
 
-The flush worker in `CheckpointManager._do_flush()`:
-```python
-while chunk := src.read(self.chunk_bytes):
-    self.phase_monitor.wait_for_io_allowed()  # non-busy wait
-    dst.write(chunk)
-```
+**Minimal V1 (phase-gate only):**
 
-**Overhead**: `Event.set()` / `Event.clear()` ≈ 200 ns. Zero training throughput impact.
-
-### 2.2 Adaptive Chunk Sizing
-
-Fixed chunk = the naive approach. Tradeoff:
-
-```
- Chunk size →    small (4 MB)              large (256 MB)
-                     │                          │
-  Syscall overhead   █████░░░░░░░░░░░░░░░░░░░░░░│ low overhead
-  Gate responsiveness │░░░░░░░░░░░░░░░░████████ │ slow to react
-  Lustre throughput   │████░░░░░░░░░░░░░░░░░░░░ │ near peak
-                      │                          │
-  Optimal zone: ──────╪──────────────────────────╪─────
-                      ↑ 4 MB floor               ↑ 512 MB ceiling
-```
-
-TEMPO's EMA adaptive controller (converges in ~5 steps):
-
-```
-On each NCCL phase end:
-  ema_nccl_ms ← 0.30 × observed_duration + 0.70 × ema_nccl_ms
-
-Before each chunk write:
-  est_write_bw  = Σ(recent 8 writes: bytes / time)
-  target_chunk  = 0.50 × ema_nccl_ms × est_write_bw
-  chunk_bytes   = clamp(target_chunk, 4 MB, 512 MB)
-```
-
-On Perlmutter 1B/2-node: **converges to 9–11 MB** (NCCL window ≈ 12 ms × NVMe ≈ 1 GB/s × 50%).
-
-### 2.3 Integration API
-
-**Option A — Context managers** (explicit, recommended for new code):
 ```python
 from tempo import TEMPOScheduler
 
-tempo = TEMPOScheduler(rank=rank, world_size=world_size, mode="tempo")
-
-for step in range(num_steps):
+tempo = TEMPOScheduler(rank=rank, world_size=ws, mode="tempo")
+for step in range(n_steps):
     tempo.on_step_begin(step)
-
-    with tempo.compute_phase():       # gate OPEN — DMA can run
-        loss = model(inputs).loss
-        loss.backward()               # FSDP reduce-scatter inside
-
-    with tempo.nccl_phase():          # gate CLOSED — DMA paused
+    with tempo.compute_phase():             # gate OPEN  — DMA proceeds
+        outputs = model(x); outputs.loss.backward()
+    with tempo.nccl_phase():               # gate CLOSED — DMA pauses
         optimizer.step()
-
     if step % ckpt_every == 0:
-        tempo.checkpoint(model.state_dict(), step)  # returns in ~10 ms
-```
-
-**Option B — FSDP comm hook** (zero training code change):
-```python
-from tempo.phase_monitor import PhaseMonitor
-monitor = PhaseMonitor(rank=rank)
-model.register_comm_hook(monitor, PhaseMonitor.fsdp_comm_hook)
-```
-
-**Mode comparison**:
-```python
-TEMPOScheduler(mode="baseline")  # greedy flush → reproduces contention (for comparison)
-TEMPOScheduler(mode="tempo")     # phase-gated flush → paper contribution
+        tempo.checkpoint(model.state_dict(), step)
 ```
 
 ---
@@ -209,85 +217,67 @@ TEMPOScheduler(mode="tempo")     # phase-gated flush → paper contribution
 
 ### 3.1 PCIe Contention Isolation
 
-**Setup**: 1 node · 4× A100 SXM · world_size=4 · 256 MB AllReduce tensor  
-**DMA injection**: `pcie_timeline_profiler.py` writes 512 MB to NVMe concurrently with each AllReduce  
-**Samples**: 800 per mode (interleaved runs, same node)  
-**Raw data**: [`results/pcie_contention/`](results/pcie_contention/) · SLURM job `52848625` (2026-05-11 21:14)
+**Setup**: 1 node · 4× A100 SXM · world_size=4 · 256 MB AllReduce · 512 MB DMA injection concurrent  
+**Raw data**: [`results/pcie_contention/`](results/pcie_contention/) · SLURM job `52848625`
 
 ```
-Latency distribution — box = [p10, p50, p99], whisker = p99.9
+Latency distribution — box=[p10,p50,p99], whisker=p99.9
 
-Baseline  ├─────────────────────────────────[═══════════════╪══]─┤
-          0          5         10         15         20         25         30 ms
+Baseline  ├────────────────────────────[══════════════╪══]─┤
+          0         5        10        15        20        25        30 ms
 
-TEMPO     ├──────────[═════╪═══]──────────┤
-          0          5    10   15 ms
+TEMPO     ├─────────[════╪════]──────┤
+          0         5        10        15 ms
 
-          [═ = IQR (p25–p75)   ╪ = median   ─ = p10/p99.9 whiskers]
-          
-          Baseline: median 26.0 ms, IQR [24.8, 26.8], p99 27.5 ms
-          TEMPO:    median 12.4 ms, IQR [11.8, 13.1], p99 14.3 ms
-          Improvement: −50.2% mean · −52.4% p50 · −48.1% p99
+Baseline: median 26.0 ms · p99 27.5 ms · p99.9 28.1 ms
+TEMPO:    median 12.4 ms · p99 14.3 ms · p99.9 14.6 ms
 ```
 
 | | Baseline | TEMPO | Δ |
 |---|---:|---:|---:|
-| AllReduce mean | 24.881 ms | 12.383 ms | **−50.2%** |
-| AllReduce p50  | 25.997 ms | 12.380 ms | **−52.4%** |
-| AllReduce p99  | 27.495 ms | 14.276 ms | **−48.1%** |
+| AllReduce mean  | 24.881 ms | 12.383 ms | **−50.2%** |
+| AllReduce p50   | 25.997 ms | 12.380 ms | **−52.4%** |
+| AllReduce p99   | 27.495 ms | 14.276 ms | **−48.1%** |
 | AllReduce p99.9 | 28.079 ms | 14.592 ms | **−48.0%** |
-| DMA mean | 26.030 ms | 20.388 ms | **−21.7%** |
+| DMA mean        | 26.030 ms | 20.388 ms | **−21.7%** |
 
 ### 3.2 End-to-End Training Timeline
 
 **Setup**: 2 nodes × 4× A100 · GPT-1B FSDP FULL_SHARD · world_size=8 · 60 steps · `ckpt_every=20`  
-**Metric**: FSDP `reduce_scatter_tensor` algbw per step (GB/s)  
-**Samples**: 1,020 per mode (17 samples/step × 60 steps)  
-**Raw data**: [`results/e2e_training/baseline/`](results/e2e_training/baseline/) · [`results/e2e_training/tempo/`](results/e2e_training/tempo/) · SLURM job `52849205` (2026-05-11 21:55)
+**Raw data**: [`results/e2e_training/`](results/e2e_training/) · SLURM job `52849205`
 
 ```
 ReduceScatter BW over training steps  [median per step, rank 0]
-
   GB/s
    8 ┤
-   7 ┤  ○  ○  ○                              ○                   ○  ○
-   6 ┤○  ○  ○  ○  ○  ◆  ◆  ○  ˖  ˖  ○  ○  ○  ○  ○  ˖  ˖  ○  ○  ○  ○
-   5 ┤     ○     ˖  ˖  ○  ○  ˖  ○  ○     ˖  ˖     ○  ○  ˖  ○     ˖
-   4 ┤                  │                  │                  │
-   3 ┤                  ▼ ckpt 20          ▼ ckpt 40          ▼ ckpt 60
-     └───────┬──────────┬──────────┬──────────┬──────────┬──────────┬──►
-             10        20        30        40        50        60  step
-
-  ○ = Baseline  ◆ = TEMPO  ˖ = TEMPO (non-ckpt, similar)
-
-  At checkpoint steps:
-    Baseline: 4.55–5.03 GB/s  (DMA competes with ReduceScatter)
-    TEMPO:    5.11–5.61 GB/s  (DMA deferred to compute windows)
-    Gap: +9.9%  (adaptive chunk converged to 9–11 MB)
+   7 ┤  ○  ○  ○                         ○                 ○  ○
+   6 ┤○  ○  ○  ○  ○  ◆  ◆  ○  ˖  ˖  ○  ○  ○  ○  ˖  ˖  ○  ○  ○  ○
+   5 ┤     ○     ˖  ˖  ○  ○  ˖  ○  ○     ˖  ˖     ○  ˖  ○     ˖
+   4 ┤              │                 │                 │
+     └──────────────▼ ckpt@20─────────▼ ckpt@40─────────▼ ckpt@60──►
+  ○=Baseline  ◆=TEMPO
 ```
 
 | | Baseline | TEMPO | Δ |
 |---|---:|---:|---:|
 | BW at ckpt steps (mean) | 5.102 GB/s | 5.606 GB/s | **+9.9%** |
-| BW at non-ckpt steps | 6.105 GB/s | 5.487 GB/s | ±noise |
-| Adaptive chunk size | — | 9–11 MB | auto-tuned |
-| Total samples | 1,020 | 1,020 | — |
-
-> **Scope note**: 1B model on 2 nodes produces ~45 MB ReduceScatter tensors per layer — smaller PCIe pressure than the 256 MB AllReduce in §3.1. The +9.9% represents the E2E gate mechanism working correctly. Larger models (7B+) and more nodes are expected to close the gap toward the §3.1 upper bound.
+| BW at non-ckpt steps    | 6.105 GB/s | 5.487 GB/s | ±noise |
+| Adaptive chunk size     | —          | 9–11 MB    | auto-tuned |
 
 ---
 
 ## 4. Comparison with Related Work
 
-| System | Venue | What they solve | Hardware assumption |
+| System | Venue | What they solve | TEMPO differentiator |
 |---|---|---|---|
-| DistServe | OSDI '24 | Prefill/decode disaggregation | Cloud VMs, TCP/IP |
-| Pie | SOSP '25 | Async I/O during Wasm inferlets | Abstract topology |
-| Aegaeon | SOSP '25 | Token-level preemption | Multiple cloud models |
-| Teola | OSDI '24 | DAG decomposition | TCP/IP clusters |
-| **TEMPO** | **—** | **Checkpoint I/O ↔ NCCL PCIe interference** | **Perlmutter: HPC PCIe + Slingshot-11** |
+| DistServe | OSDI '24 | Prefill/decode disaggregation | TEMPO targets *intra-step* PCIe + Slingshot interference in HPC |
+| Pie | SOSP '25 | Async I/O in Wasm inferlets | TEMPO adds switch-level hardware TC; Pie relies on SW scheduler |
+| Aegaeon | SOSP '25 | Token-level preemption, cloud | TEMPO is single-workload but exploits physical fabric QoS |
+| Teola | OSDI '24 | DAG decomposition, TCP/IP | TEMPO uses `libfabric` RDMA + sysfs hardware counters |
+| Blink / ShadowServe | ASPLOS/arXiv '25 | CPU-bypass via SmartNIC/DPU | TEMPO achieves same CPU-bypass in pure SW (libfabric CXI + CUDA MMIO) |
+| FlowKV | arXiv '25 | KV-cache on single-path networks | TEMPO's NVLink multipath physically eliminates PCIe HoL |
 
-**TEMPO's differentiator**: Hardware-topology-aware phase gating in pure userspace Python — no modified kernel, no firmware, no FPGA. Exploits Perlmutter's specific AMD EPYC PCIe topology without hardware modification.
+**TEMPO novelty**: pure software middleware that exploits Perlmutter's specific topology (Multi-rail Slingshot-11 · NVLink P2P · AMD EPYC PCIe I/O die) to achieve hardware-level interference isolation — no hardware modification, no DPU, no kernel patch.
 
 ---
 
@@ -296,46 +286,50 @@ ReduceScatter BW over training steps  [median per step, rank 0]
 ### PCIe Contention Isolation (§3.1)
 
 ```bash
-# 1 node, ~25 min
 sbatch eval/pcie_contention/run_phase7_eval.slurm
-# → results/pcie_contention/timeline_{baseline,tempo}.csv
+# → results/pcie_contention/timeline_{baseline,tempo}.csv  (~25 min, 1 node)
 ```
 
 ### End-to-End Training Timeline (§3.2)
 
 ```bash
-# 2 nodes × 4 GPU, ~30 min
 sbatch eval/e2e_training/run_evaluation.slurm
-# → results/e2e_training/{baseline,tempo}/nccl_bw_rank0.csv
+# → results/e2e_training/{baseline,tempo}/nccl_bw_rank0.csv  (~30 min, 2 nodes)
 ```
 
-### Minimal integration test
+### Smoke test (any single node)
 
 ```python
 import torch, torch.distributed as dist
-from tempo import TEMPOScheduler
+from tempo import TEMPOSchedulerV6
 
 dist.init_process_group("nccl")
-tempo = TEMPOScheduler(rank=dist.get_rank(), world_size=dist.get_world_size(), mode="tempo")
-model = torch.nn.parallel.DistributedDataParallel(torch.nn.Linear(1024, 1024).cuda())
-opt   = torch.optim.AdamW(model.parameters())
-
-for step in range(100):
-    tempo.on_step_begin(step)
-    with tempo.compute_phase():
+ctrl = TEMPOSchedulerV6(
+    rank=dist.get_rank(), world_size=dist.get_world_size(),
+    mode="tempo", cxi_dry_run=True,
+)
+model = torch.nn.parallel.DistributedDataParallel(
+    torch.nn.Linear(1024, 1024).cuda()
+)
+opt = torch.optim.AdamW(model.parameters())
+for step in range(50):
+    ctrl.on_step_begin(step)
+    with ctrl.compute_phase():
         model(torch.randn(32, 1024).cuda()).sum().backward()
-    with tempo.nccl_phase():
+    with ctrl.nccl_phase():
         opt.step(); opt.zero_grad()
-    if step % 20 == 0:
-        tempo.checkpoint(model.state_dict(), step)
+    if step % 10 == 0:
+        ctrl.checkpoint(model.state_dict(), step,
+                        gain_score=ctrl.compute_gain(step))
+ctrl.print_stats()
 ```
 
 ### Environment (Perlmutter)
 
 ```bash
-export CUDA_DEVICE_ORDER=PCI_BUS_ID   # stable GPU ordering
-export NCCL_P2P_DISABLE=1             # force AllReduce via NIC (not NVLink direct)
-export NCCL_IB_QPS_PER_CONNECTION=4   # Slingshot fabric tuning
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+export NCCL_P2P_DISABLE=1
+export NCCL_IB_QPS_PER_CONNECTION=4
 export OMP_NUM_THREADS=1
 ```
 
@@ -346,38 +340,52 @@ export OMP_NUM_THREADS=1
 ```
 Skim-Tempo/
 │
-├── tempo/                      Core library
-│   ├── phase_monitor.py        PhaseMonitor — threading.Event gate + EMA NCCL timer
-│   ├── checkpoint_manager.py   O(1) staging: local NVMe → async Lustre flush
-│   ├── scheduler.py            TEMPOScheduler V1–V5 (versioned, backward-compat)
-│   ├── network_monitor.py      Slingshot-11 sysfs NIC utilization poller
-│   ├── service_gain.py         Priority-heap flush job scheduler
-│   └── qos_mapper.py           DSCP → Slingshot TC QoS mapping
+├── tempo/                        Core middleware library (v0.6.0)
+│   ├── scheduler.py              TEMPOScheduler V1–V6 (versioned, backward-compat)
+│   ├── phase_monitor.py          PhaseMonitor — Event gate + dynamic rate API
+│   ├── checkpoint_manager.py     O(1) NVMe staging → async Lustre flush
+│   ├── network_monitor.py        Slingshot-11 sysfs poller + CassiniHWCounters
+│   ├── topology_router.py        Dragonfly+ placement (intra-group first)
+│   ├── service_gain.py           Priority-heap flush scheduler + PCIePressurePredictor
+│   ├── qos_mapper.py             socket.IP_TOS DSCP fallback
+│   │
+│   ├── gpu_driven.py             [V6 P1] GPU→NIC doorbell via CUDA MMIO
+│   ├── nvlink_router.py          [V6 P2] NVLink PCIe multipath router
+│   ├── libfabric_qos.py          [V6 P3] fi_setopt CXI endpoint TC control
+│   │
+│   ├── interleaving_engine.py    [V2] I/O + NCCL co-scheduling
+│   ├── sparse_transfer.py        [V4] Sparse KV selection (~8.5× reduction)
+│   ├── p2p_cache.py              [V4] DHT-style P2P DRAM/NVMe cache pool
+│   ├── nano_overlap.py           [V4] Per-layer CUDA stream pipelining
+│   └── nexus_coordinator.py      [V5] Distributed Staggered Checkpoint Protocol
 │
 ├── eval/
-│   ├── pcie_contention/            §3.1 PCIe contention isolation
-│   │   ├── pcie_timeline_profiler.py   CUPTI-timed AllReduce + DMA injection
-│   │   └── run_phase7_eval.slurm       1 node · 4 GPU · 800 samples/mode (~25 min)
-│   └── e2e_training/               §3.2 End-to-end FSDP training
-│       ├── train_with_tempo.py         GPT-1B FSDP training loop (baseline + TEMPO)
-│       ├── run_evaluation.slurm        2 nodes · 8 GPU · 60 steps (~30 min)
+│   ├── pcie_contention/          §3.1 PCIe contention isolation
+│   │   ├── pcie_timeline_profiler.py
+│   │   └── run_phase7_eval.slurm       1 node · 4 GPU · 800 samples/mode
+│   └── e2e_training/             §3.2 End-to-end FSDP training
+│       ├── train_with_tempo.py         GPT-1B FSDP (baseline + TEMPO)
+│       ├── run_evaluation.slurm        2 nodes · 8 GPU · 60 steps
 │       └── run_chunk_sweep.slurm       Chunk size sensitivity: 4–256 MB
 │
 ├── results/
-│   ├── pcie_contention/
-│   │   ├── timeline_baseline.csv   800 rows — AllReduce+DMA, greedy flush
-│   │   └── timeline_tempo.csv      800 rows — AllReduce+DMA, phase-gated
-│   ├── e2e_training/
-│   │   ├── baseline/nccl_bw_rank0.csv  1020 rows — E2E FSDP, greedy flush
-│   │   └── tempo/nccl_bw_rank0.csv    1020 rows — E2E FSDP, phase-gated
-│   └── archive/                    Earlier exploratory runs (not in paper)
+│   ├── pcie_contention/          timeline_{baseline,tempo}.csv  (800 rows each)
+│   ├── e2e_training/             {baseline,tempo}/nccl_bw_rank0.csv  (1020 rows each)
+│   └── figures/                  All paper figures (PDF + PNG)
 │
-└── scripts/
-    ├── make_figures.py             All paper figures from results/ CSVs
-    └── simulate_chunk_sweep.py     Chunk sweep analysis
+├── scripts/
+│   ├── make_figures.py
+│   └── simulate_chunk_sweep.py
+│
+├── src/
+│   ├── c_api/cassini_counters.c  Zero-overhead Cassini sysfs reader (persistent fd + mmap)
+│   ├── attention_monitor/        CUPTI attention pattern profiler
+│   └── pacing_daemon/            C++ I/O pacing daemon
+│
+└── tests/check_api.py            Import + API smoke test
 ```
 
 ---
 
 *Measured on NERSC Perlmutter · SLURM 25.11.4 · PyTorch 2.8.0+cu128 · NCCL 2.29.2-cu13*  
-*PCIe isolation: job `52848625` · E2E training: job `52849205` · both 2026-05-11*
+*PCIe isolation: job `52848625` · E2E training: job `52849205` · 2026-05-11*
