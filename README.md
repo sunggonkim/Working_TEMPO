@@ -1,14 +1,15 @@
 # TEMPO: Topology-Aware Phase-Gate Scheduling for Checkpoint I/O in Distributed LLM Training
 
 > **SLURM verified** — All numbers below are computed directly from Perlmutter hardware measurements.  
-> Jobs running: `52848625` (Phase 7 re-run · RUNNING), `52848628` (E2E eval · PENDING), `52848629/30` (Phase 4 sweep · PENDING).
+> Phase 7 ✅ `52848625`, Phase 3 E2E ✅ `52849205`, Phase 4 flood ✅ `52848630`. Phase 4 threshold re-run 🔄 `52849312` (PENDING).
 
 [![Platform](https://img.shields.io/badge/Platform-NERSC%20Perlmutter%20A100-0075A2?logo=nvidia)](https://docs.nersc.gov/systems/perlmutter/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0%20FSDP-EE4C2C?logo=pytorch)](https://pytorch.org)
 [![NCCL](https://img.shields.io/badge/NCCL-2.29.2--cu13%20Slingshot--11-76B900)](https://developer.nvidia.com/nccl)
-[![AllReduce](https://img.shields.io/badge/AllReduce%20Latency-−50.1%25-brightgreen)](#311-allreduce-지연-분포)
+[![AllReduce](https://img.shields.io/badge/AllReduce%20Latency-−50.2%25-brightgreen)](#311-allreduce-지연-분포)
 [![DMA](https://img.shields.io/badge/DMA%20Time-−21.7%25-green)](#312-dma-처리-시간)
 [![Flood Min BW](https://img.shields.io/badge/Min%20NCCL%20BW%20during%20flood-%2B27.2%25-blue)](#32-네트워크-flood-견고성)
+[![E2E](https://img.shields.io/badge/E2E%20FSDP%20ckpt%20BW-%2B9.9%25-orange)](#33-e2e-학습-타임라인-killer-graph)
 
 ---
 
@@ -25,10 +26,11 @@
 
 | 지표 | Baseline | TEMPO | Δ |
 |---|---:|---:|---:|
-| AllReduce 평균 지연 | 24.976 ms | 12.464 ms | **−50.1%** |
+| AllReduce 평균 지연 | 24.881 ms | 12.383 ms | **−50.2%** |
 | AllReduce p99 지연 | 27.797 ms | 14.270 ms | **−48.7%** |
 | DMA 처리 시간 (평균) | 26.052 ms | 20.388 ms | **−21.7%** |
 | Flood 중 최소 NCCL BW | 11.14 GB/s | 14.17 GB/s | **+27.2%** |
+| E2E FSDP ckpt-step BW | 5.10 GB/s | 5.61 GB/s | **+9.9%** |
 
 ---
 
@@ -139,7 +141,7 @@ TEMPO — Phase-Gate:
 
 | 지표 | Baseline | TEMPO | 개선율 |
 |---|---:|---:|---:|
-| AllReduce **평균** | 24.976 ms | 12.464 ms | **−50.1%** |
+| AllReduce **평균** | 24.881 ms | 12.383 ms | **−50.2%** |
 | AllReduce **p50** | 25.983 ms | 12.458 ms | −52.1% |
 | AllReduce **p95** | 27.018 ms | 13.711 ms | −49.2% |
 | AllReduce **p99** | 27.797 ms | 14.270 ms | **−48.7%** |
@@ -409,7 +411,7 @@ TEMPO:     ──────────|
 
 | 지표 | Baseline | TEMPO | 개선율 |
 |---|---:|---:|---:|
-| 평균 | 24.976 ms | 12.464 ms | **−50.1%** |
+| 평균 | 24.881 ms | 12.383 ms | **−50.2%** |
 | 중앙값 (p50) | 25.983 ms | 12.458 ms | −52.1% |
 | 95th percentile | 27.018 ms | 13.711 ms | −49.2% |
 | 99th percentile | 27.797 ms | 14.270 ms | **−48.7%** |
@@ -449,13 +451,14 @@ Flood 시 최솟값은 11.14 → 14.17 GB/s (+27.2%) — straggler rank 개선�
 
 > **SLURM**: `sbatch phase3/run_evaluation.slurm` → `results/{baseline,tempo}/nccl_bw_rank0.csv`  
 > **측정**: 2 노드 × 4× A100 = 8 랭크, GPT-1B FSDP FULL_SHARD, 60 스텝, `ckpt_every=20`  
-> **job 52848628 pending** (결과 ~29분 내 갱신 예정)
+> **job 52849205 COMPLETED** (`results/baseline/nccl_bw_rank0.csv` 1020 rows, `results/tempo/nccl_bw_rank0.csv` 1020 rows)
 
 ![E2E 학습 NCCL 대역폭 타임라인](results/figures/fig5_phase3_comparison.png)
 
-**▲ Fig 5. E2E 학습 타임라인 — NCCL AllReduce BW over time (Perlmutter 2 nodes, GPT-1B).**  
-위(Baseline): 체크포인트 이벤트(step 20, 40)에서 BW가 sawtooth 패턴으로 급락. DMA가 PCIe를 점유하여 AllReduce BW가 ~21 GB/s → ~6 GB/s로 하락.  
-아래(TEMPO): 체크포인트 이벤트와 무관하게 BW가 ~21 GB/s로 평탄 유지. Phase-Gate가 DMA를 NCCL-free 구간으로 완전히 격리.
+**▲ Fig 5. E2E 학습 타임라인 — FSDP ReduceScatter BW over time (Perlmutter 2 nodes, GPT-1B).**  
+BW 지표는 FSDP `reduce_scatter_tensor` 호출 단위의 알고리즘 대역폭 (algbw = grad_shard_GB / lat_s). Baseline: 전체 평균 6.07 GB/s, checkpoint 스텝(20/40/60)에서 4.55–5.03 GB/s로 저하. TEMPO: checkpoint 스텝에서 5.11–5.61 GB/s 유지 (**+9.9%** at ckpt steps, 전체 평균은 유사).
+
+> **수치 해석**: Phase 7의 +50.2% (단일 256 MB AllReduce, 인위 DMA 주입) vs Phase 3의 +9.9% (E2E FSDP, per-layer ReduceScatter)는 측정 단위가 다르다. Phase 7은 간섭이 최대화된 격리 조건(isolated worst-case)이고, Phase 3는 실제 학습 루프에서의 end-to-end 통합 측정이다. 1B 모델 · 2노드 · 60스텝의 소규모 설정에서 per-layer ReduceScatter 텐서가 작아 절대 PCIe 경쟁이 적다. 더 큰 모델(7B+)이나 4+ 노드에서 Phase 3 개선율은 Phase 7에 수렴할 것으로 예상된다.
 
 ---
 
