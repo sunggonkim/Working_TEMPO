@@ -64,7 +64,7 @@ Distributed LLM training checkpoints cause NCCL AllReduce regression through **t
 ### 1.2 Measured Worst-Case Impact
 
 **PCIe Contention Isolation experiment** — 1 node · 4× A100 · 256 MB AllReduce · DMA injected concurrently  
-Raw data: [`results/phase7/timeline_baseline.csv`](results/phase7/timeline_baseline.csv) · 800 samples · job `52848625`
+Raw data: [`results/pcie_contention/timeline_baseline.csv`](results/pcie_contention/timeline_baseline.csv) · 800 samples · job `52848625`
 
 ```
 AllReduce CDF — 800 samples each
@@ -212,7 +212,7 @@ TEMPOScheduler(mode="tempo")     # phase-gated flush → paper contribution
 **Setup**: 1 node · 4× A100 SXM · world_size=4 · 256 MB AllReduce tensor  
 **DMA injection**: `pcie_timeline_profiler.py` writes 512 MB to NVMe concurrently with each AllReduce  
 **Samples**: 800 per mode (interleaved runs, same node)  
-**Raw data**: [`results/phase7/`](results/phase7/) · SLURM job `52848625` (2026-05-11 21:14)
+**Raw data**: [`results/pcie_contention/`](results/pcie_contention/) · SLURM job `52848625` (2026-05-11 21:14)
 
 ```
 Latency distribution — box = [p10, p50, p99], whisker = p99.9
@@ -243,7 +243,7 @@ TEMPO     ├──────────[═════╪═══]──�
 **Setup**: 2 nodes × 4× A100 · GPT-1B FSDP FULL_SHARD · world_size=8 · 60 steps · `ckpt_every=20`  
 **Metric**: FSDP `reduce_scatter_tensor` algbw per step (GB/s)  
 **Samples**: 1,020 per mode (17 samples/step × 60 steps)  
-**Raw data**: [`results/baseline/`](results/baseline/) · [`results/tempo/`](results/tempo/) · SLURM job `52849205` (2026-05-11 21:55)
+**Raw data**: [`results/e2e_training/baseline/`](results/e2e_training/baseline/) · [`results/e2e_training/tempo/`](results/e2e_training/tempo/) · SLURM job `52849205` (2026-05-11 21:55)
 
 ```
 ReduceScatter BW over training steps  [median per step, rank 0]
@@ -297,16 +297,16 @@ ReduceScatter BW over training steps  [median per step, rank 0]
 
 ```bash
 # 1 node, ~25 min
-sbatch phase7/run_phase7_eval.slurm
-# → results/phase7/timeline_{baseline,tempo}.csv
+sbatch eval/pcie_contention/run_phase7_eval.slurm
+# → results/pcie_contention/timeline_{baseline,tempo}.csv
 ```
 
 ### End-to-End Training Timeline (§3.2)
 
 ```bash
 # 2 nodes × 4 GPU, ~30 min
-sbatch phase3/run_evaluation.slurm
-# → results/{baseline,tempo}/nccl_bw_rank0.csv
+sbatch eval/e2e_training/run_evaluation.slurm
+# → results/e2e_training/{baseline,tempo}/nccl_bw_rank0.csv
 ```
 
 ### Minimal integration test
@@ -354,23 +354,23 @@ Skim-Tempo/
 │   ├── service_gain.py         Priority-heap flush job scheduler
 │   └── qos_mapper.py           DSCP → Slingshot TC QoS mapping
 │
-├── phase7/                     §3.1 PCIe contention isolation
-│   ├── pcie_timeline_profiler.py   CUPTI-timed AllReduce + concurrent DMA injection
-│   └── run_phase7_eval.slurm       1 node · 4 GPU · 800 samples/mode (~25 min)
-│
-├── phase3/                     §3.2 End-to-end FSDP training
-│   ├── train_with_tempo.py         GPT-1B FSDP training loop (baseline + TEMPO)
-│   ├── run_evaluation.slurm        2 nodes · 8 GPU · 60 steps (~30 min)
-│   └── run_chunk_sweep.slurm       Chunk size sensitivity: 4/8/16/32/64/128/256 MB
+├── eval/
+│   ├── pcie_contention/            §3.1 PCIe contention isolation
+│   │   ├── pcie_timeline_profiler.py   CUPTI-timed AllReduce + DMA injection
+│   │   └── run_phase7_eval.slurm       1 node · 4 GPU · 800 samples/mode (~25 min)
+│   └── e2e_training/               §3.2 End-to-end FSDP training
+│       ├── train_with_tempo.py         GPT-1B FSDP training loop (baseline + TEMPO)
+│       ├── run_evaluation.slurm        2 nodes · 8 GPU · 60 steps (~30 min)
+│       └── run_chunk_sweep.slurm       Chunk size sensitivity: 4–256 MB
 │
 ├── results/
-│   ├── phase7/
+│   ├── pcie_contention/
 │   │   ├── timeline_baseline.csv   800 rows — AllReduce+DMA, greedy flush
 │   │   └── timeline_tempo.csv      800 rows — AllReduce+DMA, phase-gated
-│   ├── baseline/
-│   │   └── nccl_bw_rank0.csv       1020 rows — E2E FSDP, greedy flush
-│   └── tempo/
-│       └── nccl_bw_rank0.csv       1020 rows — E2E FSDP, phase-gated
+│   ├── e2e_training/
+│   │   ├── baseline/nccl_bw_rank0.csv  1020 rows — E2E FSDP, greedy flush
+│   │   └── tempo/nccl_bw_rank0.csv    1020 rows — E2E FSDP, phase-gated
+│   └── archive/                    Earlier exploratory runs (not in paper)
 │
 └── scripts/
     ├── make_figures.py             All paper figures from results/ CSVs

@@ -8,7 +8,7 @@ at the hardware level.  Each figure addresses one reviewer objection:
   Fig 9 — pcie_timeline.pdf
     Objection: "Does PCIe contention ACTUALLY cause measurable AllReduce stalls?"
     Answer:    µs-level Gantt chart showing DMA overlap with AllReduce.
-    Data:      results/phase7/timeline_{baseline,tempo}.csv
+    Data:      results/pcie_contention/timeline_{baseline,tempo}.csv
 
   Fig 10 — io_nccl_sweep.pdf
     Objection: "Is the Slingshot-11 fabric really shared between I/O and NCCL?"
@@ -544,7 +544,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate OSDI micro-benchmark figures (Fig 9, 10, 11)"
     )
-    parser.add_argument("--fig", type=int, choices=[9, 10, 11],
+    parser.add_argument("--fig", type=int, choices=[9, 10, 11, 12],
                         help="Generate only this figure (default: all three)")
     parser.add_argument("--demo",  action="store_true",
                         help="Force synthetic data regardless of CSVs on disk")
@@ -559,7 +559,7 @@ def main():
 
     results_dir = Path(args.results_dir)
 
-    figs = [args.fig] if args.fig else [9, 10, 11]
+    figs = [args.fig] if args.fig else [9, 10, 11, 12]
 
     print("Generating OSDI micro-benchmark figures ...")
     for fig_id in figs:
@@ -570,11 +570,243 @@ def main():
             fig10_io_nccl_sweep(results_dir, use_demo=args.demo)
         elif fig_id == 11:
             fig11_itl_cdf(results_dir, use_demo=args.demo)
+        elif fig_id == 12:
+            fig12_nexus_dscp(results_dir, use_demo=args.demo)
 
     if args.show:
         plt.show()
 
     print("\nDone.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fig 12 — TEMPO-Nexus DSCP: collective checkpoint flood elimination
+# ─────────────────────────────────────────────────────────────────────────────
+
+def fig12_nexus_dscp(results_dir: Path = Path("results"),
+                     use_demo: bool = False) -> None:
+    """
+    4-panel figure showing TEMPO-Nexus DSCP benefit at 8-node scale.
+
+    Panel A  [top-left]  : NCCL BW time-series — baseline vs nexus,
+                           checkpoint steps highlighted in orange.
+    Panel B  [top-right] : Per-rank NIC utilisation during a single checkpoint
+                           event — baseline shows 8-node synchronised spike,
+                           nexus shows staggered ramp.
+    Panel C  [bottom-left]: Violin plot — NCCL BW at checkpoint steps only,
+                            comparing three modes (baseline, tempo-v4, nexus).
+    Panel D  [bottom-right]: Window assignment waterfall — each rank's DSCP
+                             delay relative to the earliest flusher.
+
+    Data paths
+    ----------
+    results/phase8/nexus/baseline/nccl_bw_rank*.csv
+    results/phase8/nexus/tempo-nexus/nccl_bw_rank*.csv
+    results/phase8/nexus/tempo-nexus/windows_rank*.csv
+    results/phase8/nexus/tempo-nexus/nic_bw_rank*.csv
+    """
+    import glob
+
+    OUT_DIR = results_dir / "figures"
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    OUT_PATH = OUT_DIR / "fig12_nexus_dscp.png"
+
+    # ── Load data ────────────────────────────────────────────────────────────
+    base_dir  = results_dir / "phase8" / "nexus" / "baseline"
+    nexus_dir = results_dir / "phase8" / "nexus" / "tempo-nexus"
+
+    have_data = (
+        not use_demo
+        and base_dir.exists()
+        and nexus_dir.exists()
+        and len(list(base_dir.glob("nccl_bw_rank*.csv"))) > 0
+        and len(list(nexus_dir.glob("nccl_bw_rank*.csv"))) > 0
+    )
+
+    if have_data:
+        def load_all_ranks(d, pattern):
+            frames = []
+            for f in sorted(d.glob(pattern)):
+                df = pd.read_csv(f)
+                df["rank"] = int(f.stem.split("rank")[1])
+                frames.append(df)
+            return pd.concat(frames, ignore_index=True) if frames else None
+
+        bw_base  = load_all_ranks(base_dir,  "nccl_bw_rank*.csv")
+        bw_nexus = load_all_ranks(nexus_dir, "nccl_bw_rank*.csv")
+        nic_base  = load_all_ranks(base_dir,  "nic_bw_rank*.csv")
+        nic_nexus = load_all_ranks(nexus_dir, "nic_bw_rank*.csv")
+        win_nexus = load_all_ranks(nexus_dir, "windows_rank*.csv")
+
+        # Aggregate per-step median BW
+        def agg(df):
+            return df.groupby("step")["algbw_GBs"].median().reset_index()
+
+        base_agg  = agg(bw_base)
+        nexus_agg = agg(bw_nexus)
+
+        ckpt_steps_base  = bw_base.loc[bw_base["is_ckpt"].astype(bool), "algbw_GBs"]
+        ckpt_steps_nexus = bw_nexus.loc[bw_nexus["is_ckpt"].astype(bool), "algbw_GBs"]
+    else:
+        # Demo / synthetic data matching expected results
+        rng = np.random.default_rng(42)
+        steps = np.arange(300)
+        ckpt_mask = (steps % 50 == 0) & (steps > 0)
+
+        def synth_bw(flood: bool):
+            bw = rng.normal(17.5, 0.4, len(steps))
+            if flood:
+                bw[ckpt_mask] -= rng.uniform(3.0, 6.5, ckpt_mask.sum())
+            bw = np.clip(bw, 8.0, 20.0)
+            return bw
+
+        base_bw_series  = synth_bw(flood=True)
+        nexus_bw_series = synth_bw(flood=False)
+        base_agg  = pd.DataFrame({"step": steps, "algbw_GBs": base_bw_series})
+        nexus_agg = pd.DataFrame({"step": steps, "algbw_GBs": nexus_bw_series})
+        ckpt_steps_base  = base_bw_series[ckpt_mask]
+        ckpt_steps_nexus = nexus_bw_series[ckpt_mask]
+
+        # Synthetic NIC data: baseline — 8-node spike at checkpoint
+        n_ranks = 8
+        nic_base_series  = [rng.normal(1.5, 0.3, len(steps)) for _ in range(n_ranks)]
+        nic_nexus_series = [rng.normal(1.5, 0.3, len(steps)) for _ in range(n_ranks)]
+        for step_idx in np.where(ckpt_mask)[0]:
+            # baseline: all 8 nodes spike simultaneously
+            for r in range(n_ranks):
+                nic_base_series[r][step_idx]  = rng.uniform(14, 18)
+            # nexus: staggered spikes
+            for r in range(n_ranks):
+                offset = r * 3  # staggered by 3 steps
+                target = min(step_idx + offset, len(steps) - 1)
+                nic_nexus_series[r][target] = rng.uniform(1.8, 2.5)
+
+        # Synthetic window waterfall
+        win_nexus = pd.DataFrame({
+            "step":      np.repeat([50, 100, 150], n_ranks),
+            "rank":      list(range(n_ranks)) * 3,
+            "pos":       list(range(n_ranks)) * 3,
+            "delay_ms":  [r * 200 for r in range(n_ranks)] * 3,
+            "window_ms": [200] * (n_ranks * 3),
+        })
+
+    # ── Build figure ─────────────────────────────────────────────────────────
+    fig, axes = plt.subplots(2, 2, figsize=(14, 9))
+    (ax_ts, ax_nic), (ax_vio, ax_wfall) = axes
+
+    CBASE  = "#E84855"
+    CNEXUS = "#3A86FF"
+    CGRAY  = "#888888"
+    LIGHT  = "#F8F8F8"
+
+    # Panel A — NCCL BW time-series ──────────────────────────────────────────
+    ckpt_s = base_agg["step"][base_agg["step"] % 50 == 0][1:]
+    for s in ckpt_s:
+        ax_ts.axvspan(s - 2, s + 2, color="orange", alpha=0.15)
+
+    ax_ts.plot(base_agg["step"],  base_agg["algbw_GBs"],
+               color=CBASE,  alpha=0.85, linewidth=1.4, label="Baseline (flood)")
+    ax_ts.plot(nexus_agg["step"], nexus_agg["algbw_GBs"],
+               color=CNEXUS, alpha=0.85, linewidth=1.4, label="TEMPO-Nexus (DSCP)")
+    ax_ts.set_xlabel("학습 스텝", fontsize=11)
+    ax_ts.set_ylabel("NCCL AllReduce BW (GB/s)", fontsize=11)
+    ax_ts.set_title("(A) NCCL BW — 체크포인트 스텝에서의 변동\n(주황 배경: 체크포인트 구간)",
+                    fontsize=10, fontweight="bold")
+    ax_ts.legend(fontsize=9, loc="lower left")
+    ax_ts.set_ylim(bottom=0)
+
+    # Panel B — NIC utilisation during one checkpoint event ──────────────────
+    # Show NIC utilisation at the checkpoint step window
+    ax_nic.set_title("(B) 체크포인트 순간의 NIC 사용률\n(8노드 × rank별, 체크포인트 step=100 주변)",
+                     fontsize=10, fontweight="bold")
+    if have_data and nic_base is not None:
+        ckpt_window = range(95, 115)
+        base_window_df  = nic_base[nic_base["step"].isin(ckpt_window)]
+        nexus_window_df = nic_nexus[nic_nexus["step"].isin(ckpt_window)]
+        for r in base_window_df["rank"].unique():
+            ax_nic.plot(base_window_df[base_window_df["rank"]==r]["step"],
+                        base_window_df[base_window_df["rank"]==r]["nic_gbps"],
+                        color=CBASE, alpha=0.3, linewidth=1)
+        for r in nexus_window_df["rank"].unique():
+            ax_nic.plot(nexus_window_df[nexus_window_df["rank"]==r]["step"],
+                        nexus_window_df[nexus_window_df["rank"]==r]["nic_gbps"],
+                        color=CNEXUS, alpha=0.3, linewidth=1)
+    else:
+        t = np.linspace(0, 12, 120)
+        for r in range(8):
+            base_nic  = 1.5 + 14 * np.exp(-((t - 3.0)**2) / 1.5)
+            nexus_nic = 1.5 + 2.0 * np.exp(-((t - (3.0 + r * 0.7))**2) / 0.3)
+            ax_nic.plot(t, base_nic,  color=CBASE,  alpha=0.25, linewidth=1)
+            ax_nic.plot(t, nexus_nic, color=CNEXUS, alpha=0.35, linewidth=1)
+    base_patch  = mpatches.Patch(color=CBASE,  alpha=0.6, label="Baseline: 동시 급등")
+    nexus_patch = mpatches.Patch(color=CNEXUS, alpha=0.6, label="TEMPO-Nexus: 시차 분산")
+    ax_nic.legend(handles=[base_patch, nexus_patch], fontsize=9)
+    ax_nic.set_xlabel("시간 (상대, 12초 창)", fontsize=11)
+    ax_nic.set_ylabel("NIC 사용률 (GB/s)", fontsize=11)
+
+    # Panel C — Violin: NCCL BW at checkpoint steps ──────────────────────────
+    vdata = [ckpt_steps_base, ckpt_steps_nexus]
+    parts = ax_vio.violinplot(vdata, positions=[0, 1],
+                              showmedians=True, showextrema=True)
+    for pc, c in zip(parts["bodies"], [CBASE, CNEXUS]):
+        pc.set_facecolor(c)
+        pc.set_alpha(0.7)
+    parts["cmedians"].set_color("white")
+    parts["cmedians"].set_linewidth(2.5)
+    for col in ["cmins", "cmaxes", "cbars"]:
+        parts[col].set_color(CGRAY)
+
+    ax_vio.set_xticks([0, 1])
+    ax_vio.set_xticklabels(["Baseline\n(flood)", "TEMPO-Nexus\n(DSCP)"], fontsize=10)
+    ax_vio.set_ylabel("NCCL AllReduce BW (GB/s)", fontsize=11)
+    ax_vio.set_title("(C) 체크포인트 스텝에서의 NCCL BW 분포\n(하단 꼬리 = flood 피해)",
+                     fontsize=10, fontweight="bold")
+    # Annotate medians
+    for pos, arr in [(0, ckpt_steps_base), (1, ckpt_steps_nexus)]:
+        med = float(np.median(arr))
+        ax_vio.text(pos, med + 0.3, f"중앙값\n{med:.1f}", ha="center",
+                    fontsize=8.5, fontweight="bold",
+                    color=CBASE if pos == 0 else CNEXUS)
+
+    # Panel D — DSCP window waterfall ────────────────────────────────────────
+    ax_wfall.set_title("(D) DSCP 윈도우 할당 — 랭크별 flush 시작 오프셋\n(스텝 50 기준)",
+                       fontsize=10, fontweight="bold")
+    if win_nexus is not None:
+        sample_step = win_nexus["step"].iloc[0] if len(win_nexus) else 50
+        step_wins = win_nexus[win_nexus["step"] == sample_step].sort_values("pos")
+        if len(step_wins):
+            colors = plt.cm.Blues(np.linspace(0.35, 0.9, len(step_wins)))
+            for i, (_, row) in enumerate(step_wins.iterrows()):
+                win_dur = float(row["window_ms"]) if "window_ms" in row else 200.0
+                ax_wfall.barh(int(row["pos"]), win_dur,
+                              left=float(row["delay_ms"]),
+                              color=colors[i], edgecolor="white",
+                              linewidth=0.8, height=0.7)
+                ax_wfall.text(float(row["delay_ms"]) + win_dur / 2,
+                              int(row["pos"]),
+                              f"rank {int(row['rank'])}", ha="center",
+                              va="center", fontsize=8, color="white",
+                              fontweight="bold")
+    else:
+        for r in range(8):
+            ax_wfall.barh(r, 200, left=r * 200,
+                          color=plt.cm.Blues(0.35 + r * 0.07),
+                          edgecolor="white", linewidth=0.8, height=0.7)
+            ax_wfall.text(r * 200 + 100, r, f"rank {r}",
+                          ha="center", va="center", fontsize=8,
+                          color="white", fontweight="bold")
+    ax_wfall.set_xlabel("체크포인트 이벤트로부터 경과 시간 (ms)", fontsize=11)
+    ax_wfall.set_ylabel("DSCP 슬롯 (로드 오름차순)", fontsize=11)
+    ax_wfall.set_yticks([])
+
+    fig.suptitle("Fig 12. TEMPO-Nexus: 분산 시차 체크포인트 프로토콜 (DSCP)\n"
+                 "8노드 집단 flush 급등 → 시차 분산으로 Slingshot 혼잡 제거",
+                 fontsize=12, fontweight="bold", y=1.01)
+    plt.tight_layout()
+    fig.savefig(str(OUT_PATH), dpi=250, bbox_inches="tight")
+    fig.savefig(str(OUT_PATH).replace(".png", ".pdf"), bbox_inches="tight")
+    plt.close(fig)
+    print(f"[fig12] {OUT_PATH}")
 
 
 if __name__ == "__main__":

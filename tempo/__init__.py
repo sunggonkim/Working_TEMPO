@@ -45,7 +45,7 @@ Usage:
 
 from tempo.phase_monitor import PhaseMonitor, TrainingPhase
 from tempo.checkpoint_manager import CheckpointManager
-from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2, TEMPOSchedulerV3, TEMPOSchedulerV4
+from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2, TEMPOSchedulerV3, TEMPOSchedulerV4, TEMPOSchedulerV5
 from tempo.network_monitor import NetworkMonitor, CassiniHWCounters
 from tempo.service_gain import ServiceGainScheduler, TokenBucket, FlushPriority
 from tempo.interleaving_engine import InterleavingEngine, PhaseDurationPredictor
@@ -55,8 +55,9 @@ from tempo.sparse_transfer import SparseTransferFilter, SparseKVBlock
 from tempo.p2p_cache import P2PCacheStore
 from tempo.nano_overlap import NanoOverlapController, LayerTiming, StepMetrics, PinnedBufferPool
 from tempo.trace_loader import TraceLoader, Request, TraceStats
+from tempo.nexus_coordinator import NexusCoordinator, LayerMicroGate, CheckpointWindow
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = [
     # Core (v1)
     "PhaseMonitor", "TrainingPhase", "CheckpointManager", "TEMPOScheduler",
@@ -74,6 +75,9 @@ __all__ = [
     "SparseTransferFilter", "SparseKVBlock",
     "P2PCacheStore",
     "NanoOverlapController", "LayerTiming", "StepMetrics", "PinnedBufferPool",
+    # V5: Nexus — Distributed Staggered Checkpoint Protocol (OSDI-level)
+    "TEMPOSchedulerV5",
+    "NexusCoordinator", "LayerMicroGate", "CheckpointWindow",
     # Real hardware + workload (OSDI AE requirements)
     "CassiniHWCounters",
     "TraceLoader", "Request", "TraceStats",

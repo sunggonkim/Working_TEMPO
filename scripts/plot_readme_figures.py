@@ -585,7 +585,7 @@ def fig_results_summary(show=False):
 
     # 소스 명시
     fig.text(0.5, -0.02,
-             "데이터 출처: results/phase7/timeline_{baseline,tempo}.csv  |  "
+             "데이터 출처: results/pcie_contention/timeline_{baseline,tempo}.csv  |  "
              "환경: Perlmutter 4노드 × A100 40GB × HPE Slingshot-11",
              ha="center", fontsize=9, color="gray", style="italic")
 

@@ -18,8 +18,8 @@ from pathlib import Path
 
 RNG = np.random.default_rng(42)
 
-BASE_CSV  = Path("results/baseline/nccl_bw_rank0.csv")
-TEMPO_CSV = Path("results/tempo/nccl_bw_rank0.csv")
+BASE_CSV  = Path("results/e2e_training/baseline/nccl_bw_rank0.csv")
+TEMPO_CSV = Path("results/e2e_training/tempo/nccl_bw_rank0.csv")
 
 if not BASE_CSV.exists() or not TEMPO_CSV.exists():
     print("ERROR: baseline/tempo CSVs not found. Run phase3/run_evaluation.slurm first.")

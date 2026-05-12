@@ -445,8 +445,8 @@ def fig4_phase1_barchart():
 # Fig 5 — Phase 3 TEMPO vs Baseline BW Over Steps
 # ═════════════════════════════════════════════════════════════════════════════
 def fig5_phase3_comparison():
-    base_path  = Path("results/baseline/nccl_bw_rank0.csv")
-    tempo_path = Path("results/tempo/nccl_bw_rank0.csv")
+    base_path  = Path("results/e2e_training/baseline/nccl_bw_rank0.csv")
+    tempo_path = Path("results/e2e_training/tempo/nccl_bw_rank0.csv")
     if not base_path.exists() or not tempo_path.exists():
         print("[fig5] CSV files not found, skipping")
         return
