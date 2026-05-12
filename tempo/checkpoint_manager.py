@@ -297,7 +297,11 @@ class CheckpointManager:
             while True:
                 # ---- Adaptive chunk resizing ----
                 if self.adaptive_chunk and self.phase_monitor is not None:
-                    avg_nccl_ms = self.phase_monitor.get_avg_nccl_duration_ms()
+                    # Use EMA-smoothed NCCL duration (more noise-robust than raw mean)
+                    avg_nccl_ms = self.phase_monitor.nccl_phase_duration_ms
+                    if avg_nccl_ms == 0.0:
+                        # Fall back to raw mean until EMA warms up
+                        avg_nccl_ms = self.phase_monitor.get_avg_nccl_duration_ms()
                     if avg_nccl_ms > 0 and _write_samples:
                         # Estimate write bandwidth from recent samples
                         est_bw_bytes_per_ms = (

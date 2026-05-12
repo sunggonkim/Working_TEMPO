@@ -76,6 +76,9 @@ class PhaseMonitor:
         # Stores the last N observed NCCL phase durations in milliseconds.
         self._nccl_window_size: int = 16
         self._nccl_durations_ms: list = []   # circular buffer (deque semantics)
+        # EMA-smoothed estimate (α=0.30); more noise-robust than raw mean.
+        # Updated each time the NCCL phase ends.
+        self._ema_nccl_ms: float = 0.0
 
         # ---- I/O gating Event ----
         # SET   = background I/O is allowed to proceed
@@ -133,10 +136,16 @@ class PhaseMonitor:
             if old_phase == TrainingPhase.NCCL_COMM:
                 elapsed = now - self._nccl_enter_time
                 self._nccl_total_s += elapsed
-                # Record for adaptive chunk sizing
-                self._nccl_durations_ms.append(elapsed * 1e3)
+                elapsed_ms = elapsed * 1e3
+                # Record for adaptive chunk sizing (circular buffer)
+                self._nccl_durations_ms.append(elapsed_ms)
                 if len(self._nccl_durations_ms) > self._nccl_window_size:
                     self._nccl_durations_ms.pop(0)
+                # EMA-smoothed estimate (α=0.30, bias-corrected on first sample)
+                if self._ema_nccl_ms == 0.0:
+                    self._ema_nccl_ms = elapsed_ms
+                else:
+                    self._ema_nccl_ms = 0.30 * elapsed_ms + 0.70 * self._ema_nccl_ms
                 self._io_allowed.set()   # ← Resume I/O flush
                 if self.on_nccl_end:
                     self.on_nccl_end()
@@ -268,6 +277,8 @@ class PhaseMonitor:
     def get_stats(self) -> dict:
         with self._lock:
             total = self._nccl_total_s + self._compute_total_s + 1e-12
+            avg_nccl = (sum(self._nccl_durations_ms) / len(self._nccl_durations_ms)
+                        if self._nccl_durations_ms else 0.0)
             return {
                 "step":               self._step,
                 "phase":              self._phase.name,
@@ -275,7 +286,8 @@ class PhaseMonitor:
                 "compute_total_s":    round(self._compute_total_s, 4),
                 "nccl_fraction":      round(self._nccl_total_s / total, 4),
                 "io_allowed":         self._io_allowed.is_set(),
-                "avg_nccl_ms":        round(self.get_avg_nccl_duration_ms(), 2),
+                "avg_nccl_ms":        round(avg_nccl, 2),
+                "ema_nccl_ms":        round(self._ema_nccl_ms, 2),
             }
 
     def get_avg_nccl_duration_ms(self) -> float:
@@ -288,6 +300,18 @@ class PhaseMonitor:
             if not self._nccl_durations_ms:
                 return 0.0
             return sum(self._nccl_durations_ms) / len(self._nccl_durations_ms)
+
+    @property
+    def nccl_phase_duration_ms(self) -> float:
+        """
+        EMA-smoothed estimate of NCCL phase duration (ms), α=0.30.
+        Preferred over ``get_avg_nccl_duration_ms`` for adaptive chunk sizing
+        because it down-weights old observations and reacts faster to changes
+        in NCCL phase length (e.g., gradient accumulation schedule changes).
+        Returns 0.0 before the first NCCL phase completes.
+        """
+        with self._lock:
+            return self._ema_nccl_ms
 
     def reset_stats(self) -> None:
         with self._lock:
