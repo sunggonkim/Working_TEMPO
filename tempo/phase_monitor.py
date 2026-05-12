@@ -115,6 +115,71 @@ class PhaseMonitor:
         """
         return self._io_allowed.wait(timeout=timeout)
 
+    def get_dynamic_flush_rate(
+        self,
+        requested_bps:     float,
+        nccl_bw_bps:       float = 0.0,
+        pcie_ceiling_bps:  float = 64e9,
+        safety_margin:     float = 0.10,
+    ) -> float:
+        """
+        Continuous (non-binary) bandwidth budget for the next flush chunk.
+
+        Unlike wait_for_io_allowed() which fully blocks during NCCL phases,
+        this returns a float target rate that CheckpointManager feeds into
+        its token bucket.  The effect is smooth rate adaptation instead of
+        stop-go oscillation:
+
+          NCCL active          → 0.0  (must not write during AllReduce)
+          NCCL idle, low load  → requested_bps (full rate)
+          NCCL idle, high load → pcie_ceiling × (1 − nccl_fraction − margin)
+
+        Parameters
+        ----------
+        requested_bps    : ideal flush rate (bytes/sec) from token bucket
+        nccl_bw_bps      : current NCCL AllReduce bandwidth on PCIe (bytes/sec);
+                           0 = caller doesn't know; use EMA estimate.
+        pcie_ceiling_bps : total PCIe bandwidth (DMA + NCCL share, default 64 GB/s)
+        safety_margin    : fractional headroom to preserve above NCCL estimate
+                           (default 10% → stops flush before ceiling is reached)
+
+        Returns
+        -------
+        float  allocated bytes/sec for the next write chunk (0.0 = do not write)
+        """
+        with self._lock:
+            if self._phase == TrainingPhase.NCCL_COMM:
+                return 0.0   # hard block during active AllReduce
+
+        # Estimate NCCL PCIe consumption from EMA phase duration
+        effective_nccl_bps = nccl_bw_bps
+        if effective_nccl_bps == 0.0 and self._ema_nccl_ms > 0.0:
+            # Heuristic: typical AllReduce tensor size / NCCL phase duration
+            # For 1B model (256 MB AllReduce tensor per phase):
+            _TYPICAL_ALLREDUCE_BYTES = 256 * 1024 * 1024
+            effective_nccl_bps = _TYPICAL_ALLREDUCE_BYTES / (self._ema_nccl_ms * 1e-3)
+
+        nccl_fraction     = effective_nccl_bps / max(pcie_ceiling_bps, 1.0)
+        available_fraction = max(0.0, 1.0 - nccl_fraction - safety_margin)
+        allocated_bps      = pcie_ceiling_bps * available_fraction
+        return min(requested_bps, allocated_bps)
+
+    @property
+    def estimated_nccl_bps(self) -> float:
+        """
+        Rough estimate of NCCL PCIe bandwidth consumption (bytes/sec).
+
+        Returns 0.0 when in COMPUTE phase (NCCL not active).
+        Used by PCIePressurePredictor to compute real-time look-ahead.
+        """
+        with self._lock:
+            if self._phase != TrainingPhase.NCCL_COMM:
+                return 0.0
+            if self._ema_nccl_ms <= 0.0:
+                return 0.0
+            _TYPICAL_ALLREDUCE_BYTES = 256 * 1024 * 1024
+            return _TYPICAL_ALLREDUCE_BYTES / (self._ema_nccl_ms * 1e-3)
+
     # ------------------------------------------------------------------
     # Phase transitions
     # ------------------------------------------------------------------

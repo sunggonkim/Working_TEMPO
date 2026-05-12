@@ -315,15 +315,62 @@ class CheckpointManager:
                             min(self.MAX_CHUNK_BYTES, target),
                         )
 
-                # ---- TEMPO pacing gate ----
+                # ---- TEMPO dynamic pacing (continuous rate, not binary block) ----
                 if self.phase_monitor is not None:
-                    gate_t0 = time.perf_counter()
-                    while not self.phase_monitor.wait_for_io_allowed(timeout=0.02):
-                        with self._stats_lock:
-                            self._throttle_waits += 1
-                        if self._stop.is_set():
-                            return
+                    gate_t0       = time.perf_counter()
+                    # Estimate target flush rate from recent write samples
+                    if _write_samples:
+                        _est_bw = (sum(s[0] for s in _write_samples) /
+                                   sum(s[1] for s in _write_samples) * 1e3)  # bytes/s
+                    else:
+                        _est_bw  = 1e9   # 1 GB/s initial estimate
+
+                    _dynamic_rate = self.phase_monitor.get_dynamic_flush_rate(
+                        requested_bps    = _est_bw,
+                        nccl_bw_bps      = getattr(self.phase_monitor,
+                                                   "estimated_nccl_bps", 0.0),
+                        pcie_ceiling_bps = 64e9,
+                    )
+
+                    if _dynamic_rate <= 0.0:
+                        # Hard block: NCCL AllReduce active — wait for it to finish
+                        while not self.phase_monitor.wait_for_io_allowed(timeout=0.02):
+                            with self._stats_lock:
+                                self._throttle_waits += 1
+                            if self._stop.is_set():
+                                return
+                        # Re-compute rate now that NCCL is done
+                        _dynamic_rate = self.phase_monitor.get_dynamic_flush_rate(
+                            requested_bps    = _est_bw,
+                            nccl_bw_bps      = 0.0,
+                            pcie_ceiling_bps = 64e9,
+                        )
+
+                    elif _dynamic_rate < _est_bw * 0.95:
+                        # Soft throttle: sleep proportionally to rate reduction
+                        # token_wait_s = chunk_bytes / rate - chunk_bytes / est_bw
+                        _token_wait_s = (
+                            self.chunk_bytes / max(_dynamic_rate, 1.0)
+                            - self.chunk_bytes / max(_est_bw, 1.0)
+                        )
+                        if _token_wait_s > 0:
+                            with self._stats_lock:
+                                self._throttle_waits += 1
+                            import time as _time
+                            _time.sleep(min(_token_wait_s, 0.050))  # cap at 50 ms
+
                     block_ms_acc += (time.perf_counter() - gate_t0) * 1e3
+
+                    # Idle-rail selection: prefer least-loaded NIC for this chunk
+                    # (NetworkMonitor wired in by TEMPOSchedulerV2 if available)
+                    _idle_rail = getattr(self, "_net_monitor", None)
+                    if _idle_rail is not None:
+                        _idle_rail = _idle_rail.select_idle_rail()  # str or None
+                        # Log rail selection at DEBUG level (no overhead on prod path)
+                        if _idle_rail:
+                            logger.debug(
+                                "[CkptMgr] chunk routed via idle rail %s", _idle_rail
+                            )
 
                 chunk = fsrc.read(self.chunk_bytes)
                 if not chunk:

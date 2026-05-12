@@ -223,6 +223,97 @@ class NetworkMonitor:
         # convert bytes/s → bits/s → fraction
         return (bps * 8.0) / self.link_speed_bps
 
+    def per_rail_util(self) -> Dict[str, float]:
+        """
+        Return per-NIC utilisation as fraction of link speed [0, 1+].
+
+        Perlmutter: 4 Slingshot NICs (hsn0–hsn3) mapped 1:1 to 4 A100s.
+        This is the ground truth for multipath routing decisions:
+        route the next flush chunk through the NIC with the lowest score.
+
+        Returns empty dict in simulation mode.
+        """
+        if self._simulated:
+            return {}
+        with self._lock:
+            return {
+                nic: (ema * 8.0) / self.link_speed_bps
+                for nic, (_, ema, _w) in self._nic_state.items()
+            }
+
+    def select_idle_rail(self) -> Optional[str]:
+        """
+        Return the NIC name with the LOWEST current utilisation.
+
+        Used by CheckpointManager to direct each flush chunk through
+        whichever Slingshot rail is least-loaded at that moment.
+        Multipath I/O: alternating chunks across two idle rails can
+        double effective write bandwidth without any hardware change.
+
+        Returns None if:
+          - simulation mode (no real hardware detected)
+          - all rails exceed congestion_threshold (fully saturated)
+        """
+        per_rail = self.per_rail_util()
+        if not per_rail:
+            return None
+        best_nic  = min(per_rail, key=per_rail.__getitem__)
+        best_util = per_rail[best_nic]
+        if best_util >= self.congestion_threshold:
+            return None   # all rails saturated
+        return best_nic
+
+    def count_idle_rails(self) -> int:
+        """
+        Return the number of NICs below congestion_threshold.
+
+        Used by PCIePressurePredictor.route_decision() to scale the
+        effective PCIe headroom (each idle rail adds an independent
+        32 GB/s lane on Perlmutter).
+        """
+        if self._simulated:
+            return 1  # conservative: assume at least 1 idle rail
+        per_rail = self.per_rail_util()
+        return sum(1 for u in per_rail.values() if u < self.congestion_threshold)
+
+    def predict_congestion_ms(
+        self,
+        bytes_pending: int,
+        flush_bps:     float,
+    ) -> float:
+        """
+        Predict milliseconds until congestion if we start flushing NOW
+        at flush_bps bytes/sec.
+
+        Returns:
+          float("inf")  → safe; flush fits within current headroom
+          0.0           → already congested; do not start flush
+          N > 0         → will hit congestion in N ms; micro-delay by N ms
+
+        Algorithm (O(1)):
+            headroom_bps  = link_speed × threshold − current_ema_bps × 8
+            if flush_bps × 8 ≤ headroom_bps → no congestion predicted
+            else:
+                time_until_congestion = safe_bytes / flush_bps
+        """
+        if self._simulated:
+            return float("inf")
+        if not self._io_allowed_event.is_set():
+            return 0.0   # already congested
+        with self._lock:
+            current_bits_s = self._total_bps_ema * 8.0
+        threshold_bits_s  = self.link_speed_bps * self.congestion_threshold
+        headroom_bits_s   = max(0.0, threshold_bits_s - current_bits_s)
+        flush_bits_s      = flush_bps * 8.0
+        if flush_bits_s <= headroom_bits_s:
+            return float("inf")   # fits within headroom indefinitely
+        # bytes we can send before hitting threshold (at current delta rate)
+        incremental_bits_s = flush_bits_s - headroom_bits_s
+        # Time (in seconds) until accumulated extra bits fill 1 s of headroom
+        # (conservative: assumes NCCL stays constant)
+        time_s = headroom_bits_s / max(incremental_bits_s, 1.0)
+        return time_s * 1000.0   # → ms
+
     def set_simulated_bps(self, bps: float):
         """Inject a simulated bandwidth value (for unit tests)."""
         with self._lock:

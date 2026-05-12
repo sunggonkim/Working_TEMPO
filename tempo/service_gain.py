@@ -309,3 +309,133 @@ class TokenBucket:
         dt  = now - self._last_ts
         self._tokens = min(self.capacity, self._tokens + dt * self.rate_bps)
         self._last_ts = now
+
+
+# ===========================================================================
+# O(1) Analytical PCIe Pressure Predictor  (Pillar 3 — OSDI novelty)
+# ===========================================================================
+
+class PCIePressurePredictor:
+    """
+    Lightweight O(1) look-ahead: given a pending flush request, predict
+    whether PCIe bandwidth will be overloaded N ms from now.
+
+    LLM compute is deterministic:
+        batch_size × seq_len → exact KV-cache bytes.
+    No ML model. Single arithmetic expression per scheduling decision.
+
+    PCIe Gen4 x16 (AMD EPYC on Perlmutter):
+        - Unidirectional:  32 GB/s
+        - Bidirectional:   64 GB/s  (DMA + NCCL share this)
+
+    Decision logic
+    --------------
+    pressure = (flush_bw_needed + nccl_bw_current) / pcie_ceiling
+
+      pressure < 0.90  → proceed at full rate
+      0.90–1.10        → rate-limit to headroom × 0.85 (spread over idle rails)
+      1.10–1.50        → micro_delay: wait for NCCL to release bandwidth
+      > 1.50           → defer entire flush to next compute window
+
+    Idle-rail multiplier:
+        Perlmutter: 4 GPUs × 4 Slingshot NICs (1:1 mapped).
+        If 2 rails are idle, effective PCIe headroom doubles.
+        select_idle_rail() in NetworkMonitor picks the least-loaded one.
+    """
+
+    # AMD EPYC PCIe Gen4 x16 constants
+    PCIE_UNIDIRECTIONAL_BPS: float = 32e9   # 32 GB/s
+    PCIE_CEILING_BPS:        float = 64e9   # 64 GB/s bidirectional total
+
+    @staticmethod
+    def predict_kv_bytes(
+        batch_size:  int,
+        seq_len:     int,
+        n_layers:    int,
+        n_heads:     int,
+        head_dim:    int,
+        dtype_bytes: int = 2,   # fp16 = 2 bytes
+    ) -> int:
+        """
+        Exact KV-cache byte count for one forward pass.  O(1).
+
+            KV = 2 (K+V) × n_layers × n_heads × head_dim × seq_len × batch × dtype
+
+        For GPT-1B (n_layers=24, n_heads=16, head_dim=64):
+            batch=8, seq=512  →  ~192 MB
+            batch=32, seq=2048 → ~3.1 GB
+        """
+        return 2 * n_layers * n_heads * head_dim * seq_len * batch_size * dtype_bytes
+
+    @staticmethod
+    def predict_flush_bw(kv_bytes: int, flush_window_s: float) -> float:
+        """Bytes/sec needed to flush kv_bytes within flush_window_s."""
+        return kv_bytes / max(flush_window_s, 1e-9)
+
+    @classmethod
+    def pcie_pressure(
+        cls,
+        flush_bw_bps:     float,
+        nccl_bw_bps:      float,
+        pcie_ceiling_bps: float = 0,  # 0 = use class default
+    ) -> float:
+        """
+        PCIe pressure coefficient ∈ [0, ∞).
+
+        Interpretation:
+          < 0.90 → safe, no interference predicted
+          ≥ 0.90 → contention; reduce rate or pick idle rail
+          ≥ 1.10 → overload; micro-delay needed
+          ≥ 1.50 → severe; must defer to next compute window
+        """
+        ceiling = pcie_ceiling_bps if pcie_ceiling_bps > 0 else cls.PCIE_CEILING_BPS
+        return (flush_bw_bps + nccl_bw_bps) / ceiling
+
+    @classmethod
+    def route_decision(
+        cls,
+        kv_bytes:         int,
+        flush_window_s:   float,
+        nccl_bw_bps:      float,
+        n_idle_rails:     int = 1,
+        pcie_ceiling_bps: float = 0,
+    ) -> "tuple[str, float]":
+        """
+        O(1) routing decision for a pending flush.
+
+        Returns (action, param):
+          ("proceed",     rate_bps)      → flush at full requested rate
+          ("rate_limit",  safe_rate_bps) → flush at throttled rate via idle rail
+          ("micro_delay", delay_ms)      → micro-delay (sleep), then retry
+          ("defer",       0.0)           → skip this window entirely
+
+        Parameters
+        ----------
+        kv_bytes        : payload size in bytes
+        flush_window_s  : available time window (NCCL phase duration ÷ 2)
+        nccl_bw_bps     : current NCCL AllReduce bandwidth in bytes/sec
+        n_idle_rails    : number of Slingshot NICs not currently saturated
+        pcie_ceiling_bps: override for PCIe ceiling (0 = use default 64 GB/s)
+        """
+        ceiling = pcie_ceiling_bps if pcie_ceiling_bps > 0 else cls.PCIE_CEILING_BPS
+        flush_bw  = cls.predict_flush_bw(kv_bytes, flush_window_s)
+        headroom  = ceiling - nccl_bw_bps
+
+        # Each idle rail is an independent PCIe x16 lane → multiply headroom
+        eff_headroom = headroom * max(1, n_idle_rails)
+
+        pressure = cls.pcie_pressure(flush_bw, nccl_bw_bps, ceiling)
+
+        if pressure < 0.90:
+            return ("proceed", flush_bw)
+        elif n_idle_rails > 0 and flush_bw <= eff_headroom:
+            safe_rate = eff_headroom * 0.85 / max(1, n_idle_rails)
+            return ("rate_limit", safe_rate)
+        elif pressure < 1.50:
+            # Micro-delay: estimate ms until NCCL frees enough headroom
+            deficit_bps   = flush_bw + nccl_bw_bps - ceiling
+            decay_rate    = nccl_bw_bps / max(flush_window_s * 1000, 1.0)  # bps per ms
+            delay_ms      = max(1.0, min(50.0, deficit_bps / max(decay_rate, 1.0)))
+            return ("micro_delay", delay_ms)
+        else:
+            return ("defer", 0.0)

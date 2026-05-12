@@ -321,6 +321,8 @@ class TEMPOSchedulerV2(TEMPOScheduler):
         )
         if self.net_monitor:
             self.net_monitor.start()
+            # Wire into CheckpointManager for per-chunk idle-rail routing
+            self.ckpt_manager._net_monitor = self.net_monitor
 
         # 2. Service Gain Scheduler
         self.svc_gain = (
@@ -368,8 +370,17 @@ class TEMPOSchedulerV2(TEMPOScheduler):
         metadata:   Optional[dict] = None,
     ) -> str:
         """
-        V2 checkpoint: consult ServiceGain before flushing.
-        Under congestion, low-gain checkpoints may be deferred.
+        V2 checkpoint: O(1) PCIe look-ahead + dynamic routing decision.
+
+        Before every flush:
+          1. PCIePressurePredictor.route_decision() computes whether PCIe will
+             be overloaded if we start flushing NOW (batch_size × seq_len →
+             exact KV bytes, single arithmetic expression, O(1)).
+          2. decision:
+             "proceed"       → flush at full rate (pass-through to V1)
+             "rate_limit"    → flush at safe_rate_bps via idle Slingshot rail
+             "micro_delay"   → sleep N ms, then proceed at throttled rate
+             "defer"         → skip flush this step (recompute fallback)
         """
         if self.svc_gain is not None:
             self.svc_gain.update_step(step)
@@ -377,25 +388,79 @@ class TEMPOSchedulerV2(TEMPOScheduler):
         if self.mode != "tempo":
             return super().checkpoint(state_dict, step, metadata)
 
-        # Compute gain and decide whether to flush
+        # ---- O(1) PCIe pressure look-ahead ----
+        from tempo.service_gain import PCIePressurePredictor
+
+        meta        = metadata or {}
+        kv_bytes    = meta.get("size_bytes", 256 * 1024 * 1024)  # default 256 MB
+        batch_size  = meta.get("batch_size",  8)
+        seq_len     = meta.get("seq_len",    512)
+        n_layers    = meta.get("n_layers",    24)
+        n_heads     = meta.get("n_heads",     16)
+        head_dim    = meta.get("head_dim",    64)
+
+        # Compute exact KV-cache bytes if model shape is known
+        if all(k in meta for k in ("batch_size", "seq_len", "n_layers", "n_heads", "head_dim")):
+            kv_bytes = PCIePressurePredictor.predict_kv_bytes(
+                batch_size, seq_len, n_layers, n_heads, head_dim
+            )
+
+        # Current NCCL bandwidth estimate from PhaseMonitor EMA
+        nccl_bw  = getattr(self.phase_monitor, "estimated_nccl_bps", 0.0)
+
+        # Available flush window = half the EMA NCCL phase duration
+        nccl_ms      = self.phase_monitor.nccl_phase_duration_ms
+        flush_win_s  = max(0.010, nccl_ms * 1e-3 * 0.5)  # 50% of NCCL window
+
+        # Count idle Slingshot rails
+        n_idle = (
+            self.net_monitor.count_idle_rails()
+            if self.net_monitor is not None else 1
+        )
+
+        action, param = PCIePressurePredictor.route_decision(
+            kv_bytes       = kv_bytes,
+            flush_window_s = flush_win_s,
+            nccl_bw_bps    = nccl_bw,
+            n_idle_rails   = n_idle,
+        )
+
+        logger.debug(
+            "[TEMPOv2] step=%d kv=%.1fMB nccl=%.1fGB/s idle_rails=%d "
+            "→ action=%s param=%.2f",
+            step, kv_bytes / 1e6, nccl_bw / 1e9, n_idle, action, param,
+        )
+
+        if action == "defer":
+            # Gain also checked: if ServiceGain says recompute, skip entirely
+            if self.svc_gain is not None:
+                priority = self.svc_gain.submit_job(None, step)
+                if priority.recompute_fallback:
+                    logger.info(
+                        "[TEMPOv2] Step %d: DEFERRED (pressure=overload, "
+                        "gain=%.3f < threshold)", step, priority.gain
+                    )
+                    return ""
+            logger.info("[TEMPOv2] Step %d: DEFERRED by PCIe look-ahead", step)
+            return ""
+
+        elif action == "micro_delay":
+            delay_ms = float(param)
+            logger.debug("[TEMPOv2] Step %d: micro-delay %.1f ms", step, delay_ms)
+            time.sleep(delay_ms * 1e-3)
+
+        # For "rate_limit": the dynamic rate is handled in CheckpointManager
+        # via get_dynamic_flush_rate() — no extra action needed here.
+        # The idle rail is also selected automatically inside _do_flush.
+
+        # ---- ServiceGain priority (final gate) ----
         if self.svc_gain is not None:
             priority = self.svc_gain.submit_job(None, step)
-
             if priority.recompute_fallback:
                 logger.info(
-                    "[TEMPOv2] Step %d: gain=%.3f — recommending RECOMPUTE "
-                    "(skipping Lustre flush under congestion)", step, priority.gain
+                    "[TEMPOv2] Step %d: gain=%.3f — RECOMPUTE fallback", step, priority.gain
                 )
-                # Still save locally; skip the remote flush
-                with self.phase_monitor.checkpoint_phase():
-                    path = self.ckpt_manager.save_async.__wrapped__(
-                        self.ckpt_manager, state_dict, step, metadata
-                    ) if hasattr(self.ckpt_manager.save_async, "__wrapped__") \
-                    else self.ckpt_manager.save_async(state_dict, step, metadata)
-                return path
-
-            # Set token bucket rate based on gain
-            # (future: wire directly into CheckpointManager chunk throttle)
+                return ""
             logger.debug(
                 "[TEMPOv2] Step %d: gain=%.3f defer=%s bps=%.1f GB/s",
                 step, priority.gain, priority.deferrable,
