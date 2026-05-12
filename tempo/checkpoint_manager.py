@@ -79,7 +79,7 @@ class CheckpointManager:
     """
 
     DEFAULT_CHUNK   = 128 * 1024 * 1024   # 128 MB (previous default was 256 MB)
-    MIN_CHUNK_BYTES =  16 * 1024 * 1024   #  16 MB
+    MIN_CHUNK_BYTES =   4 * 1024 * 1024   #   4 MB  (enough for ~4ms at 1 GB/s Lustre)
     MAX_CHUNK_BYTES = 512 * 1024 * 1024   # 512 MB
 
     def __init__(

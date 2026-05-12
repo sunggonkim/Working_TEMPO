@@ -60,7 +60,8 @@ TRAIN_FLAGS=(
     --seq-len      512
     --output-dir   results
     --local-nvme   "${LOCAL_NVME}"
-    --flush-chunk-mb 64
+    --flush-chunk-mb 32
+    --adaptive-chunk
 )
 
 echo "==========================================="

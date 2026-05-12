@@ -83,8 +83,8 @@ class TEMPOScheduler:
         local_nvme_dir: str  = "/tmp/tempo_ckpts",
         lustre_dir:     Optional[str] = None,
         mode:           str  = "tempo",
-        flush_chunk_mb: int  = 128,
-        adaptive_chunk: bool = False,
+        flush_chunk_mb: int  = 32,
+        adaptive_chunk: bool = True,
         verbose:        bool = False,
     ):
         if mode not in ("tempo", "baseline"):
@@ -289,8 +289,8 @@ class TEMPOSchedulerV2(TEMPOScheduler):
         local_nvme_dir:         str   = "/tmp/tempo_ckpts",
         lustre_dir:             Optional[str] = None,
         mode:                   str   = "tempo",
-        flush_chunk_mb:         int   = 128,
-        adaptive_chunk:         bool  = False,
+        flush_chunk_mb:         int   = 32,
+        adaptive_chunk:         bool  = True,
         verbose:                bool  = False,
         # V2 additions
         milestone_interval:     int   = 500,
@@ -518,8 +518,8 @@ class TEMPOSchedulerV3(TEMPOSchedulerV2):
         local_nvme_dir:       str   = "/tmp/tempo_ckpts",
         lustre_dir:           Optional[str] = None,
         mode:                 str   = "tempo",
-        flush_chunk_mb:       int   = 128,
-        adaptive_chunk:       bool  = False,
+        flush_chunk_mb:       int   = 32,
+        adaptive_chunk:       bool  = True,
         verbose:              bool  = False,
         milestone_interval:   int   = 500,
         congestion_threshold: float = 0.75,
@@ -751,8 +751,8 @@ class TEMPOSchedulerV4(TEMPOSchedulerV3):
         local_nvme_dir:          str   = "/tmp/tempo_ckpts",
         lustre_dir:              Optional[str] = None,
         mode:                    str   = "tempo",
-        flush_chunk_mb:          int   = 128,
-        adaptive_chunk:          bool  = False,
+        flush_chunk_mb:          int   = 32,
+        adaptive_chunk:          bool  = True,
         verbose:                 bool  = False,
         milestone_interval:      int   = 500,
         congestion_threshold:    float = 0.75,
@@ -980,3 +980,234 @@ class TEMPOSchedulerV4(TEMPOSchedulerV3):
         super().shutdown(wait=wait)
         if self.nano_ctrl is not None:
             self.nano_ctrl.shutdown()
+
+
+# =============================================================================
+# TEMPOSchedulerV5 — Nexus: Distributed Staggered Checkpoint Protocol (DSCP)
+# =============================================================================
+
+class TEMPOSchedulerV5(TEMPOSchedulerV4):
+    """
+    TEMPO v5 (Nexus): Cross-node autonomous checkpoint orchestration.
+
+    Adds two orthogonal mechanisms over v4:
+
+    **1. Distributed Staggered Checkpoint Protocol (DSCP)** (§3.1)
+        Before each checkpoint flush, all ranks exchange their current NIC
+        utilisation via a single ``dist.all_reduce`` on a world_size-float
+        tensor (~50 µs overhead on Slingshot-11).  The coordinator sorts ranks
+        by load and assigns each rank a non-overlapping flush window:
+
+            delay_rank_i = rank_position × base_window_ms
+
+        This converts the N-node synchronized checkpoint flood into a pipelined
+        N-stage flush with constant per-stage bandwidth, eliminating the
+        Slingshot congestion spike observed in phase4 experiments.
+
+        Expected impact at 8-node scale (Perlmutter):
+          - Peak collective I/O BW: 16 GB/s → 2 GB/s (÷8 serialized)
+          - NCCL AllReduce BW variance during checkpoint steps: → near-zero
+          - End-to-end checkpoint time: unchanged (windows tile continuously)
+
+    **2. Per-layer AllReduce Micro-Gates** (§3.2)
+        FSDP performs AllReduce layer-by-layer (Reduce-Scatter → All-Gather
+        per FSDP unit).  v1–v4 wait for ALL layers to complete AllReduce before
+        starting ANY DMA.  v5 installs a ``LayerMicroGate`` (CUDA Event) per
+        layer:
+
+            layer L AllReduce done → gate_L fires → DMA for shard_L starts
+
+        This overlaps DMA_{0..k-1} with AllReduce_{k..N}, reducing the I/O
+        bubble from O(N × AR_latency) to O(max(AR_N, max_DMA)).
+
+        Integration: call ``on_layer_ar_done(layer_id)`` after each FSDP unit's
+        reduce completes, or register via ``fsdp_layer_comm_hook``.
+
+    Parameters (additions over v4)
+    --------------------------------
+    enable_nexus : bool
+        Enable DSCP cross-node coordination (default True).
+    nexus_base_window_ms : float
+        Initial estimate of single-node flush time in ms (default 200.0).
+        Updated adaptively via EMA after each checkpoint.
+    nexus_overlap_fraction : float
+        Allow adjacent windows to overlap by this fraction (default 0.0 =
+        non-overlapping, safest; 0.1–0.2 for higher throughput if acceptable).
+    enable_layer_gates : bool
+        Enable per-layer AllReduce micro-gates (default True).
+    n_layers : int
+        Number of transformer layers; overrides v4's n_layers for nano_overlap.
+    """
+
+    def __init__(
+        self,
+        # ---- inherited v4 params ----
+        rank:                    int   = 0,
+        world_size:              int   = 1,
+        local_nvme_dir:          str   = "/tmp/tempo_ckpts",
+        lustre_dir:              Optional[str] = None,
+        mode:                    str   = "tempo",
+        flush_chunk_mb:          int   = 32,
+        adaptive_chunk:          bool  = True,
+        verbose:                 bool  = False,
+        milestone_interval:      int   = 500,
+        congestion_threshold:    float = 0.75,
+        enable_network_monitor:  bool  = True,
+        enable_service_gain:     bool  = True,
+        enable_interleaving:     bool  = True,
+        enable_topology_routing: bool  = True,
+        enable_qos:              bool  = True,
+        dry_run_qos:             bool  = True,
+        global_link_quota:       float = 0.20,
+        enable_sparse_transfer:  bool  = True,
+        sparse_threshold:        float = 0.01,
+        enable_p2p_cache:        bool  = True,
+        p2p_dram_limit_gb:       float = 4.0,
+        enable_nano_overlap:     bool  = True,
+        n_layers:                int   = 32,
+        # ---- v5 params ----
+        enable_nexus:            bool  = True,
+        nexus_base_window_ms:    float = 200.0,
+        nexus_overlap_fraction:  float = 0.0,
+        enable_layer_gates:      bool  = True,
+    ) -> None:
+        super().__init__(
+            rank=rank,
+            world_size=world_size,
+            local_nvme_dir=local_nvme_dir,
+            lustre_dir=lustre_dir,
+            mode=mode,
+            flush_chunk_mb=flush_chunk_mb,
+            adaptive_chunk=adaptive_chunk,
+            verbose=verbose,
+            milestone_interval=milestone_interval,
+            congestion_threshold=congestion_threshold,
+            enable_network_monitor=enable_network_monitor,
+            enable_service_gain=enable_service_gain,
+            enable_interleaving=enable_interleaving,
+            enable_topology_routing=enable_topology_routing,
+            enable_qos=enable_qos,
+            dry_run_qos=dry_run_qos,
+            global_link_quota=global_link_quota,
+            enable_sparse_transfer=enable_sparse_transfer,
+            sparse_threshold=sparse_threshold,
+            enable_p2p_cache=enable_p2p_cache,
+            p2p_dram_limit_gb=p2p_dram_limit_gb,
+            enable_nano_overlap=enable_nano_overlap,
+            n_layers=n_layers,
+        )
+
+        self._enable_nexus       = enable_nexus
+        self._enable_layer_gates = enable_layer_gates
+        self.nexus: Optional["NexusCoordinator"] = None
+
+        if enable_nexus or enable_layer_gates:
+            from tempo.nexus_coordinator import NexusCoordinator
+            nm_ref = getattr(self, "network_monitor", None)
+            self.nexus = NexusCoordinator(
+                rank=rank,
+                world_size=world_size,
+                n_layers=n_layers,
+                base_window_ms=nexus_base_window_ms,
+                overlap_fraction=nexus_overlap_fraction,
+                network_monitor=nm_ref,
+            )
+            logger.info("[TEMPOv5] NexusCoordinator initialised  "
+                        "dscp=%s  layer_gates=%s",
+                        enable_nexus, enable_layer_gates)
+
+    # -----------------------------------------------------------------------
+    # Override checkpoint to inject DSCP window wait
+    # -----------------------------------------------------------------------
+
+    def checkpoint(
+        self,
+        state_dict,
+        step:         int,
+        filename:     Optional[str] = None,
+        force:        bool          = False,
+    ):
+        """
+        Checkpoint with DSCP window assignment.
+
+        If nexus is enabled, waits for this rank's assigned window before
+        dispatching the flush to CheckpointManager.  Records flush duration
+        for adaptive window re-estimation.
+        """
+        if self._enable_nexus and self.nexus is not None and self.mode == "tempo":
+            t0  = time.perf_counter()
+            win = self.nexus.wait_for_window(step=step)
+            logger.debug(
+                "[TEMPOv5] rank=%d step=%d DSCP window: pos=%d delay=%.1fms",
+                self.rank, step, win.position, win.delay_seconds * 1000,
+            )
+            result = super().checkpoint(state_dict, step, filename=filename, force=force)
+            elapsed = time.perf_counter() - t0
+            self.nexus.record_flush_time(elapsed)
+            return result
+
+        return super().checkpoint(state_dict, step, filename=filename, force=force)
+
+    # -----------------------------------------------------------------------
+    # Per-layer micro-gate API (called from training loop or FSDP hook)
+    # -----------------------------------------------------------------------
+
+    def on_step_begin(self, step: int) -> None:
+        """Reset micro-gates at the start of each step."""
+        super().on_step_begin(step)
+        if self.nexus is not None:
+            self.nexus.begin_step(step)
+
+    def on_layer_ar_done(self, layer_id: int,
+                         stream=None) -> None:
+        """
+        Signal that layer `layer_id`'s AllReduce has completed.
+
+        Fires the per-layer CUDA Event gate, unblocking any DMA waiting on
+        that layer's shard.  Zero overhead on the training critical path
+        (single cudaEventRecord call).
+
+        Parameters
+        ----------
+        layer_id : int
+            FSDP unit / transformer layer index (0-based).
+        stream : torch.cuda.Stream or None
+            Compute stream on which the AllReduce just finished.
+        """
+        if self._enable_layer_gates and self.nexus is not None:
+            self.nexus.on_layer_ar_done(layer_id=layer_id, stream=stream)
+
+    def wait_layer_gate(self, layer_id: int, io_stream=None) -> None:
+        """
+        Block ``io_stream`` until layer ``layer_id``'s AllReduce gate fires.
+        Called by the flush thread before writing each per-layer shard.
+        """
+        if self._enable_layer_gates and self.nexus is not None:
+            self.nexus.wait_layer_gate(layer_id=layer_id, io_stream=io_stream)
+
+    # -----------------------------------------------------------------------
+    # Stats
+    # -----------------------------------------------------------------------
+
+    def get_stats(self) -> dict:
+        stats = super().get_stats()
+        if self.nexus is not None:
+            stats["nexus"] = self.nexus.get_stats()
+        return stats
+
+    def print_stats(self) -> None:
+        super().print_stats()
+        if self.nexus is not None:
+            self.nexus.print_stats()
+            s = self.nexus.get_stats()
+            print(f"  --- TEMPO v5 Nexus (DSCP) ---")
+            print(f"  Window EMA         : {s['window_ms_ema']:.1f} ms")
+            print(f"  Checkpoints        : {s['n_checkpoints']}")
+            if s['flush_ms_mean'] is not None:
+                print(f"  Flush time (mean)  : {s['flush_ms_mean']:.1f} ms")
+                print(f"  Flush time (max)   : {s['flush_ms_max']:.1f} ms")
+            print(f"{'='*60}\n")
+
+    def shutdown(self, wait: bool = True) -> None:
+        super().shutdown(wait=wait)
+        # nexus coordinator is stateless (no background threads to join)

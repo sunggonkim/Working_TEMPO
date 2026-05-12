@@ -73,10 +73,12 @@ def parse_args():
                    default=os.environ.get("LOCAL_NVME", "/tmp/tempo_ckpts"))
     p.add_argument("--lustre-dir",  type=str,
                    default=os.environ.get("PSCRATCH", "/tmp/lustre_mock") + "/tempo_eval")
-    p.add_argument("--flush-chunk-mb", type=int, default=128,
-                   help="Chunk size (MB) for paced flush (default 128)")
-    p.add_argument("--adaptive-chunk", action="store_true",
-                   help="Automatically tune chunk size based on NCCL phase duration")
+    p.add_argument("--flush-chunk-mb", type=int, default=32,
+                   help="Chunk size (MB) for paced flush (default 32; adaptive mode tunes down from here)")
+    p.add_argument("--adaptive-chunk", action="store_true", default=True,
+                   help="Automatically tune chunk size based on NCCL phase duration (default: on)")
+    p.add_argument("--no-adaptive-chunk", dest="adaptive_chunk", action="store_false",
+                   help="Disable adaptive chunk sizing")
     p.add_argument("--verbose", action="store_true")
     return p.parse_args()
 

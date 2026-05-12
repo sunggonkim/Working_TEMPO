@@ -100,15 +100,15 @@ echo "==========================================="
 
 run_one "baseline"      --mode baseline
 
-run_one "tempo-16mb"    --mode tempo  --flush-chunk-mb  16
+run_one "tempo-4mb"     --mode tempo  --flush-chunk-mb   4 --no-adaptive-chunk
+run_one "tempo-8mb"     --mode tempo  --flush-chunk-mb   8 --no-adaptive-chunk
+run_one "tempo-16mb"    --mode tempo  --flush-chunk-mb  16 --no-adaptive-chunk
+run_one "tempo-32mb"    --mode tempo  --flush-chunk-mb  32 --no-adaptive-chunk
+run_one "tempo-64mb"    --mode tempo  --flush-chunk-mb  64 --no-adaptive-chunk
+run_one "tempo-128mb"   --mode tempo  --flush-chunk-mb 128 --no-adaptive-chunk
+run_one "tempo-256mb"   --mode tempo  --flush-chunk-mb 256 --no-adaptive-chunk
 
-run_one "tempo-64mb"    --mode tempo  --flush-chunk-mb  64
-
-run_one "tempo-128mb"   --mode tempo  --flush-chunk-mb 128
-
-run_one "tempo-256mb"   --mode tempo  --flush-chunk-mb 256
-
-run_one "tempo-adaptive" --mode tempo  --flush-chunk-mb 128 --adaptive-chunk
+run_one "tempo-adaptive" --mode tempo  --flush-chunk-mb 32 --adaptive-chunk
 
 echo ""
 echo "==========================================="

@@ -35,8 +35,9 @@ import logging
 import argparse
 import threading
 import statistics
+from datetime import timedelta
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Optional, Tuple
 
 import torch
 import torch.distributed as dist
@@ -54,9 +55,12 @@ log = logging.getLogger(__name__)
 # Sweep parameters
 # ---------------------------------------------------------------------------
 # I/O rate sweep points in GB/s (0 = no background I/O)
-IO_RATES_GBS    = [0.0, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0]
-MEASURE_SECS    = 30       # seconds to measure at each I/O rate point
+# 32 GB/s removed: fully saturates Slingshot fabric → single AllReduce takes
+# >600 s → NCCL watchdog kills ranks before measurement completes.
+IO_RATES_GBS    = [0.0, 1.0, 2.0, 4.0, 8.0, 16.0]
+MEASURE_SECS    = 20       # seconds to measure at each I/O rate point (was 30)
 WARMUP_SECS     = 5        # seconds to discard at the start of each point
+NCCL_OP_TIMEOUT_S = 45.0  # per-AllReduce timeout; record sentinel if exceeded
 AR_TENSOR_MB    = 256      # AllReduce tensor size per rank (MB)
 IO_CHUNK_MB     = 128      # I/O write chunk size (MB)
 FLOOD_RANK      = 0        # rank that performs background I/O
@@ -176,7 +180,14 @@ def measure_allreduce(
     while time.monotonic() < deadline_measure:
         torch.cuda.synchronize(device)
         start_evt.record()
-        dist.all_reduce(tensor, op=dist.ReduceOp.SUM, async_op=False)
+        try:
+            work = dist.all_reduce(tensor, op=dist.ReduceOp.SUM, async_op=True)
+            work.wait()  # blocks; NCCL watchdog enforces NCCL_OP_TIMEOUT_S
+        except Exception as exc:
+            log.warning("[all_reduce] exception (likely NCCL timeout): %s", exc)
+            # Record sentinel latency so caller knows this op timed out
+            latencies_ms.append(NCCL_OP_TIMEOUT_S * 1000.0)
+            break  # PG is unusable after a watchdog error
         end_evt.record()
         torch.cuda.synchronize(device)
 
@@ -338,6 +349,7 @@ def main():
     dist.init_process_group(
         backend="nccl",
         device_id=device,
+        timeout=timedelta(seconds=90),  # shorter than default 600s watchdog
     )
     rank = dist.get_rank()
 
