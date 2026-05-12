@@ -1,7 +1,7 @@
 # TEMPO: Topology-Aware Phase-Gate Scheduling for Checkpoint I/O in Distributed LLM Training
 
 > **SLURM verified** — All numbers below are computed directly from Perlmutter hardware measurements.  
-> Phase 7 ✅ `52848625`, Phase 3 E2E ✅ `52849205`, Phase 4 flood ✅ `52848630`. Phase 4 threshold re-run 🔄 `52849312` (PENDING).
+> Phase 7 ✅ `52848625` · Phase 3 E2E ✅ `52849205` · Phase 4 flood 🔄 `52849622` (threshold=0.75 re-run; previous 0.70 attempt overwritten data).
 
 [![Platform](https://img.shields.io/badge/Platform-NERSC%20Perlmutter%20A100-0075A2?logo=nvidia)](https://docs.nersc.gov/systems/perlmutter/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0%20FSDP-EE4C2C?logo=pytorch)](https://pytorch.org)
