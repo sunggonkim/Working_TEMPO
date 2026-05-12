@@ -183,7 +183,7 @@ def main():
     # NetworkMonitor (v2 mode only, and only on flooder rank)
     net_monitor = None
     if args.mode == "tempo-v2" and rank == args.flood_rank:
-        net_monitor = NetworkMonitor()  # uses module default (0.70)
+        net_monitor = NetworkMonitor(congestion_threshold=0.75)  # empirically optimal
         net_monitor.start()
         logger.info("[probe] NetworkMonitor started")
 
