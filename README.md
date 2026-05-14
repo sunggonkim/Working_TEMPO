@@ -9,6 +9,7 @@
 [![AllReduce](https://img.shields.io/badge/AllReduce%20Latency-−50.2%25-brightgreen)](#31-pcie-contention-isolation)
 [![DMA](https://img.shields.io/badge/DMA%20Time-−21.7%25-green)](#31-pcie-contention-isolation)
 [![E2E](https://img.shields.io/badge/E2E%20ckpt--step%20BW-%2B3.4%25-orange)](#32-end-to-end-training-timeline)
+[![Architecture](https://img.shields.io/badge/Architecture-Dynamic%20%26%20Async-blueviolet)](#21-core-phase-gate-mechanism)
 
 ---
 
@@ -16,6 +17,7 @@
 
 1. [Motivation](#1-motivation)
 2. [Design](#2-design)
+   - [Dynamic & Async Architecture Overview](#20-dynamic--async-architecture-overview)
    - [Core: Phase-Gate Mechanism](#21-core-phase-gate-mechanism)
    - [Pillar 1 — GPU-Driven NIC Orchestration](#22-pillar-1--gpu-driven-nic-orchestration)
    - [Pillar 2 — NVLink PCIe Multipath Routing](#23-pillar-2--nvlink-pcie-multipath-routing)
@@ -23,8 +25,9 @@
    - [Integration API](#25-integration-api)
 3. [Evaluation](#3-evaluation)
 4. [Comparison with Related Work](#4-comparison-with-related-work)
-5. [Reproducing Results](#5-reproducing-results)
-6. [Repository Layout](#6-repository-layout)
+5. [OSDI/SOSP Readiness Status](#5-osdisosp-readiness-status)
+6. [Reproducing Results](#6-reproducing-results)
+7. [Repository Layout](#7-repository-layout)
 
 ---
 
@@ -75,6 +78,61 @@ Raw data: [`results/pcie_contention/`](results/pcie_contention/) · SLURM job `5
 
 TEMPO is a **pure userspace Python middleware** — no modified kernel, no firmware, no FPGA. It exploits Perlmutter's physical topology through three layered mechanisms built on top of a core phase-gate.
 
+### 2.0 Dynamic & Async Architecture Overview
+
+TEMPO is designed around two principles: **every decision is made at runtime** (dynamic) and **no operation blocks the training loop** (async).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  DYNAMIC CONTROL PLANE (adapts every step)                                      │
+│                                                                                 │
+│  PhaseMonitor ──EMA(α=0.3)──► nccl_phase_duration_ms                           │
+│       │                              │                                          │
+│       │                    ServiceGainScheduler                                 │
+│       │                    (priority heap; score = α·progress + β·recovery      │
+│       │                     + γ·urgency; defers jobs with gain < 0.30)          │
+│       │                              │                                          │
+│       └──────────────────────────┼──► adaptive_chunk_bytes                 │
+│                                      │    = clamp(nccl_ms × Lustre_BW × 0.5,   │
+│                                      │            4 MB, 512 MB)                │
+│                                      │    Converges in ~10 steps               │
+│                                                                                 │
+│  NetworkMonitor ──sysfs 5ms──► EMA util per NIC ──► NVLinkRouter.select()      │
+│  FabricQoSManager ──────────► fi_setopt TC per transfer                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ASYNC EXECUTION PIPELINE (never blocks training thread)                        │
+│                                                                                 │
+│  Training thread:                                                               │
+│    on_step_begin() → compute_phase() → nccl_phase() → checkpoint()             │
+│                                                  ↓ ~10 ms to local NVMe        │
+│                                                returns immediately              │
+│                                                                                 │
+│  Background flush thread (daemon):                                              │
+│    queue.get() → wait_for_io_allowed() → write CHUNK → repeat                  │
+│                        ↑                                                        │
+│                 threading.Event (zero-overhead gate)                            │
+│                 SET   = compute phase   → flush proceeds                        │
+│                 CLEAR = NCCL phase      → flush blocks (no busy-spin)           │
+│                                                                                 │
+│  GPU doorbell thread (V6, Pillar 1):                                            │
+│    CUDA stream completion → cudaMemcpyAsync(MMIO, token, 8B) → NIC fires RDMA  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key async/dynamic components:**
+
+| Component | Dynamic behaviour | Async mechanism |
+|-----------|-------------------|-----------------|
+| `PhaseMonitor` | EMA-smoothed NCCL window estimation | `threading.Event` gate (zero CPU on training path) |
+| `CheckpointManager` | Adaptive chunk sizing per cycle | Background daemon thread + `queue.Queue` |
+| `NetworkMonitor` | Per-NIC EMA utilisation, 5 ms poll | Sysfs reader thread |
+| `ServiceGainScheduler` | Per-flush priority score | Priority heap; defers low-gain jobs |
+| `NVLinkRouter` | O(1) egress-NIC selection | Sysfs poller thread |
+| `FabricQoSManager` | Per-transfer TC based on gain score | `fi_setopt` (single call, no lock on critical path) |
+| `GpuDrivenPool` | GPU-triggered doorbell token | `cudaMemcpyAsync` to NIC MMIO (no CPU wakeup) |
+
 ### 2.1 Core: Phase-Gate Mechanism
 
 `PhaseMonitor` detects whether the training loop is in an NCCL AllReduce window or a compute window and gates the `CheckpointManager` flush thread accordingly.
@@ -101,6 +159,8 @@ chunk = clamp(target_chunk, 4 MB, 256 MB)
 
 ### 2.2 Pillar 1 — GPU-Driven NIC Orchestration
 
+> **Status: V6 PoC implemented · [not yet benchmarked on Perlmutter — hardware measurements pending]**
+
 **Problem:** Even with async threads, the CPU must wake up after each GPU kernel to call `fi_send` — adding 5–50 µs dead time.
 
 **Solution:** Pre-register transfer descriptors with the Cassini ASIC. The GPU kernel writes an 8-byte doorbell token directly to the NIC's MMIO page via `cudaMemcpyAsync`. The NIC fires the RDMA send immediately — no CPU involved.
@@ -120,6 +180,8 @@ Implementation: [`tempo/gpu_driven.py`](tempo/gpu_driven.py)
 **vs Blink/ShadowServe (ASPLOS/arXiv 2025):** those require a SmartNIC/DPU. TEMPO achieves the same CPU-bypass in pure software via libfabric CXI.
 
 ### 2.3 Pillar 2 — NVLink PCIe Multipath Routing
+
+> **Status: V6 PoC implemented · [not yet benchmarked on Perlmutter — hardware measurements pending]**
 
 **Problem:** GPU `i` owns PCIe lane → `hsn{i}` (32 GB/s). A checkpoint flood saturates that lane and — through the shared AMD EPYC PCIe I/O die — degrades AllReduce on all ranks.
 
@@ -142,6 +204,8 @@ Implementation: [`tempo/nvlink_router.py`](tempo/nvlink_router.py)
 **vs DistServe/FlowKV:** single-path assumption causes HoL blocking. TEMPO eliminates the bottleneck physically.
 
 ### 2.4 Pillar 3 — libfabric CXI Traffic-Class Control
+
+> **Status: V6 PoC implemented · [not yet benchmarked on Perlmutter — hardware measurements pending]**
 
 **Problem:** `socket.IP_TOS` marks TCP headers only. NCCL uses Portals4/RDMA (OFI CXI provider) which bypasses the kernel stack — `IP_TOS` never reaches the Cassini ASIC.
 
@@ -251,8 +315,8 @@ ReduceScatter BW over training steps  [median per step, rank 0]
   GB/s
    8 ┤
    7 ┤  ○  ○  ○                         ○                 ○  ○
-   6 ┤○  ○  ○  ○  ○  ◆  ◆  ○  ˖  ˖  ○  ○  ○  ○  ˖  ˖  ○  ○  ○  ○
-   5 ┤     ○     ˖  ˖  ○  ○  ˖  ○  ○     ˖  ˖     ○  ˖  ○     ˖
+   6 ┤○  ○  ○  ○  ○  ◆  ◆  ○  ˙  ˙  ○  ○  ○  ○  ˙  ˙  ○  ○  ○  ○
+   5 ┤     ○     ˙  ˙  ○  ○  ˙  ○  ○     ˙  ˙     ○  ˙  ○     ˙
    4 ┤              │                 │                 │
      └──────────────▼ ckpt@20─────────▼ ckpt@40─────────▼ ckpt@60──►
   ○=Baseline  ◆=TEMPO
@@ -261,8 +325,8 @@ ReduceScatter BW over training steps  [median per step, rank 0]
 | | Baseline | TEMPO | Δ |
 |---|---:|---:|---:|
 | BW at ckpt steps (mean) | 4.788 GB/s | 4.952 GB/s | **+3.4%** |
-| BW at non-ckpt steps    | 4.921 GB/s | 4.869 GB/s | ±noise |
-| Adaptive chunk size     | —          | 9–11 MB    | auto-tuned |
+| BW at non-ckpt steps    | 4.921 GB/s | 4.869 GB/s | **−1.1%** (within step noise) |
+| Adaptive chunk size     | —          | 5–11 MB    | auto-tuned (converges from 64 MB initial) |
 
 ---
 
@@ -281,7 +345,48 @@ ReduceScatter BW over training steps  [median per step, rank 0]
 
 ---
 
-## 5. Reproducing Results
+## 5. OSDI/SOSP Readiness Status
+
+### What is measured (hardware-verified, SLURM-provenance)
+
+| Experiment | Result | Rows | SLURM job |
+|------------|--------|-----:|-----------|
+| PCIe contention isolation (1 node · 4× A100 · 256 MB AR · 512 MB DMA) | AllReduce **−50.2%** · DMA **−21.7%** | 800 / mode | `52848625` |
+| E2E training BW at ckpt steps (2 nodes · 8× A100 · GPT-1B FSDP · 60 steps) | **+3.4%** | 1020 / mode | `52849205` |
+
+### What needs hardware measurement before OSDI/SOSP submission
+
+| Experiment | Target file | Expected result |
+|------------|-------------|-----------------|
+| P1 GPU doorbell vs CPU `fi_send` (latency / throughput) | `eval/pcie_contention/` | CPU-wakeup removal ~5–50 µs per transfer |
+| P2 NVLink relay vs PCIe stall (throughput under saturation) | new SLURM script | ~4× node egress BW vs Active-Standby |
+| P3 CXI TC marking vs no marking (NCCL BW under concurrent flood) | `eval/e2e_training/` | NCCL BW isolation under Slingshot congestion |
+| Node scaling: 2 → 4 → 8 → 16 → 32 nodes (AllReduce regression curve) | [not yet measured] | Degradation slope vs. TEMPO floor |
+| Ablation: core only / core+P1 / core+P1+P2 / core+P1+P2+P3 | [not yet measured] | Per-pillar contribution breakdown |
+| Workload breadth: 7B / 13B / 70B FSDP | [not yet measured] | Generalises across model size |
+
+### V6 Pillar implementation status
+
+| Pillar | Code status | Hardware result | Claim level |
+|--------|-------------|-----------------|-------------|
+| Core Phase-Gate | ✅ Production | ✅ Measured (jobs above) | **Paper-ready** |
+| P1 GPU-Driven NIC Doorbell | ✅ PoC (`tempo/gpu_driven.py`) | ⏳ [not yet benchmarked] | PoC only |
+| P2 NVLink PCIe Multipath | ✅ PoC (`tempo/nvlink_router.py`) | ⏳ [not yet benchmarked] | PoC only |
+| P3 libfabric CXI TC Control | ✅ PoC (`tempo/libfabric_qos.py`) | ⏳ [not yet benchmarked] | PoC only |
+
+### Architecture novelty summary (OSDI/SOSP differentiator)
+
+TEMPO is the **only system** that combines:
+1. **Dynamic, async phase-gate** — `threading.Event`-based O(1) flush gating, no busy-spin, zero training-path overhead
+2. **Adaptive rate control** — EMA-smoothed NCCL window drives chunk sizing, converges in ~10 steps
+3. **HPC-specific hardware exploitation** — Slingshot-11 CXI TC, NVLink P2P relay, PCIe MMIO doorbell
+4. **Pure software, no hardware modification** — deployed on unmodified Perlmutter nodes
+
+This combination is absent from all six comparison papers (DistServe, Pie, Aegaeon, Teola, FuseLink, NanoFlow / Blink), which either target cloud TCP/IP, require custom hardware, or only address communication overlap without hardware-level QoS.
+
+---
+
+## 6. Reproducing Results
 
 ### PCIe Contention Isolation (§3.1)
 
@@ -335,7 +440,7 @@ export OMP_NUM_THREADS=1
 
 ---
 
-## 6. Repository Layout
+## 7. Repository Layout
 
 ```
 Skim-Tempo/
