@@ -24,6 +24,10 @@
    - [Pillar 3 — libfabric CXI Traffic-Class Control](#24-pillar-3--libfabric-cxi-traffic-class-control)
    - [Integration API](#25-integration-api)
 3. [Evaluation](#3-evaluation)
+   - [§3.1 PCIe Contention Isolation](#31-pcie-contention-isolation)
+   - [§3.2 End-to-End Training Timeline](#32-end-to-end-training-timeline)
+   - [§3.3 Node Scaling](#33-node-scaling-allreduce-regression-curve)
+   - [§3.4 Ablation Study](#34-ablation-study-per-component-contribution)
 4. [Comparison with Related Work](#4-comparison-with-related-work)
 5. [OSDI/SOSP Readiness Status](#5-osdisosp-readiness-status)
 6. [Reproducing Results](#6-reproducing-results)
@@ -92,7 +96,7 @@ TEMPO is designed around two principles: **every decision is made at runtime** (
 │       │                    (priority heap; score = α·progress + β·recovery      │
 │       │                     + γ·urgency; defers jobs with gain < 0.30)          │
 │       │                              │                                          │
-│       └──────────────────────────┼──► adaptive_chunk_bytes                 │
+│       └──────────────────────────────┼──► adaptive_chunk_bytes                 │
 │                                      │    = clamp(nccl_ms × Lustre_BW × 0.5,   │
 │                                      │            4 MB, 512 MB)                │
 │                                      │    Converges in ~10 steps               │
@@ -328,6 +332,49 @@ ReduceScatter BW over training steps  [median per step, rank 0]
 | BW at non-ckpt steps    | 4.921 GB/s | 4.869 GB/s | **−1.1%** (within step noise) |
 | Adaptive chunk size     | —          | 5–11 MB    | auto-tuned (converges from 64 MB initial) |
 
+### 3.3 Node Scaling (AllReduce Regression Curve)
+
+**Setup**: 2 / 4 / 8 / 16 / 32 nodes · 4× A100 per node · GPT-1B FSDP · 80 steps · `ckpt_every=20`  
+**Script**: [`eval/node_scaling/run_node_scaling.slurm`](eval/node_scaling/run_node_scaling.slurm)  
+**Result**: [not yet measured] — submit with `bash eval/node_scaling/submit_all_scaling.sh`
+
+Expected finding: baseline AllReduce latency grows super-linearly with node count as
+Slingshot quota-contention probability P_conflict → 1; TEMPO maintains near-hardware-floor
+latency by gating I/O to non-NCCL windows.
+
+| N nodes | Baseline @ckpt (ms) | TEMPO @ckpt (ms) | Δ |
+|--------:|--------------------:|-----------------:|--:|
+| 2       | [not yet measured]  | [not yet measured] | — |
+| 4       | [not yet measured]  | [not yet measured] | — |
+| 8       | [not yet measured]  | [not yet measured] | — |
+| 16      | [not yet measured]  | [not yet measured] | — |
+| 32      | [not yet measured]  | [not yet measured] | — |
+
+> **Provenance**: table will be auto-populated from
+> `results/node_scaling/scaling_N{N}_{baseline,tempo}.csv` after SLURM jobs complete.
+
+### 3.4 Ablation Study (Per-Component Contribution)
+
+**Setup**: 2 nodes · 8× A100 · GPT-1B FSDP · 80 steps · `ckpt_every=20`  
+**Script**: [`eval/ablation/run_ablation.slurm`](eval/ablation/run_ablation.slurm)  
+**Result**: [not yet measured] — submit with `sbatch eval/ablation/run_ablation.slurm`
+
+Five conditions run sequentially in the same SLURM job:
+
+| Ablation mode | Components enabled | @ckpt algbw (GB/s) | vs baseline |
+|---------------|--------------------|-------------------:|------------:|
+| `baseline`        | none (greedy flush) | [not yet measured] | — |
+| `core`            | Phase-gate (V1) only | [not yet measured] | — |
+| `core_p1`         | Phase-gate + P1 GPU doorbell | [not yet measured] | — |
+| `core_p1_p2`      | Phase-gate + P1 + P2 NVLink routing | [not yet measured] | — |
+| `core_p1_p2_p3`   | Phase-gate + P1 + P2 + P3 CXI TC (full V6) | [not yet measured] | — |
+
+> **Note**: P1 (GPU doorbell) and P3 (CXI TC) run with `cxi_dry_run=True` on non-Perlmutter
+> and in PoC mode until hardware benchmarks confirm fi_setopt availability.
+> P2 (NVLink routing) activates EMA-based NIC saturation detection via sysfs polling.  
+> **Provenance**: table will be auto-populated from
+> `results/ablation/{mode}/nccl_bw_rank0.csv` after SLURM job completes.
+
 ---
 
 ## 4. Comparison with Related Work
@@ -361,8 +408,8 @@ ReduceScatter BW over training steps  [median per step, rank 0]
 | P1 GPU doorbell vs CPU `fi_send` (latency / throughput) | `eval/pcie_contention/` | CPU-wakeup removal ~5–50 µs per transfer |
 | P2 NVLink relay vs PCIe stall (throughput under saturation) | new SLURM script | ~4× node egress BW vs Active-Standby |
 | P3 CXI TC marking vs no marking (NCCL BW under concurrent flood) | `eval/e2e_training/` | NCCL BW isolation under Slingshot congestion |
-| Node scaling: 2 → 4 → 8 → 16 → 32 nodes (AllReduce regression curve) | [not yet measured] | Degradation slope vs. TEMPO floor |
-| Ablation: core only / core+P1 / core+P1+P2 / core+P1+P2+P3 | [not yet measured] | Per-pillar contribution breakdown |
+| Node scaling: 2 → 4 → 8 → 16 → 32 nodes (AllReduce regression curve) | [`eval/node_scaling/run_node_scaling.slurm`](eval/node_scaling/run_node_scaling.slurm) | Degradation slope vs. TEMPO floor |
+| Ablation: core only / core+P1 / core+P1+P2 / core+P1+P2+P3 | [`eval/ablation/run_ablation.slurm`](eval/ablation/run_ablation.slurm) | Per-pillar contribution breakdown |
 | Workload breadth: 7B / 13B / 70B FSDP | [not yet measured] | Generalises across model size |
 
 ### V6 Pillar implementation status
@@ -400,6 +447,29 @@ sbatch eval/pcie_contention/run_phase7_eval.slurm
 ```bash
 sbatch eval/e2e_training/run_evaluation.slurm
 # → results/e2e_training/{baseline,tempo}/nccl_bw_rank0.csv  (~30 min, 2 nodes)
+```
+
+### Node Scaling (§3.3)
+
+```bash
+# Submit all 5 node counts at once:
+bash eval/node_scaling/submit_all_scaling.sh
+# or individually:
+sbatch --nodes=4 eval/node_scaling/run_node_scaling.slurm
+# → results/node_scaling/scaling_N{N}_{baseline,tempo}.csv  (~40 min per N)
+
+# Plot after all jobs complete:
+python eval/node_scaling/plot_node_scaling.py
+```
+
+### Ablation Study (§3.4)
+
+```bash
+sbatch eval/ablation/run_ablation.slurm
+# → results/ablation/{mode}/nccl_bw_rank0.csv  (~2 hr, 2 nodes, 5 modes sequential)
+
+# Plot after job completes:
+python eval/ablation/plot_ablation.py
 ```
 
 ### Smoke test (any single node)
@@ -472,10 +542,21 @@ Skim-Tempo/
 │       ├── train_with_tempo.py         GPT-1B FSDP (baseline + TEMPO)
 │       ├── run_evaluation.slurm        2 nodes · 8 GPU · 60 steps
 │       └── run_chunk_sweep.slurm       Chunk size sensitivity: 4–256 MB
+│   ├── node_scaling/             §3.3 Node scaling regression curve
+│   │   ├── train_scaling.py            Training script with n-nodes label
+│   │   ├── run_node_scaling.slurm      --nodes=N override; submit via submit_all_scaling.sh
+│   │   ├── submit_all_scaling.sh       Batch submit N=2,4,8,16,32
+│   │   └── plot_node_scaling.py        Scaling figure + summary CSV
+│   └── ablation/                 §3.4 Per-component ablation study
+│       ├── train_ablation.py           5-mode ablation training script
+│       ├── run_ablation.slurm          2 nodes · 5 modes sequential (~2 hr)
+│       └── plot_ablation.py            Bar chart figure + summary CSV
 │
-├── results/
+│   ├── results/
 │   ├── pcie_contention/          timeline_{baseline,tempo}.csv  (800 rows each)
 │   ├── e2e_training/             {baseline,tempo}/nccl_bw_rank0.csv  (1020 rows each)
+│   ├── node_scaling/             scaling_N{N}_{baseline,tempo}.csv  [not yet measured]
+│   ├── ablation/                 {mode}/nccl_bw_rank0.csv  [not yet measured]
 │   └── figures/                  All paper figures (PDF + PNG)
 │
 ├── scripts/
