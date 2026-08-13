@@ -1,0 +1,251 @@
+diff --git a/include/datastates.hpp b/include/datastates.hpp
+index bb4d713..aa7dde6 100644
+--- a/include/datastates.hpp
++++ b/include/datastates.hpp
+@@ -17,6 +17,8 @@ public:
+     virtual void restore(std::uint64_t version, std::uint64_t uid, const char* ptr, std::uint64_t size, std::uint64_t offset, std::string path) = 0;
+     virtual void restore_region(std::shared_ptr<mem_region_t> m) = 0;
+     virtual void wait(bool persist=false) = 0;
++    virtual void configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0) = 0;
++    virtual void set_d2h_paused(bool paused) = 0;
+     virtual std::string shutdown() = 0;
+     virtual std::string get_queue_stats(bool for_flush_queue=true) = 0;
+     virtual ~core_t() = default;
+@@ -27,4 +29,4 @@ static std::shared_ptr<core_t> core_engine_instance {nullptr};
+ core_t* create_core_engine(size_t host_cache_size, int gpu_id, int rank = -1, bool use_io_uring = false, size_t fs_block_alignment = FS_BLOCK_SIZE_ALIGNMENT);
+ } // namespace datastates
+ 
+-#endif // __DATASTATES_HPP
+\ No newline at end of file
++#endif // __DATASTATES_HPP
+diff --git a/include/state_io_engine.hpp b/include/state_io_engine.hpp
+index e838020..c6fbbd8 100644
+--- a/include/state_io_engine.hpp
++++ b/include/state_io_engine.hpp
+@@ -13,6 +13,8 @@ public:
+     virtual void ckpt(std::uint64_t version, state_manager_t* state, std::string path) = 0;
+     virtual std::string restore(std::uint64_t version, std::string path) = 0;
+     virtual void wait(state_manager_t* state, bool persist=false) = 0;
++    virtual void configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0) = 0;
++    virtual void set_d2h_paused(bool paused) = 0;
+     virtual std::string shutdown() = 0;
+     virtual std::string get_queue_stats(bool for_flush_queue=true) = 0;
+     virtual ~state_io_engine_t() = default;
+@@ -22,4 +24,4 @@ static std::atomic<bool> is_state_io_engine_active {true};
+ state_io_engine_t* create_state_io_engine(size_t host_cache_size, int gpu_id, int rank = -1, bool use_io_uring = false, size_t fs_block_alignment = FS_BLOCK_SIZE_ALIGNMENT);
+ } // namespace datastates
+ 
+-#endif // __STATE_IO_ENGINE_HPP
+\ No newline at end of file
++#endif // __STATE_IO_ENGINE_HPP
+diff --git a/python/nb_datastates_core.cpp b/python/nb_datastates_core.cpp
+index 1556b73..0bd172e 100644
+--- a/python/nb_datastates_core.cpp
++++ b/python/nb_datastates_core.cpp
+@@ -51,6 +51,9 @@ NB_MODULE(datastates_core, m) {
+         .def("restore", &restore_wrapper,
+              "version"_a, "region_uid"_a, "obj"_a, "size"_a, "offset"_a, "path"_a)
+         .def("wait", &datastates::core_t::wait, "persist"_a = false)
++        .def("configure_d2h_pacing", &datastates::core_t::configure_d2h_pacing,
++             "bytes_per_second"_a, "start_delay_ns"_a = 0)
++        .def("set_d2h_paused", &datastates::core_t::set_d2h_paused, "paused"_a)
+         .def("get_queue_stats", &datastates::core_t::get_queue_stats, "for_flush_queue"_a = true)
+         .def("shutdown", &datastates::core_t::shutdown);
+     
+@@ -83,6 +86,11 @@ NB_MODULE(datastates_core, m) {
+              "Restore a state provider's data from a checkpoint.")
+         .def("wait", &datastates::state_io_engine_t::wait,
+              "state"_a, "persist"_a = false, "Wait for all operations to complete.")
++        .def("configure_d2h_pacing", &datastates::state_io_engine_t::configure_d2h_pacing,
++             "bytes_per_second"_a, "start_delay_ns"_a = 0,
++             "Configure deterministic D2H pacing for queued state chunks.")
++        .def("set_d2h_paused", &datastates::state_io_engine_t::set_d2h_paused,
++             "paused"_a, "Pause or resume launching D2H chunks.")
+         .def("get_queue_stats", &datastates::state_io_engine_t::get_queue_stats,
+              "for_flush_queue"_a = true, "Get the current queue statistics.")
+         .def("shutdown", &datastates::state_io_engine_t::shutdown,
+diff --git a/python/state_io_engine_impl.cpp b/python/state_io_engine_impl.cpp
+index afab703..dad9dec 100644
+--- a/python/state_io_engine_impl.cpp
++++ b/python/state_io_engine_impl.cpp
+@@ -50,6 +50,14 @@ void state_io_engine_impl_t::wait(state_manager_t* state, bool persist) {
+     }
+ }
+ 
++void state_io_engine_impl_t::configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns) {
++    core_engine->configure_d2h_pacing(bytes_per_second, start_delay_ns);
++}
++
++void state_io_engine_impl_t::set_d2h_paused(bool paused) {
++    core_engine->set_d2h_paused(paused);
++}
++
+ std::string state_io_engine_impl_t::get_queue_stats(bool for_flush_queue) {
+     try {
+         return core_engine->get_queue_stats(for_flush_queue);
+@@ -207,4 +215,4 @@ state_io_engine_impl_t::~state_io_engine_impl_t() {
+     }
+ }
+ 
+-} // namespace datastates
+\ No newline at end of file
++} // namespace datastates
+diff --git a/python/state_io_engine_impl.hpp b/python/state_io_engine_impl.hpp
+index d475d1f..8c0580c 100644
+--- a/python/state_io_engine_impl.hpp
++++ b/python/state_io_engine_impl.hpp
+@@ -27,6 +27,8 @@ public:
+     void ckpt(std::uint64_t version, state_manager_t* state, std::string path) override;
+     std::string restore(std::uint64_t version, std::string path) override;
+     void wait(state_manager_t* state, bool persist=false) override;
++    void configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0) override;
++    void set_d2h_paused(bool paused) override;
+     std::string get_queue_stats(bool for_flush_queue=true) override;
+     std::string shutdown() override;
+ 
+diff --git a/src/core_impl.cpp b/src/core_impl.cpp
+index ad053a6..74c2e58 100644
+--- a/src/core_impl.cpp
++++ b/src/core_impl.cpp
+@@ -109,6 +109,14 @@ void core_impl_t::wait(bool persist) {
+     }
+ }
+ 
++void core_impl_t::configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns) {
++    gpu_tier->configure_flush_pacing(bytes_per_second, start_delay_ns);
++}
++
++void core_impl_t::set_d2h_paused(bool paused) {
++    gpu_tier->set_flush_paused(paused);
++}
++
+ std::string core_impl_t::get_queue_stats(bool for_flush_queue) {
+     try {
+         std::string stats = "Device: " + std::to_string(gpu_id) + ", GPU: " + std::to_string(gpu_tier->get_queue_size(for_flush_queue)) + ", Host: " + std::to_string(host_tier->get_queue_size(for_flush_queue));
+@@ -142,4 +150,4 @@ core_impl_t::~core_impl_t() {
+     }
+ }
+ 
+-} // namespace datastates
+\ No newline at end of file
++} // namespace datastates
+diff --git a/src/core_impl.hpp b/src/core_impl.hpp
+index 78703b0..0994761 100644
+--- a/src/core_impl.hpp
++++ b/src/core_impl.hpp
+@@ -28,6 +28,8 @@ public:
+     void restore(std::uint64_t version, std::uint64_t region_id, const char* ptr, std::uint64_t size, std::uint64_t offset, std::string path) override;
+     void restore_region(std::shared_ptr<mem_region_t> m) override;
+     void wait(bool persist=false) override;
++    void configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0) override;
++    void set_d2h_paused(bool paused) override;
+     std::string get_queue_stats(bool for_flush_queue=true) override;
+     std::string shutdown() override;
+     ~core_impl_t();
+diff --git a/src/tiers/gpu_tier.cpp b/src/tiers/gpu_tier.cpp
+index 2a0713e..3e9b4f0 100644
+--- a/src/tiers/gpu_tier.cpp
++++ b/src/tiers/gpu_tier.cpp
+@@ -14,6 +14,7 @@ gpu_tier_t::gpu_tier_t(int gpu_id, unsigned int num_threads, size_t total_size,
+ }
+ 
+ gpu_tier_t::~gpu_tier_t() {
++    set_flush_paused(false);
+     flush_q.wait_for_completion();
+     fetch_q.wait_for_completion();
+     is_active = false;
+@@ -47,6 +48,22 @@ void gpu_tier_t::wait_for_completion() {
+     flush_q.wait_for_completion();
+ };
+ 
++void gpu_tier_t::configure_flush_pacing(double bytes_per_second, std::uint64_t start_delay_ns) {
++    pacing_bytes_issued_ = 0;
++    pacing_epoch_ = std::chrono::steady_clock::now() + std::chrono::nanoseconds(start_delay_ns);
++    pacing_bytes_per_second_.store(bytes_per_second, std::memory_order_release);
++}
++
++void gpu_tier_t::set_flush_paused(bool paused) {
++    flush_paused_.store(paused, std::memory_order_release);
++    if (paused) {
++        // Wait for an already launched D2H chunk to finish.  The worker holds
++        // this mutex from admission through cudaStreamSynchronize().
++        std::unique_lock<std::mutex> lock(pause_mutex_);
++    }
++    pause_cv_.notify_all();
++}
++
+ void gpu_tier_t::flush_io_() {
+     checkCuda(cudaSetDevice(gpu_id_));
+     while(is_active) {
+@@ -56,10 +73,29 @@ void gpu_tier_t::flush_io_() {
+         auto src = flush_q.get_front();
+         perf_profiler.record_event(src, GPU_WAIT_END);
+         auto dest = std::make_shared<mem_region_t>(src, successor_tier_->tier_type_);
+-        successor_tier_->mem_pool->allocate(dest);
+-        perf_profiler.record_event(src, GPU_START);
+-        checkCuda(cudaMemcpyAsync(const_cast<void*>(static_cast<const void*>(dest->ptr)), static_cast<const void*>(src->ptr), src->size, cudaMemcpyDeviceToHost, flush_stream));
+-        checkCuda(cudaStreamSynchronize(flush_stream));
++        {
++            std::unique_lock<std::mutex> lock(pause_mutex_);
++            pause_cv_.wait(lock, [&] {
++                return !flush_paused_.load(std::memory_order_acquire);
++            });
++            const double pacing_rate = pacing_bytes_per_second_.load(std::memory_order_acquire);
++            if (pacing_rate > 0.0) {
++                const auto offset = std::chrono::duration<double>(
++                    static_cast<double>(pacing_bytes_issued_) / pacing_rate
++                );
++                std::this_thread::sleep_until(
++                    pacing_epoch_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(offset)
++                );
++                pause_cv_.wait(lock, [&] {
++                    return !flush_paused_.load(std::memory_order_acquire);
++                });
++            }
++            successor_tier_->mem_pool->allocate(dest);
++            perf_profiler.record_event(src, GPU_START);
++            checkCuda(cudaMemcpyAsync(const_cast<void*>(static_cast<const void*>(dest->ptr)), static_cast<const void*>(src->ptr), src->size, cudaMemcpyDeviceToHost, flush_stream));
++            checkCuda(cudaStreamSynchronize(flush_stream));
++            pacing_bytes_issued_ += src->size;
++        }
+         successor_tier_->flush(dest);
+         mem_pool->deallocate(src);
+         perf_profiler.record_event(src, GPU_END);
+diff --git a/src/tiers/gpu_tier.hpp b/src/tiers/gpu_tier.hpp
+index 5348e46..f76a9b4 100644
+--- a/src/tiers/gpu_tier.hpp
++++ b/src/tiers/gpu_tier.hpp
+@@ -3,11 +3,21 @@
+ 
+ #include "base_tier.hpp"
+ #include <cuda_runtime.h>
++#include <atomic>
++#include <chrono>
++#include <condition_variable>
++#include <mutex>
+ using namespace datastates;
+ class gpu_tier_t : public base_tier_t {
+     char* start_ptr_ = nullptr;
+     cudaStream_t flush_stream;
+     cudaStream_t fetch_stream;
++    std::atomic<double> pacing_bytes_per_second_ {0.0};
++    std::chrono::steady_clock::time_point pacing_epoch_;
++    std::uint64_t pacing_bytes_issued_ = 0;
++    std::atomic<bool> flush_paused_ {false};
++    std::condition_variable pause_cv_;
++    std::mutex pause_mutex_;
+     void flush_io_();
+     void fetch_io_();
+ public:
+@@ -16,6 +26,8 @@ public:
+     void flush(std::shared_ptr<mem_region_t> m);
+     void fetch(std::shared_ptr<mem_region_t> m);
+     void wait_for_completion();
++    void configure_flush_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0);
++    void set_flush_paused(bool paused);
+ };
+ 
+-#endif // __DATASTATES_GPU_TIER_HPP
+\ No newline at end of file
++#endif // __DATASTATES_GPU_TIER_HPP
+

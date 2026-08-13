@@ -1,0 +1,78 @@
+{
+  "schema_version": "tempo-rd-compact-evidence-1",
+  "as_of": "2026-08-13",
+  "artifact_policy": {
+    "raw_results_versioned": false,
+    "raw_results_location": "local results/ archive",
+    "self_contained_ae_package": false
+  },
+  "claims": [
+    {
+      "id": "checkpoint_group_tail_motivation",
+      "status": "supported_scoped",
+      "job": 56500531,
+      "evidence": {
+        "foreground_active_fsdp_p99_ms": 5.178,
+        "datastates_active_fsdp_p99_ms": 15.039
+      }
+    },
+    {
+      "id": "tempo_v3_scheduler",
+      "status": "falsified",
+      "job": 56493788,
+      "reason": "all checkpoints missed the one-second deadline; final event completed 15/16 ranks"
+    },
+    {
+      "id": "current_phase_scheduler_win",
+      "status": "not_supported",
+      "jobs": [56859316, 56860098, 56861820, 56861979],
+      "reason": "two reproducible regressions followed by one pass and one capacity failure"
+    },
+    {
+      "id": "latest_g1_tier_attribution",
+      "status": "not_ready",
+      "job": 56873704,
+      "evidence": {
+        "logical_stage_records": "48/48",
+        "missing_mode_domain_pairs": 10,
+        "observed_partial_path": "rank-bound GPU-local D2H"
+      }
+    },
+    {
+      "id": "p2p_path_sensitivity",
+      "status": "supported_path_candidate",
+      "baseline_job": 56857331,
+      "intervention_job": 56858081,
+      "evidence": {
+        "open_combined_step_p99_baseline_ms": 70.280,
+        "open_combined_step_p99_p2p_disabled_ms": 308.831
+      },
+      "boundary": "no per-GPU byte attribution; not controller-ready"
+    },
+    {
+      "id": "inference_kv",
+      "status": "correctness_only",
+      "job": 56863076,
+      "boundary": "single-GPU Torch H2D smoke; no native backend or causal performance claim"
+    },
+    {
+      "id": "scheduler_superiority",
+      "status": "not_supported"
+    },
+    {
+      "id": "topology_causality",
+      "status": "not_supported"
+    },
+    {
+      "id": "sota",
+      "status": "disallowed"
+    }
+  ],
+  "next_candidate": {
+    "id": "C0",
+    "description": "work-conserving D2H inflight/rate cap",
+    "phase_prediction": false,
+    "future_persistence_lease": false,
+    "allocation_authorized": false
+  }
+}

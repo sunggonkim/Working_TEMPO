@@ -1,93 +1,170 @@
-"""
-TEMPO: Temporal Emulation and Masking for Predictable I/O in Large-Scale AI Training
-OSDI/SC 2025 Systems Paper — NERSC Perlmutter Experiment Codebase
+"""TEMPO collective-group D2H checkpoint scheduling prototype."""
 
-Core Problem:
-    Even in hardware-isolated network topologies (separate storage NIC vs. GPU NIC),
-    aggressive checkpoint flushing (NVMe -> RAM -> Slingshot 11 NIC -> Lustre) causes
-    PCIe Root Complex contention on the AMD EPYC CPU, degrading NCCL All-Reduce
-    bandwidth by up to 40%.
+from tempo.group_credit_checkpoint import GroupCreditCheckpointer
+from tempo.resource_domain import (
+    DOMAIN_CONTRACTS,
+    DomainContract,
+    DomainObservation,
+    EvidenceLevel,
+    FlowStage,
+    ForegroundOperation,
+    ResourceDomain,
+    allowed_counter_scopes,
+    StateFlow,
+    aggregate_observations,
+    causal_candidate_domains,
+    domain_contract,
+)
+from tempo.tier_attribution import (
+    AttributionMode,
+    ModeSpec,
+    required_domains_for_modes,
+    TierEvaluation,
+    evaluate_tier_attribution,
+    validate_mode_evidence,
+    validate_attribution_manifest,
+)
+from tempo.kv_flow import (
+    KVAdmissionDecision,
+    KVFlowLedger,
+    KVOperation,
+    KVTransferRequest,
+    KVVersion,
+)
+from tempo.torch_kv_backend import TorchKVBackend, TorchKVCompletion
+from tempo.causal_gate import (
+    CausalGateConfig,
+    CausalModeRecord,
+    CausalPromotion,
+    InferenceModeRecord,
+    evaluate_causal_matrix,
+    evaluate_inference_matrix,
+)
+from tempo.domain_admission import (
+    DomainAdmissionController,
+    DomainBudget,
+    DomainDecision,
+    DomainRequest,
+    FlowAdmissionLedger,
+)
+from tempo.domain_evidence import (
+    AtlasEntry,
+    CounterSupport,
+    DomainEvidence,
+    DomainCoverage,
+    PathStatus,
+    assess_domain_coverage,
+    build_atlas,
+    controller_candidates,
+    detect_bottleneck_shift,
+)
+from tempo.domain_counters import CounterDelta, CounterSnapshot, counter_delta, validate_counter_series
+from tempo.path_intervention import (
+    PathInterventionEvidence,
+    build_causal_domain_controller,
+    controller_ready_domains,
+    path_intervention_candidates,
+    validate_path_intervention_artifact,
+)
+from tempo.flow_adapters import (
+    StateFlowAdmission,
+    checkpoint_state_flow,
+    flow_route_signature,
+    kv_state_flow,
+)
+from tempo.replication_gate import (
+    InferenceReplicationBlock,
+    ReplicationResult,
+    TrainingReplicationBlock,
+    evaluate_inference_replication,
+    evaluate_training_replication,
+)
+from tempo.foreground_path import validate_foreground_path
+from tempo.observation_window import (
+    ObservationInterval,
+    JoinedObservationWindow,
+    canonicalize_observation_windows,
+    join_observation_window,
+    observation_window_contract,
+    serialize_joined_observation_window,
+    serialize_observation_interval,
+    validate_observation_windows,
+)
 
-    PCIe Contention Path (Perlmutter GPU node):
-        NVMe (PCIe 4.0) ──► AMD EPYC I/O Die ──► Slingshot NIC (PCIe)
-        GPU NCCL        ──► AMD EPYC I/O Die ──► Slingshot NIC (PCIe)
-                                  ▲
-                          CONTENTION POINT
-                    (PCIe Root Complex + DRAM BW)
-
-Solution — TEMPO Pacing Scheduler:
-    1. PhaseMonitor:      Detects current training phase (NCCL vs. Compute)
-    2. CheckpointManager: O(1) local NVMe save + background Lustre flush
-    3. TEMPOScheduler:    Pauses/throttles flush during NCCL, resumes during matmul
-
-TEMPO v4 (SOSP-level) additional components:
-    4. SparseTransferFilter: InfiniGen-style attention-probe sparse KV selection
-       — reduces checkpoint payload ~8.5× (only hot ~12% tokens transferred)
-    5. P2PCacheStore: Mooncake-style DHT P2P DRAM/NVMe pool
-       — eliminates Lustre metadata latency for cache-hot checkpoints
-    6. NanoOverlapController: NanoFlow-style per-layer CUDA stream pipelining
-       — eliminates I/O bubble by overlapping KV I/O with next-layer compute
-
-Usage:
-    >>> from tempo import TEMPOSchedulerV4
-    >>> ctrl = TEMPOSchedulerV4(rank=rank, world_size=ws,
-    ...            lustre_dir=os.environ["PSCRATCH"]+"/ckpts")
-    >>> for step in range(n_steps):
-    ...     ctrl.on_step_begin(step)
-    ...     for layer in range(32):
-    ...         ctrl.on_layer_event(layer, "start")
-    ...         # ... forward pass ...
-    ...         ctrl.on_layer_event(layer, "end")
-    ...     if step % ckpt_every == 0:
-    ...         ctrl.checkpoint(model.state_dict(), step)
-    >>> ctrl.shutdown()
-"""
-
-from tempo.phase_monitor import PhaseMonitor, TrainingPhase
-from tempo.checkpoint_manager import CheckpointManager
-from tempo.scheduler import TEMPOScheduler, TEMPOSchedulerV2, TEMPOSchedulerV3, TEMPOSchedulerV4, TEMPOSchedulerV5, TEMPOSchedulerV6
-from tempo.gpu_driven import GpuDrivenEndpoint, GpuDrivenPool, FI_TC_STORAGE, FI_TC_LOW_LATENCY
-from tempo.nvlink_router import NVLinkRouter
-from tempo.libfabric_qos import FabricQoSManager, CXIEndpointQoS, CXI_TC, gain_to_cxi_tc
-from tempo.network_monitor import NetworkMonitor, CassiniHWCounters
-from tempo.service_gain import ServiceGainScheduler, TokenBucket, FlushPriority
-from tempo.interleaving_engine import InterleavingEngine, PhaseDurationPredictor
-from tempo.topology_router import TopologyRouter, PlacementDecision, PlacementTier
-from tempo.qos_mapper import QoSMapper, TC, TrafficClass
-from tempo.sparse_transfer import SparseTransferFilter, SparseKVBlock
-from tempo.p2p_cache import P2PCacheStore
-from tempo.nano_overlap import NanoOverlapController, LayerTiming, StepMetrics, PinnedBufferPool
-from tempo.trace_loader import TraceLoader, Request, TraceStats
-from tempo.nexus_coordinator import NexusCoordinator, LayerMicroGate, CheckpointWindow
-
-__version__ = "0.6.0"
+__version__ = "0.1.0"
 __all__ = [
-    # Core (v1)
-    "PhaseMonitor", "TrainingPhase", "CheckpointManager", "TEMPOScheduler",
-    # V2: Communication & I/O-Aware Co-Scheduling
-    "TEMPOSchedulerV2",
-    "NetworkMonitor",
-    "ServiceGainScheduler", "TokenBucket", "FlushPriority",
-    "InterleavingEngine", "PhaseDurationPredictor",
-    # V3: Topology-Aware + Hardware QoS Co-Design
-    "TEMPOSchedulerV3",
-    "TopologyRouter", "PlacementDecision", "PlacementTier",
-    "QoSMapper", "TC", "TrafficClass",
-    # V4: Sparse Transfer + P2P Cache + Nano-Overlap (SOSP-level)
-    "TEMPOSchedulerV4",
-    "SparseTransferFilter", "SparseKVBlock",
-    "P2PCacheStore",
-    "NanoOverlapController", "LayerTiming", "StepMetrics", "PinnedBufferPool",
-    # V5: Nexus — Distributed Staggered Checkpoint Protocol (OSDI-level)
-    "TEMPOSchedulerV5",
-    "NexusCoordinator", "LayerMicroGate", "CheckpointWindow",
-    # V6: GPU-Driven NIC + NVLink Multipath + libfabric CXI TC (OSDI head-to-head)
-    "TEMPOSchedulerV6",
-    "GpuDrivenEndpoint", "GpuDrivenPool",
-    "FI_TC_STORAGE", "FI_TC_LOW_LATENCY",
-    "NVLinkRouter",
-    "FabricQoSManager", "CXIEndpointQoS", "CXI_TC", "gain_to_cxi_tc",
-    # Real hardware + workload (OSDI AE requirements)
-    "CassiniHWCounters",
-    "TraceLoader", "Request", "TraceStats",
+    "GroupCreditCheckpointer",
+    "DOMAIN_CONTRACTS",
+    "DomainContract",
+    "DomainObservation",
+    "EvidenceLevel",
+    "FlowStage",
+    "ForegroundOperation",
+    "ResourceDomain",
+    "allowed_counter_scopes",
+    "StateFlow",
+    "aggregate_observations",
+    "causal_candidate_domains",
+    "domain_contract",
+    "AttributionMode",
+    "ModeSpec",
+    "required_domains_for_modes",
+    "TierEvaluation",
+    "evaluate_tier_attribution",
+    "validate_mode_evidence",
+    "validate_attribution_manifest",
+    "KVAdmissionDecision",
+    "KVFlowLedger",
+    "KVOperation",
+    "KVTransferRequest",
+    "KVVersion",
+    "TorchKVBackend",
+    "TorchKVCompletion",
+    "CausalGateConfig",
+    "CausalModeRecord",
+    "CausalPromotion",
+    "InferenceModeRecord",
+    "evaluate_causal_matrix",
+    "evaluate_inference_matrix",
+    "DomainAdmissionController",
+    "DomainBudget",
+    "DomainDecision",
+    "DomainRequest",
+    "FlowAdmissionLedger",
+    "AtlasEntry",
+    "CounterSupport",
+    "DomainEvidence",
+    "DomainCoverage",
+    "PathStatus",
+    "assess_domain_coverage",
+    "build_atlas",
+    "controller_candidates",
+    "detect_bottleneck_shift",
+    "CounterDelta",
+    "CounterSnapshot",
+    "counter_delta",
+    "validate_counter_series",
+    "PathInterventionEvidence",
+    "build_causal_domain_controller",
+    "validate_path_intervention_artifact",
+    "path_intervention_candidates",
+    "controller_ready_domains",
+    "checkpoint_state_flow",
+    "kv_state_flow",
+    "flow_route_signature",
+    "StateFlowAdmission",
+    "InferenceReplicationBlock",
+    "ReplicationResult",
+    "TrainingReplicationBlock",
+    "evaluate_inference_replication",
+    "evaluate_training_replication",
+    "validate_foreground_path",
+    "ObservationInterval",
+    "JoinedObservationWindow",
+    "canonicalize_observation_windows",
+    "join_observation_window",
+    "observation_window_contract",
+    "serialize_joined_observation_window",
+    "serialize_observation_interval",
+    "validate_observation_windows",
 ]
