@@ -1,26 +1,32 @@
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.egg-info/
-.eggs/
-dist/
-build/
-.env
+.baseline_build/
+.baseline_deps/
+.vscode/
+eval/archive-local/
+paper/archive-local/
 
-# Results (large data, keep structure only)
-results/baseline/*.csv
-results/contention/*.csv
-results/tempo/*.csv
-results/smoke/smoke_nccl/*.csv
-
-# Logs
-logs/*.err
-logs/*.out
-*.log
-
-# Slurm job output
+# Runtime artifacts stay local. Source-bound status is recorded in paper/.
+logs/
+results/**
+!results/README.md
 slurm-*.out
 slurm-*.err
+*.log
 
-# fio temp files
-/tmp/tempo_dummy*
+# LaTeX source is versioned; generated build products stay local.
+paper/tempo_sc/*.aux
+paper/tempo_sc/*.bbl
+paper/tempo_sc/*.blg
+paper/tempo_sc/*.fdb_latexmk
+paper/tempo_sc/*.fls
+paper/tempo_sc/*.log
+paper/tempo_sc/*.out
+paper/tempo_sc/*.pdf
+
+# Local tooling noise.
+.DS_Store
+.pytest_cache/
+.coverage*
+htmlcov/

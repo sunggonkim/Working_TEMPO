@@ -1,0 +1,26 @@
+{
+  "datastates": {
+    "commit": "1b849900f402cff614ff3d7e62e3bb29cfb29fa4",
+    "repository": "https://github.com/DataStates/datastates-llm",
+    "patch_chain": [
+      "datastates_tempo_v2.patch",
+      "datastates_tempo_v3.patch",
+      "datastates_tempo_v4.patch"
+    ],
+    "baseline_policy": "credit control disabled; legacy whole-region/64 MiB write path",
+    "common_changes": "GIL/liveness/fsync telemetry and commit-evidence fixes are shared by the runnable DataStates and v4 policies"
+  },
+  "liburing": {
+    "commit": "08468cc3830185c75f9e7edefd88aa01e5c2f8ab",
+    "tag": "liburing-2.9",
+    "repository": "https://github.com/axboe/liburing"
+  },
+  "pytorch": {
+    "version": "2.8.0+cu129",
+    "api": "torch.distributed.checkpoint.async_save"
+  },
+  "torchsnapshot": {
+    "commit": "a0ff1ec289c08f6cf6408c544b6ad23605c93462",
+    "repository": "https://github.com/pytorch/torchsnapshot"
+  }
+}

@@ -1,0 +1,330 @@
+diff --git a/include/datastates.hpp b/include/datastates.hpp
+--- a/include/datastates.hpp
++++ b/include/datastates.hpp
+@@ -19,6 +19,8 @@ public:
+     virtual void wait(bool persist=false) = 0;
+     virtual void configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0) = 0;
+     virtual void set_d2h_paused(bool paused) = 0;
++    virtual void set_persistence_paused(bool paused) = 0;
++    virtual std::uint64_t get_d2h_first_issue_unix_ns() = 0;
+     virtual std::string shutdown() = 0;
+     virtual std::string get_queue_stats(bool for_flush_queue=true) = 0;
+     virtual ~core_t() = default;
+diff --git a/include/state_io_engine.hpp b/include/state_io_engine.hpp
+--- a/include/state_io_engine.hpp
++++ b/include/state_io_engine.hpp
+@@ -15,6 +15,8 @@ public:
+     virtual void wait(state_manager_t* state, bool persist=false) = 0;
+     virtual void configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0) = 0;
+     virtual void set_d2h_paused(bool paused) = 0;
++    virtual void set_persistence_paused(bool paused) = 0;
++    virtual std::uint64_t get_d2h_first_issue_unix_ns() = 0;
+     virtual std::string shutdown() = 0;
+     virtual std::string get_queue_stats(bool for_flush_queue=true) = 0;
+     virtual ~state_io_engine_t() = default;
+diff --git a/src/core_impl.hpp b/src/core_impl.hpp
+--- a/src/core_impl.hpp
++++ b/src/core_impl.hpp
+@@ -30,6 +30,8 @@ public:
+     void wait(bool persist=false) override;
+     void configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0) override;
+     void set_d2h_paused(bool paused) override;
++    void set_persistence_paused(bool paused) override;
++    std::uint64_t get_d2h_first_issue_unix_ns() override;
+     std::string get_queue_stats(bool for_flush_queue=true) override;
+     std::string shutdown() override;
+     ~core_impl_t();
+diff --git a/src/core_impl.cpp b/src/core_impl.cpp
+--- a/src/core_impl.cpp
++++ b/src/core_impl.cpp
+@@ -117,6 +117,14 @@ void core_impl_t::set_d2h_paused(bool paused) {
+     gpu_tier->set_flush_paused(paused);
+ }
+ 
++void core_impl_t::set_persistence_paused(bool paused) {
++    host_tier->set_flush_paused(paused);
++}
++
++std::uint64_t core_impl_t::get_d2h_first_issue_unix_ns() {
++    return gpu_tier->get_first_issue_unix_ns();
++}
++
+ std::string core_impl_t::get_queue_stats(bool for_flush_queue) {
+     try {
+         std::string stats = "Device: " + std::to_string(gpu_id) + ", GPU: " + std::to_string(gpu_tier->get_queue_size(for_flush_queue)) + ", Host: " + std::to_string(host_tier->get_queue_size(for_flush_queue));
+diff --git a/src/file_handlers/io_uring_handler.cpp b/src/file_handlers/io_uring_handler.cpp
+--- a/src/file_handlers/io_uring_handler.cpp
++++ b/src/file_handlers/io_uring_handler.cpp
+@@ -187,4 +187,9 @@ void io_uring_handler_t::fsync() {
+         io_uring_wait_cv_.wait(io_uring_lock_);
+     }
+     io_uring_lock_.unlock();
+-}
+\ No newline at end of file
++    for (const auto& entry : open_fds_) {
++        if (::fsync(entry.second) != 0) {
++            FATAL("[io_uring_handler] fsync failed for " + entry.first.first + ": " + std::string(strerror(errno)));
++        }
++    }
++}
+diff --git a/src/tiers/gpu_tier.hpp b/src/tiers/gpu_tier.hpp
+--- a/src/tiers/gpu_tier.hpp
++++ b/src/tiers/gpu_tier.hpp
+@@ -13,8 +13,9 @@ class gpu_tier_t : public base_tier_t {
+     cudaStream_t flush_stream;
+     cudaStream_t fetch_stream;
+     std::atomic<double> pacing_bytes_per_second_ {0.0};
+-    std::chrono::steady_clock::time_point pacing_epoch_;
+-    std::uint64_t pacing_bytes_issued_ = 0;
++    std::chrono::steady_clock::time_point pacing_next_issue_;
++    bool pacing_initialized_ = false;
++    std::atomic<std::uint64_t> first_issue_unix_ns_ {0};
+     std::atomic<bool> flush_paused_ {false};
+     std::condition_variable pause_cv_;
+     std::mutex pause_mutex_;
+@@ -28,6 +29,7 @@ public:
+     void wait_for_completion();
+     void configure_flush_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0);
+     void set_flush_paused(bool paused);
++    std::uint64_t get_first_issue_unix_ns() const;
+ };
+ 
+ #endif // __DATASTATES_GPU_TIER_HPP
+diff --git a/src/tiers/gpu_tier.cpp b/src/tiers/gpu_tier.cpp
+--- a/src/tiers/gpu_tier.cpp
++++ b/src/tiers/gpu_tier.cpp
+@@ -49,9 +49,16 @@ void gpu_tier_t::wait_for_completion() {
+ };
+ 
+ void gpu_tier_t::configure_flush_pacing(double bytes_per_second, std::uint64_t start_delay_ns) {
+-    pacing_bytes_issued_ = 0;
+-    pacing_epoch_ = std::chrono::steady_clock::now() + std::chrono::nanoseconds(start_delay_ns);
++    std::unique_lock<std::mutex> lock(pause_mutex_);
++    pacing_next_issue_ = std::chrono::steady_clock::now() + std::chrono::nanoseconds(start_delay_ns);
++    pacing_initialized_ = true;
++    first_issue_unix_ns_.store(0, std::memory_order_release);
+     pacing_bytes_per_second_.store(bytes_per_second, std::memory_order_release);
++    pause_cv_.notify_all();
++}
++
++std::uint64_t gpu_tier_t::get_first_issue_unix_ns() const {
++    return first_issue_unix_ns_.load(std::memory_order_acquire);
+ }
+ 
+ void gpu_tier_t::set_flush_paused(bool paused) {
+@@ -73,28 +80,56 @@ void gpu_tier_t::flush_io_() {
+         auto src = flush_q.get_front();
+         perf_profiler.record_event(src, GPU_WAIT_END);
+         auto dest = std::make_shared<mem_region_t>(src, successor_tier_->tier_type_);
++        successor_tier_->mem_pool->allocate(dest);
+         {
+             std::unique_lock<std::mutex> lock(pause_mutex_);
+             pause_cv_.wait(lock, [&] {
+                 return !flush_paused_.load(std::memory_order_acquire);
+             });
+-            const double pacing_rate = pacing_bytes_per_second_.load(std::memory_order_acquire);
+-            if (pacing_rate > 0.0) {
+-                const auto offset = std::chrono::duration<double>(
+-                    static_cast<double>(pacing_bytes_issued_) / pacing_rate
+-                );
+-                std::this_thread::sleep_until(
+-                    pacing_epoch_ + std::chrono::duration_cast<std::chrono::steady_clock::duration>(offset)
+-                );
++            double pacing_rate = pacing_bytes_per_second_.load(std::memory_order_acquire);
++            while (pacing_rate > 0.0 && pacing_initialized_) {
++                const bool interrupted = pause_cv_.wait_until(lock, pacing_next_issue_, [&] {
++                    return flush_paused_.load(std::memory_order_acquire);
++                });
++                if (!interrupted)
++                    break;
+                 pause_cv_.wait(lock, [&] {
+                     return !flush_paused_.load(std::memory_order_acquire);
+                 });
++                pacing_rate = pacing_bytes_per_second_.load(std::memory_order_acquire);
+             }
+-            successor_tier_->mem_pool->allocate(dest);
++            std::uint64_t expected_first_issue = 0;
++            const auto issue_unix_ns = static_cast<std::uint64_t>(
++                std::chrono::duration_cast<std::chrono::nanoseconds>(
++                    std::chrono::system_clock::now().time_since_epoch()
++                ).count()
++            );
++            first_issue_unix_ns_.compare_exchange_strong(
++                expected_first_issue, issue_unix_ns, std::memory_order_acq_rel
++            );
+             perf_profiler.record_event(src, GPU_START);
+             checkCuda(cudaMemcpyAsync(const_cast<void*>(static_cast<const void*>(dest->ptr)), static_cast<const void*>(src->ptr), src->size, cudaMemcpyDeviceToHost, flush_stream));
+             checkCuda(cudaStreamSynchronize(flush_stream));
+-            pacing_bytes_issued_ += src->size;
++            if (pacing_rate > 0.0) {
++                auto interval = std::chrono::duration_cast<std::chrono::nanoseconds>(
++                    std::chrono::duration<double>(static_cast<double>(src->size) / pacing_rate)
++                );
++                if (interval.count() < 1)
++                    interval = std::chrono::nanoseconds(1);
++                pacing_next_issue_ += interval;
++                const auto now = std::chrono::steady_clock::now();
++                if (pacing_next_issue_ < now) {
++                    // Skip missed credits instead of resetting the epoch or
++                    // issuing a catch-up burst.  Since every rank was seeded
++                    // from the same future wall-clock epoch, this preserves
++                    // group-aligned credit slots across collective pauses.
++                    const auto behind = std::chrono::duration_cast<std::chrono::nanoseconds>(
++                        now - pacing_next_issue_
++                    );
++                    const auto slots = behind.count() / interval.count() + 1;
++                    pacing_next_issue_ += interval * slots;
++                }
++            }
+         }
+         successor_tier_->flush(dest);
+         mem_pool->deallocate(src);
+diff --git a/src/tiers/host_tier.hpp b/src/tiers/host_tier.hpp
+--- a/src/tiers/host_tier.hpp
++++ b/src/tiers/host_tier.hpp
+@@ -14,6 +14,9 @@
+ #include <numeric>
+ #include <stdexcept>
+ #include <set>
++#include <atomic>
++#include <condition_variable>
++#include <mutex>
+ #include "file_handlers/base_file_handler.hpp"
+ #include "file_handlers/io_uring_handler.hpp"
+ #include "file_handlers/pwrite_handler.hpp"
+@@ -24,12 +27,16 @@ class host_tier_t : public base_tier_t {
+     void flush_io_();
+     void fetch_io_();
+     std::shared_ptr<base_file_handler_t> file_handler = nullptr;
++    std::atomic<bool> flush_paused_ {false};
++    std::condition_variable pause_cv_;
++    std::mutex pause_mutex_;
+ public:
+     host_tier_t(int gpu_id, unsigned int num_threads, size_t total_size, int rank=-1, bool use_io_uring=false);
+     ~host_tier_t();
+     void flush(std::shared_ptr<mem_region_t> m);
+     void fetch(std::shared_ptr<mem_region_t> m);
+     void wait_for_completion();
++    void set_flush_paused(bool paused);
+ };
+ 
+-#endif // __DATASTATES_HOST_TIER_HPP
+\ No newline at end of file
++#endif // __DATASTATES_HOST_TIER_HPP
+diff --git a/src/tiers/host_tier.cpp b/src/tiers/host_tier.cpp
+--- a/src/tiers/host_tier.cpp
++++ b/src/tiers/host_tier.cpp
+@@ -27,6 +27,7 @@ host_tier_t::host_tier_t(int gpu_id, unsigned int num_threads, size_t total_size,
+ }
+ 
+ host_tier_t::~host_tier_t() {
++    set_flush_paused(false);
+     wait_for_completion();
+     fetch_q.wait_for_completion();
+     is_active = false;
+@@ -38,6 +39,11 @@ host_tier_t::~host_tier_t() {
+     free(start_ptr_);
+ }
+ 
++void host_tier_t::set_flush_paused(bool paused) {
++    flush_paused_.store(paused, std::memory_order_release);
++    pause_cv_.notify_all();
++}
++
+ void host_tier_t::flush(std::shared_ptr<mem_region_t> src) {
+     assert((successor_tier_ != nullptr) && "[HOST_TIER] Successor tier is not set.");
+     assert((src->curr_tier_type == HOST_PINNED_TIER || src->curr_tier_type == HOST_UNPINNED_TIER) && "[HOST_TIER] Source to flush from should be a host memory type.");
+@@ -67,6 +73,12 @@ void host_tier_t::flush_io_() {
+             if (!res)
+                 break;
+             auto src = flush_q.get_front();
++            {
++                std::unique_lock<std::mutex> lock(pause_mutex_);
++                pause_cv_.wait(lock, [&] {
++                    return !flush_paused_.load(std::memory_order_acquire);
++                });
++            }
+             perf_profiler.record_event(src, HOST_WAIT_END);
+             perf_profiler.record_event(src, HOST_START);
+             bool is_odirect = false;
+diff --git a/python/state_io_engine_impl.hpp b/python/state_io_engine_impl.hpp
+--- a/python/state_io_engine_impl.hpp
++++ b/python/state_io_engine_impl.hpp
+@@ -29,6 +29,8 @@ public:
+     void wait(state_manager_t* state, bool persist=false) override;
+     void configure_d2h_pacing(double bytes_per_second, std::uint64_t start_delay_ns=0) override;
+     void set_d2h_paused(bool paused) override;
++    void set_persistence_paused(bool paused) override;
++    std::uint64_t get_d2h_first_issue_unix_ns() override;
+     std::string get_queue_stats(bool for_flush_queue=true) override;
+     std::string shutdown() override;
+ 
+diff --git a/python/state_io_engine_impl.cpp b/python/state_io_engine_impl.cpp
+--- a/python/state_io_engine_impl.cpp
++++ b/python/state_io_engine_impl.cpp
+@@ -58,6 +58,14 @@ void state_io_engine_impl_t::set_d2h_paused(bool paused) {
+     core_engine->set_d2h_paused(paused);
+ }
+ 
++void state_io_engine_impl_t::set_persistence_paused(bool paused) {
++    core_engine->set_persistence_paused(paused);
++}
++
++std::uint64_t state_io_engine_impl_t::get_d2h_first_issue_unix_ns() {
++    return core_engine->get_d2h_first_issue_unix_ns();
++}
++
+ std::string state_io_engine_impl_t::get_queue_stats(bool for_flush_queue) {
+     try {
+         return core_engine->get_queue_stats(for_flush_queue);
+diff --git a/python/nb_datastates_core.cpp b/python/nb_datastates_core.cpp
+--- a/python/nb_datastates_core.cpp
++++ b/python/nb_datastates_core.cpp
+@@ -50,12 +50,17 @@ NB_MODULE(datastates_core, m) {
+              "version"_a, "region_uid"_a, "obj"_a, "size"_a, "offset"_a, "path"_a)
+         .def("restore", &restore_wrapper,
+              "version"_a, "region_uid"_a, "obj"_a, "size"_a, "offset"_a, "path"_a)
+-        .def("wait", &datastates::core_t::wait, "persist"_a = false)
++        .def("wait", &datastates::core_t::wait, "persist"_a = false,
++             nb::call_guard<nb::gil_scoped_release>())
+         .def("configure_d2h_pacing", &datastates::core_t::configure_d2h_pacing,
+              "bytes_per_second"_a, "start_delay_ns"_a = 0)
+-        .def("set_d2h_paused", &datastates::core_t::set_d2h_paused, "paused"_a)
++        .def("set_d2h_paused", &datastates::core_t::set_d2h_paused, "paused"_a,
++             nb::call_guard<nb::gil_scoped_release>())
++        .def("set_persistence_paused", &datastates::core_t::set_persistence_paused, "paused"_a)
++        .def("get_d2h_first_issue_unix_ns", &datastates::core_t::get_d2h_first_issue_unix_ns)
+         .def("get_queue_stats", &datastates::core_t::get_queue_stats, "for_flush_queue"_a = true)
+-        .def("shutdown", &datastates::core_t::shutdown);
++        .def("shutdown", &datastates::core_t::shutdown,
++             nb::call_guard<nb::gil_scoped_release>());
+     
+     // Factory function to create core engine instance (PIMPL)
+     m.def("create_core_engine", &datastates::create_core_engine,
+@@ -85,16 +90,23 @@ NB_MODULE(datastates_core, m) {
+              "version"_a, "path"_a,
+              "Restore a state provider's data from a checkpoint.")
+         .def("wait", &datastates::state_io_engine_t::wait,
+-             "state"_a, "persist"_a = false, "Wait for all operations to complete.")
++             "state"_a, "persist"_a = false, "Wait for all operations to complete.",
++             nb::call_guard<nb::gil_scoped_release>())
+         .def("configure_d2h_pacing", &datastates::state_io_engine_t::configure_d2h_pacing,
+              "bytes_per_second"_a, "start_delay_ns"_a = 0,
+              "Configure deterministic D2H pacing for queued state chunks.")
+         .def("set_d2h_paused", &datastates::state_io_engine_t::set_d2h_paused,
+-             "paused"_a, "Pause or resume launching D2H chunks.")
++             "paused"_a, "Pause or resume launching D2H chunks.",
++             nb::call_guard<nb::gil_scoped_release>())
++        .def("set_persistence_paused", &datastates::state_io_engine_t::set_persistence_paused,
++             "paused"_a, "Pause or resume submitting host-to-storage chunks.")
++        .def("get_d2h_first_issue_unix_ns", &datastates::state_io_engine_t::get_d2h_first_issue_unix_ns,
++             "Return the realtime timestamp of the first admitted D2H chunk.")
+         .def("get_queue_stats", &datastates::state_io_engine_t::get_queue_stats,
+              "for_flush_queue"_a = true, "Get the current queue statistics.")
+         .def("shutdown", &datastates::state_io_engine_t::shutdown,
+-             "Shutdown the state I/O engine.");
++             "Shutdown the state I/O engine.",
++             nb::call_guard<nb::gil_scoped_release>());
+ 
+     // We need to provide a factory function to create the singleton instance
+     // because state_io_engine_t is an abstract class, and implemented through PIMPL.
