@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="820" viewBox="0 0 1240 820">
+<style>
+text { font-family: DejaVu Sans, Arial, sans-serif; fill: #20242a; }
+.title { font-size: 22px; font-weight: 700; }
+.panel-title { font-size: 15px; font-weight: 700; }
+.tick,.category,.legend { font-size: 11px; }
+.value { font-size: 9px; font-weight: 600; }
+</style>
+<rect width="1240" height="820" fill="#f5f7fa"/>
+<text x="620.0" y="38" text-anchor="middle" class="title">Candidate C: strongest-fixed versus TEMPO by workload</text>
+<g transform="translate(20,75)">
+<rect x="0" y="0" width="590" height="350" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="295.0" y="24" text-anchor="middle" class="panel-title">E2E median by workload</text>
+<line x1="64" y1="292.00" x2="574" y2="292.00" stroke="#e8ebef"/>
+<text x="56" y="296.00" text-anchor="end" class="tick">0.0</text>
+<line x1="64" y1="229.00" x2="574" y2="229.00" stroke="#e8ebef"/>
+<text x="56" y="233.00" text-anchor="end" class="tick">1792</text>
+<line x1="64" y1="166.00" x2="574" y2="166.00" stroke="#e8ebef"/>
+<text x="56" y="170.00" text-anchor="end" class="tick">3585</text>
+<line x1="64" y1="103.00" x2="574" y2="103.00" stroke="#e8ebef"/>
+<text x="56" y="107.00" text-anchor="end" class="tick">5377</text>
+<line x1="64" y1="40.00" x2="574" y2="40.00" stroke="#e8ebef"/>
+<text x="56" y="44.00" text-anchor="end" class="tick">7169</text>
+<rect x="75.90" y="270.78" width="29.10" height="21.22" fill="#f58518" rx="2"/>
+<text x="90.45" y="266.78" text-anchor="middle" class="value">603.7</text>
+<rect x="108.00" y="276.33" width="29.10" height="15.67" fill="#e45756" rx="2"/>
+<text x="122.55" y="272.33" text-anchor="middle" class="value">445.8</text>
+<text x="106.50" y="312" text-anchor="middle" class="category">C0 cool</text>
+<rect x="160.90" y="217.20" width="29.10" height="74.80" fill="#f58518" rx="2"/>
+<text x="175.45" y="213.20" text-anchor="middle" class="value">2128</text>
+<rect x="193.00" y="215.03" width="29.10" height="76.97" fill="#e45756" rx="2"/>
+<text x="207.55" y="211.03" text-anchor="middle" class="value">2190</text>
+<text x="191.50" y="312" text-anchor="middle" class="category">C1 D-hot</text>
+<rect x="245.90" y="263.28" width="29.10" height="28.72" fill="#f58518" rx="2"/>
+<text x="260.45" y="259.28" text-anchor="middle" class="value">817.0</text>
+<rect x="278.00" y="274.46" width="29.10" height="17.54" fill="#e45756" rx="2"/>
+<text x="292.55" y="270.46" text-anchor="middle" class="value">499.0</text>
+<text x="276.50" y="312" text-anchor="middle" class="category">C2 remote-hot</text>
+<rect x="330.90" y="208.33" width="29.10" height="83.67" fill="#f58518" rx="2"/>
+<text x="345.45" y="204.33" text-anchor="middle" class="value">2380</text>
+<rect x="363.00" y="271.84" width="29.10" height="20.16" fill="#e45756" rx="2"/>
+<text x="377.55" y="267.84" text-anchor="middle" class="value">573.6</text>
+<text x="361.50" y="312" text-anchor="middle" class="category">C2 KV-hot</text>
+<rect x="415.90" y="78.44" width="29.10" height="213.56" fill="#f58518" rx="2"/>
+<text x="430.45" y="74.44" text-anchor="middle" class="value">6076</text>
+<rect x="448.00" y="136.91" width="29.10" height="155.09" fill="#e45756" rx="2"/>
+<text x="462.55" y="132.91" text-anchor="middle" class="value">4412</text>
+<text x="446.50" y="312" text-anchor="middle" class="category">C3 both-hot</text>
+<rect x="500.90" y="226.83" width="29.10" height="65.17" fill="#f58518" rx="2"/>
+<text x="515.45" y="222.83" text-anchor="middle" class="value">1854</text>
+<rect x="533.00" y="275.64" width="29.10" height="16.36" fill="#e45756" rx="2"/>
+<text x="547.55" y="271.64" text-anchor="middle" class="value">465.4</text>
+<text x="531.50" y="312" text-anchor="middle" class="category">recovery</text>
+<rect x="64" y="329" width="10" height="10" fill="#f58518"/>
+<text x="78" y="338" class="legend">strongest fixed (remote)</text>
+<rect x="262" y="329" width="10" height="10" fill="#e45756"/>
+<text x="276" y="338" class="legend">TEMPO</text>
+</g>
+<g transform="translate(630,75)">
+<rect x="0" y="0" width="590" height="350" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="295.0" y="24" text-anchor="middle" class="panel-title">TTFT median by workload</text>
+<line x1="64" y1="292.00" x2="574" y2="292.00" stroke="#e8ebef"/>
+<text x="56" y="296.00" text-anchor="end" class="tick">0.0</text>
+<line x1="64" y1="229.00" x2="574" y2="229.00" stroke="#e8ebef"/>
+<text x="56" y="233.00" text-anchor="end" class="tick">830.3</text>
+<line x1="64" y1="166.00" x2="574" y2="166.00" stroke="#e8ebef"/>
+<text x="56" y="170.00" text-anchor="end" class="tick">1661</text>
+<line x1="64" y1="103.00" x2="574" y2="103.00" stroke="#e8ebef"/>
+<text x="56" y="107.00" text-anchor="end" class="tick">2491</text>
+<line x1="64" y1="40.00" x2="574" y2="40.00" stroke="#e8ebef"/>
+<text x="56" y="44.00" text-anchor="end" class="tick">3321</text>
+<rect x="75.90" y="280.64" width="29.10" height="11.36" fill="#f58518" rx="2"/>
+<text x="90.45" y="276.64" text-anchor="middle" class="value">149.8</text>
+<rect x="108.00" y="286.23" width="29.10" height="5.77" fill="#e45756" rx="2"/>
+<text x="122.55" y="282.23" text-anchor="middle" class="value">76.1</text>
+<text x="106.50" y="312" text-anchor="middle" class="category">C0 cool</text>
+<rect x="160.90" y="280.61" width="29.10" height="11.39" fill="#f58518" rx="2"/>
+<text x="175.45" y="276.61" text-anchor="middle" class="value">150.1</text>
+<rect x="193.00" y="280.53" width="29.10" height="11.47" fill="#e45756" rx="2"/>
+<text x="207.55" y="276.53" text-anchor="middle" class="value">151.2</text>
+<text x="191.50" y="312" text-anchor="middle" class="category">C1 D-hot</text>
+<rect x="245.90" y="272.59" width="29.10" height="19.41" fill="#f58518" rx="2"/>
+<text x="260.45" y="268.59" text-anchor="middle" class="value">255.8</text>
+<rect x="278.00" y="286.30" width="29.10" height="5.70" fill="#e45756" rx="2"/>
+<text x="292.55" y="282.30" text-anchor="middle" class="value">75.1</text>
+<text x="276.50" y="312" text-anchor="middle" class="category">C2 remote-hot</text>
+<rect x="330.90" y="184.07" width="29.10" height="107.93" fill="#f58518" rx="2"/>
+<text x="345.45" y="180.07" text-anchor="middle" class="value">1422</text>
+<rect x="363.00" y="285.75" width="29.10" height="6.25" fill="#e45756" rx="2"/>
+<text x="377.55" y="281.75" text-anchor="middle" class="value">82.4</text>
+<text x="361.50" y="312" text-anchor="middle" class="category">C2 KV-hot</text>
+<rect x="415.90" y="78.44" width="29.10" height="213.56" fill="#f58518" rx="2"/>
+<text x="430.45" y="74.44" text-anchor="middle" class="value">2814</text>
+<rect x="448.00" y="253.45" width="29.10" height="38.55" fill="#e45756" rx="2"/>
+<text x="462.55" y="249.45" text-anchor="middle" class="value">508.1</text>
+<text x="446.50" y="312" text-anchor="middle" class="category">C3 both-hot</text>
+<rect x="500.90" y="273.96" width="29.10" height="18.04" fill="#f58518" rx="2"/>
+<text x="515.45" y="269.96" text-anchor="middle" class="value">237.7</text>
+<rect x="533.00" y="285.64" width="29.10" height="6.36" fill="#e45756" rx="2"/>
+<text x="547.55" y="281.64" text-anchor="middle" class="value">83.9</text>
+<text x="531.50" y="312" text-anchor="middle" class="category">recovery</text>
+<rect x="64" y="329" width="10" height="10" fill="#f58518"/>
+<text x="78" y="338" class="legend">strongest fixed (remote)</text>
+<rect x="262" y="329" width="10" height="10" fill="#e45756"/>
+<text x="276" y="338" class="legend">TEMPO</text>
+</g>
+<g transform="translate(20,445)">
+<rect x="0" y="0" width="590" height="350" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="295.0" y="24" text-anchor="middle" class="panel-title">TPOT p99 by workload</text>
+<line x1="64" y1="292.00" x2="574" y2="292.00" stroke="#e8ebef"/>
+<text x="56" y="296.00" text-anchor="end" class="tick">0.0</text>
+<line x1="64" y1="229.00" x2="574" y2="229.00" stroke="#e8ebef"/>
+<text x="56" y="233.00" text-anchor="end" class="tick">83.7</text>
+<line x1="64" y1="166.00" x2="574" y2="166.00" stroke="#e8ebef"/>
+<text x="56" y="170.00" text-anchor="end" class="tick">167.3</text>
+<line x1="64" y1="103.00" x2="574" y2="103.00" stroke="#e8ebef"/>
+<text x="56" y="107.00" text-anchor="end" class="tick">251.0</text>
+<line x1="64" y1="40.00" x2="574" y2="40.00" stroke="#e8ebef"/>
+<text x="56" y="44.00" text-anchor="end" class="tick">334.6</text>
+<rect x="75.90" y="225.14" width="29.10" height="66.86" fill="#f58518" rx="2"/>
+<text x="90.45" y="221.14" text-anchor="middle" class="value">88.8</text>
+<rect x="108.00" y="238.02" width="29.10" height="53.98" fill="#e45756" rx="2"/>
+<text x="122.55" y="234.02" text-anchor="middle" class="value">71.7</text>
+<text x="106.50" y="312" text-anchor="middle" class="category">C0 cool</text>
+<rect x="160.90" y="189.82" width="29.10" height="102.18" fill="#f58518" rx="2"/>
+<text x="175.45" y="185.82" text-anchor="middle" class="value">135.7</text>
+<rect x="193.00" y="188.89" width="29.10" height="103.11" fill="#e45756" rx="2"/>
+<text x="207.55" y="184.89" text-anchor="middle" class="value">136.9</text>
+<text x="191.50" y="312" text-anchor="middle" class="category">C1 D-hot</text>
+<rect x="245.90" y="269.22" width="29.10" height="22.78" fill="#f58518" rx="2"/>
+<text x="260.45" y="265.22" text-anchor="middle" class="value">30.3</text>
+<rect x="278.00" y="269.43" width="29.10" height="22.57" fill="#e45756" rx="2"/>
+<text x="292.55" y="265.43" text-anchor="middle" class="value">30.0</text>
+<text x="276.50" y="312" text-anchor="middle" class="category">C2 remote-hot</text>
+<rect x="330.90" y="158.13" width="29.10" height="133.87" fill="#f58518" rx="2"/>
+<text x="345.45" y="154.13" text-anchor="middle" class="value">177.8</text>
+<rect x="363.00" y="229.56" width="29.10" height="62.44" fill="#e45756" rx="2"/>
+<text x="377.55" y="225.56" text-anchor="middle" class="value">82.9</text>
+<text x="361.50" y="312" text-anchor="middle" class="category">C2 KV-hot</text>
+<rect x="415.90" y="149.66" width="29.10" height="142.34" fill="#f58518" rx="2"/>
+<text x="430.45" y="145.66" text-anchor="middle" class="value">189.0</text>
+<rect x="448.00" y="78.44" width="29.10" height="213.56" fill="#e45756" rx="2"/>
+<text x="462.55" y="74.44" text-anchor="middle" class="value">283.6</text>
+<text x="446.50" y="312" text-anchor="middle" class="category">C3 both-hot</text>
+<rect x="500.90" y="266.12" width="29.10" height="25.88" fill="#f58518" rx="2"/>
+<text x="515.45" y="262.12" text-anchor="middle" class="value">34.4</text>
+<rect x="533.00" y="267.21" width="29.10" height="24.79" fill="#e45756" rx="2"/>
+<text x="547.55" y="263.21" text-anchor="middle" class="value">32.9</text>
+<text x="531.50" y="312" text-anchor="middle" class="category">recovery</text>
+<rect x="64" y="329" width="10" height="10" fill="#f58518"/>
+<text x="78" y="338" class="legend">strongest fixed (remote)</text>
+<rect x="262" y="329" width="10" height="10" fill="#e45756"/>
+<text x="276" y="338" class="legend">TEMPO</text>
+</g>
+<g transform="translate(630,445)">
+<rect x="0" y="0" width="590" height="350" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="295.0" y="24" text-anchor="middle" class="panel-title">Request goodput by workload</text>
+<line x1="64" y1="292.00" x2="574" y2="292.00" stroke="#e8ebef"/>
+<text x="56" y="296.00" text-anchor="end" class="tick">0.0%</text>
+<line x1="64" y1="229.00" x2="574" y2="229.00" stroke="#e8ebef"/>
+<text x="56" y="233.00" text-anchor="end" class="tick">29.5%</text>
+<line x1="64" y1="166.00" x2="574" y2="166.00" stroke="#e8ebef"/>
+<text x="56" y="170.00" text-anchor="end" class="tick">59.0%</text>
+<line x1="64" y1="103.00" x2="574" y2="103.00" stroke="#e8ebef"/>
+<text x="56" y="107.00" text-anchor="end" class="tick">88.5%</text>
+<line x1="64" y1="40.00" x2="574" y2="40.00" stroke="#e8ebef"/>
+<text x="56" y="44.00" text-anchor="end" class="tick">118.0%</text>
+<rect x="75.90" y="92.68" width="29.10" height="199.32" fill="#f58518" rx="2"/>
+<text x="90.45" y="88.68" text-anchor="middle" class="value">93.3%</text>
+<rect x="108.00" y="92.68" width="29.10" height="199.32" fill="#e45756" rx="2"/>
+<text x="122.55" y="88.68" text-anchor="middle" class="value">93.3%</text>
+<text x="106.50" y="312" text-anchor="middle" class="category">C0 cool</text>
+<rect x="160.90" y="92.68" width="29.10" height="199.32" fill="#f58518" rx="2"/>
+<text x="175.45" y="88.68" text-anchor="middle" class="value">93.3%</text>
+<rect x="193.00" y="92.68" width="29.10" height="199.32" fill="#e45756" rx="2"/>
+<text x="207.55" y="88.68" text-anchor="middle" class="value">93.3%</text>
+<text x="191.50" y="312" text-anchor="middle" class="category">C1 D-hot</text>
+<rect x="245.90" y="78.44" width="29.10" height="213.56" fill="#f58518" rx="2"/>
+<text x="260.45" y="74.44" text-anchor="middle" class="value">100.0%</text>
+<rect x="278.00" y="78.44" width="29.10" height="213.56" fill="#e45756" rx="2"/>
+<text x="292.55" y="74.44" text-anchor="middle" class="value">100.0%</text>
+<text x="276.50" y="312" text-anchor="middle" class="category">C2 remote-hot</text>
+<rect x="330.90" y="110.47" width="29.10" height="181.53" fill="#f58518" rx="2"/>
+<text x="345.45" y="106.47" text-anchor="middle" class="value">85.0%</text>
+<rect x="363.00" y="106.92" width="29.10" height="185.08" fill="#e45756" rx="2"/>
+<text x="377.55" y="102.92" text-anchor="middle" class="value">86.7%</text>
+<text x="361.50" y="312" text-anchor="middle" class="category">C2 KV-hot</text>
+<rect x="415.90" y="188.78" width="29.10" height="103.22" fill="#f58518" rx="2"/>
+<text x="430.45" y="184.78" text-anchor="middle" class="value">48.3%</text>
+<rect x="448.00" y="163.86" width="29.10" height="128.14" fill="#e45756" rx="2"/>
+<text x="462.55" y="159.86" text-anchor="middle" class="value">60.0%</text>
+<text x="446.50" y="312" text-anchor="middle" class="category">C3 both-hot</text>
+<rect x="500.90" y="99.80" width="29.10" height="192.20" fill="#f58518" rx="2"/>
+<text x="515.45" y="95.80" text-anchor="middle" class="value">90.0%</text>
+<rect x="533.00" y="78.44" width="29.10" height="213.56" fill="#e45756" rx="2"/>
+<text x="547.55" y="74.44" text-anchor="middle" class="value">100.0%</text>
+<text x="531.50" y="312" text-anchor="middle" class="category">recovery</text>
+<rect x="64" y="329" width="10" height="10" fill="#f58518"/>
+<text x="78" y="338" class="legend">strongest fixed (remote)</text>
+<rect x="262" y="329" width="10" height="10" fill="#e45756"/>
+<text x="276" y="338" class="legend">TEMPO</text>
+</g>
+</svg>

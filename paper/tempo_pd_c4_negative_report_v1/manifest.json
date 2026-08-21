@@ -1,0 +1,17 @@
+{
+  "negative_analysis": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_pd_c4_semantic_credit_epoch_candidate_v7_job_57362947/negative_conclusion_analysis_v2.json",
+  "negative_analysis_sha256": "c8cb985aba33724b22c16d1501d9cdbd057d95ea5231b64de23a88d2572cd1f3",
+  "outputs": {
+    "candidate_c_phase_metrics.png": "948a159162dfdb3c459042e378723dd5f76755ce065cd2fe7f99c2509e75d794",
+    "candidate_c_phase_metrics.svg": "a6fd02f2ac48936b996aed25bcbe013b41ee766e0dcdedb1c71dad128047b1a5",
+    "candidate_c_pooled_metrics.png": "823cd5418d65f01d58b73f0f752d47595201c7f77b7e31941699dba1d005936d",
+    "candidate_c_pooled_metrics.svg": "3676aea50ca6fb84b45aa4091278134a3916ee1ff22e7848cdac9233159deb36",
+    "negative_conclusion_report.md": "5ae06540008dd4603cbf224ebb23d0c8b3bb37a3311df5b977e44eded72b7438"
+  },
+  "phase_analysis": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_pd_c4_semantic_credit_epoch_candidate_v7_job_57362947/phase_screen_analysis.json",
+  "phase_analysis_sha256": "f5b9e8994d97974cddde1fc9529ee364f029278226f3fb3a5d1aa5d21374a773",
+  "preview_converter": "/usr/bin/magick",
+  "renderer": "/pscratch/sd/s/sgkim/Skim-Tempo/eval/sota_4node/render_tempo_pd_c4_negative_report.py",
+  "renderer_sha256": "a6bf927c207bdef80d1e1ee2e26236113d3e2780d50ccd999d9fe9fa3896d84d",
+  "schema": "tempo-pd-c4-negative-report-manifest-v1"
+}

@@ -1,0 +1,213 @@
+{
+  "base_c4_run_contract": {
+    "path": "eval/sota_4node/tempo_pd_c4_phase_screen_run_contract_v1.json",
+    "schema": "tempo-pd-c4-phase-screen-run-contract-v1",
+    "sha256": "89a9ebe8962a8be24db7201740be9b203b9d1d35b5c920e7d53ca48504618d87"
+  },
+  "calibration_only": true,
+  "claim_boundary": "request-level admission and routing under moving endpoint contention with the official vLLM/LMCache P/D data plane unchanged",
+  "controller_parameter_search_allowed": false,
+  "controller_reset_before_each_measured_block": true,
+  "elastic_profile": {
+    "fingerprint_sha256": "7b161a59723c2b358e602fcce569b4e3c85d4677c1b9fce144bed6f6d548a8a3",
+    "path": "results/tempo_elastic_pd_canonical_discovery_57133688/profiles/real_tempo_pd_elastic_profile_run17_v452.json",
+    "sha256": "db65320aa1bbb7c1e095c0d7a4312749327dafbffd904009d83355aa80231a2d"
+  },
+  "endpoint_routing_policy": "semantic_epoch_v1",
+  "endpoint_service_profile": {
+    "derived_from_sha256": "aa0eb9019ca6fd802901d6b8d0107dd165145c2230cfd3db03ca065c04205bcf",
+    "fingerprint_sha256": "8499a3c0465ad94abc0887180f2e627cc812fa98e5f1caf412b6b74bc17aad21",
+    "path": "eval/sota_4node/real_tempo_pd_endpoint_service_profile_c4_semantic_credit_epoch_v2.json",
+    "schema": "tempo-pd-endpoint-service-profile-v2",
+    "sha256": "20caf9c155d927085c4f40535080c62e2309c317aff8d6e3954a6c67c8f9c8d1"
+  },
+  "external_service_proxy_contract": {
+    "confirmed_miss_prefill_only_fallback_explicitly_labeled": true,
+    "geometry_rule": "minimum_measured_prompt_and_output_ceiling",
+    "outside_profile_envelope_fails_closed": true,
+    "proxy_is_exact_service_evidence": false,
+    "same_residency_preferred": true,
+    "scope": "route_pinned_external_tenants_only",
+    "tempo_adaptive_requests_require_exact_profile_rows": true
+  },
+  "fingerprint_sha256": "d1eb201f7f083ef02ffda7acb3978b8680f86044b22e9baa15e11184eddedfbf",
+  "fixed_baseline_overrides": [
+    {
+      "baseline_sha256": "d77bce03c39728f7d061bc1b1e60b70e23c7b58001f4657752bf39f3f55856b8",
+      "candidate_sha256": "b38c2e56ed8b0a392e37b42ebef27f7c5ba2ed6dae77c4add722c0581a25b25a",
+      "path": "eval/sota_4node/tempo_pd_elastic_router.py",
+      "scope": "admission_or_service_profile_only"
+    },
+    {
+      "baseline_sha256": "68bd0d50ef0cfa5a3d14d3dd7cdf0798a5ea517d7e60d4e8be4518d0c730a66e",
+      "candidate_sha256": "42a37da258dd09ef1144034a8afd5a9f66eda7aabbf24d4ef8a7393d489e3eb6",
+      "path": "tempo/pd_endpoint_profile.py",
+      "scope": "admission_or_service_profile_only"
+    }
+  ],
+  "fixed_c4_implementation_contract": {
+    "fingerprint_sha256": "f62bf421d6a60a218d18ea02a7b0bf8bc7737954b656a64c60c77c32f0b4eec0",
+    "path": "eval/sota_4node/tempo_pd_c4_implementation_contract_v1.json",
+    "schema": "tempo-pd-c4-implementation-contract-v1",
+    "sha256": "fa5b23288d14e8f938b0c7820016b5313a7140126252edbec36db7d1ff74a5a4"
+  },
+  "frozen_validation_allowed": false,
+  "implementation": [
+    {
+      "path": "tempo/pd_endpoint_controller.py",
+      "sha256": "ea62e40f64387b53e001bf2370b4046ecfcec31ab2bddc79fd30710d45df73b3"
+    },
+    {
+      "path": "tempo/pd_endpoint_profile.py",
+      "sha256": "42a37da258dd09ef1144034a8afd5a9f66eda7aabbf24d4ef8a7393d489e3eb6"
+    },
+    {
+      "path": "eval/sota_4node/analyze_tempo_pd_c4_phase_screen.py",
+      "sha256": "f4aefbdf147742392487d463c79a50a4906b4366dbbcc56d00526c0c95cd86ea"
+    },
+    {
+      "path": "eval/sota_4node/analyze_tempo_pd_c4_semantic_epoch_screen.py",
+      "sha256": "7174dc436c86b0264376f90ab14580648c22e0d262e559c4bd8c26a976d18e08"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_elastic_frontend.py",
+      "sha256": "5753275acff4947e6d395c9c7136b7b9f5730712abb2a0e153520edc847a7a96"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_elastic_router.py",
+      "sha256": "b38c2e56ed8b0a392e37b42ebef27f7c5ba2ed6dae77c4add722c0581a25b25a"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_elastic_router_v448.py",
+      "sha256": "d69155022015caeecad96025ab682c6e436025e1b57213a0f0054a217aef840c"
+    },
+    {
+      "path": "eval/sota_4node/c4_phase_screen_pd_node_entry.sh",
+      "sha256": "68912ce57af655600249231ee8a5b9c4429cb2a02e56fb0b2f0c82270a880332"
+    },
+    {
+      "path": "eval/sota_4node/prepare_c4_python_overlay.sh",
+      "sha256": "99b06ec512ae8318d4d24e62258c43b2244384486392e733b05d60fe24fe5a5b"
+    },
+    {
+      "path": "eval/sota_4node/stage_c4_python_overlay.sh",
+      "sha256": "5b25f9e382cb06b9a92e47ffb68bf932051fc384b9f0ae7617ca9d5f812fdbe7"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_phase_screen_client.py",
+      "sha256": "6de454f5c1f0c48812c4e585f1c0f9fa170523e4cf435f8bae524922df033e7d"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_pd_c4_phase_screen_node.py",
+      "sha256": "efef7043ba1c4ba80705c827ddf51f9f90d546b0e2a3d6cb197a83faf048081e"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_semantic_epoch_screen_in_allocation.sh",
+      "sha256": "423c2437500d376e3b1d2b64af3bef51a9f4301561f3b5ee4c4171f90fc2271d"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_c4_semantic_epoch_run_contract.py",
+      "sha256": "7871e6f32123e93aa3218e2adf0e137734aa5aabffbe29636b8a6203a790e9cc"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_semantic_epoch_endpoint_profile.py",
+      "sha256": "5a25e47cb863a24b93f599d0e4b9347bf2a707b08c83627d43158b174f439038"
+    }
+  ],
+  "offline_replay": {
+    "live_c4_screen_authorized": true,
+    "path": "results/tempo_pd_c4_endpoint_replay_v1_job_57343718.json",
+    "schema": "tempo-pd-endpoint-controller-replay-v1",
+    "sha256": "df39e54eb4d6738c6b33dacb678a6f73cbf6ecd15dc1bb0c424f218090a160a2"
+  },
+  "passive_external_credit": true,
+  "performance_claim_allowed": false,
+  "phase_manifest": {
+    "path": "eval/sota_4node/tempo_pd_c4_phase_screen_manifest_v1.json",
+    "sha256": "c029e24a7cfea6cd567ffd89dc2b49b9822d92514341f73f04582f0f70aa7544"
+  },
+  "physical_switch_bottleneck_claim_allowed": false,
+  "purpose": "exploratory live screen of profile-bound pair-local semantic evidence, all-tenant endpoint credits, and a hysteretic route epoch",
+  "runtime_environment": {
+    "TEMPO_ELASTIC_PD_PROFILE_SCOPE": "screen_only",
+    "TEMPO_LMCACHE_LOCAL_CPU_GB": "16",
+    "TEMPO_LMCACHE_NIXL_BACKEND": "UCX",
+    "TEMPO_LMCACHE_PD_BUFFER_BYTES": "2147483648",
+    "TEMPO_PD_BENCHMARK_COLD_MEASURED": "1",
+    "TEMPO_PD_BENCHMARK_RESET_DECODER_APC": "0",
+    "TEMPO_PD_C4_APPROVED": "YES",
+    "TEMPO_PD_C4_COOLDOWN_S": "2",
+    "TEMPO_PD_C4_PHASE_DURATION_MS": "15000",
+    "TEMPO_PD_DECODER_REUSE_ITEMS": "all",
+    "TEMPO_PD_ENDPOINT_FEEDBACK_MODE": "adaptive",
+    "TEMPO_PD_ENDPOINT_PASSIVE_FEEDBACK": "1",
+    "TEMPO_PD_ENDPOINT_ROUTING_POLICY": "semantic_epoch_v1",
+    "TEMPO_PD_FORWARD_TOKEN_IDS": "0",
+    "TEMPO_PD_FRONTEND_PAIR_POLICY": "tempo-min-outstanding-decode-tokens-v1",
+    "TEMPO_PD_FRONTEND_REPLICATE_WARM_AFFINITY": "1",
+    "TEMPO_PD_LONG_REMOTE_CATCHUP_MIN_PROMPT_TOKENS": "0",
+    "TEMPO_PD_LONG_REMOTE_CATCHUP_PRIORITY": "0",
+    "TEMPO_PD_MEDIAN_GUARD_PRIORITY": "0",
+    "TEMPO_PD_MEDIUM_REMOTE_CATCHUP_PRIORITY": "0",
+    "TEMPO_PD_PRESSURE_MODE": "disabled",
+    "TEMPO_PD_PROXY_KV_CONTROL_OVERLAP": "0",
+    "TEMPO_PD_PROXY_TOKENIZER_PLACEMENT": "round_robin",
+    "TEMPO_PD_REMOTE_CATCHUP_MIN_OUTPUT_TOKENS": "256",
+    "TEMPO_PD_REMOTE_CATCHUP_PRIORITY": "0",
+    "TEMPO_PD_REMOTE_DECODE_PLACEMENT": "paired",
+    "TEMPO_PD_STRONG_REMOTE_CATCHUP_PRIORITY": "0",
+    "TEMPO_VLLM_ASYNC_SCHEDULING": "0",
+    "TEMPO_VLLM_DECODER_MAX_NUM_BATCHED_TOKENS": "32768",
+    "TEMPO_VLLM_DECODER_PREFIX_CACHING": "0",
+    "TEMPO_VLLM_LOAD_SNAPSHOT_MODE": "disabled",
+    "TEMPO_VLLM_MAX_NUM_SEQS": "16",
+    "TEMPO_VLLM_SCHEDULING_POLICY": "fcfs"
+  },
+  "schema": "tempo-pd-c4-semantic-epoch-screen-run-contract-v2",
+  "semantic_credit_contract": {
+    "decoder_high_water_denominator": 2,
+    "decoder_high_water_numerator": 1,
+    "decoder_load_scope": "frontend_request_start_to_http_eof",
+    "decoder_low_water_denominator": 4,
+    "decoder_low_water_numerator": 1,
+    "endpoint_credit_scope": "all_route_pinned_and_tempo_work_to_first_response",
+    "epoch_confirmation_requests": 2,
+    "frontend_decoder_watermarks_policy_input": false,
+    "local_external_credit_opens_epoch": true,
+    "pair_local": true,
+    "phase_label_policy_input": false,
+    "physical_switch_label_policy_input": false,
+    "policy": "semantic_epoch_v1",
+    "remote_external_credit_close_fraction": 1.0,
+    "remote_overload_service_stretch": 2.0
+  },
+  "semantic_observer_analysis": {
+    "path": "results/tempo_pd_c4_semantic_load_observer_v1_job_57352661/semantic_load_analysis_v2.json",
+    "schema": "tempo-pd-c4-semantic-load-analysis-v1",
+    "sha256": "deb0c49d1e82a54a6246d1deb9eb78a5e9803b7f9a46cdf623c592eb41766f42"
+  },
+  "semantic_observer_result": {
+    "path": "results/tempo_pd_c4_semantic_load_observer_v1_job_57352661/result.json",
+    "schema": "tempo-pd-c4-phase-screen-node-v1",
+    "sha256": "cb364a96c06894142aa053f4da2a0a11d47ad0853c015739a6c1368e9d3ff1b6"
+  },
+  "slurm": {
+    "gpus": 16,
+    "interactive_time_limit": "04:00:00",
+    "login_node_experiment_execution_allowed": false,
+    "nodes": 4,
+    "perlmutter_only": true
+  },
+  "source_endpoint_service_profile": {
+    "fingerprint_sha256": "45dca4ccc938f05f44abb53d8573d2d6831e340df5520a17c1afc21715316210",
+    "path": "eval/sota_4node/real_tempo_pd_endpoint_service_profile_c4_screen_v1.json",
+    "schema": "tempo-pd-endpoint-service-profile-v1",
+    "sha256": "aa0eb9019ca6fd802901d6b8d0107dd165145c2230cfd3db03ca065c04205bcf"
+  },
+  "source_workload": {
+    "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+    "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+  },
+  "transport": "LMCacheConnectorV1:UCX",
+  "unchanged_pd_data_plane": true
+}

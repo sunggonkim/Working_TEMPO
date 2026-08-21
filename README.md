@@ -6,45 +6,46 @@ TEMPO Elastic-PD는 실제 vLLM Prefill/Decode(P/D) 환경에서 요청을 실�
 LMCache remote prefill로 보내며, local compute와 remote KV 용량을 서로 다른
 credit으로 관리합니다.
 
-현재 결론은 명확합니다. 검증된 4노드 workload에서 full TEMPO가 official
-LMCache always-remote보다 빠르면서 정확성을 유지했습니다. 다만 이는 해당
-topology와 frozen workload에 한정된 결과이며 보편적 SOTA 주장은 아닙니다.
+## 현재 최종 결론 (2026-08-21)
+
+원래 목표와 성공 조건은 바꾸지 않았습니다. 현실적인 phase-changing C4
+contention workload에서 세 개의 구조적으로 다른 TEMPO candidate를 실제
+4노드 vLLM P/D와 official `LMCacheConnectorV1:UCX` 경로로 검증했습니다.
+정확성과 양쪽 route의 유용성은 확인했지만, 어느 candidate도 strongest-fixed
+대비 median 개선과 tail 보장을 동시에 만족하지 못했습니다. 따라서 이
+목표는 사전 명시한 stop condition에 따라 **재현 가능한 negative
+conclusion**으로 종료합니다.
+
+이 결론은 LMCache가 항상 느리거나 orchestration을 버려야 한다는 뜻이
+아닙니다. C1 decoder-hot에서는 remote가 이겼고, C2 remote-path-hot에서는
+local이 이겼습니다. Candidate C가 local로 고른 요청과 remote로 고른 요청도
+각각 반대 경로 counterfactual보다 중앙값 기준 78.04%, 25.90% 빨랐습니다.
+실패한 부분은 route 선택 자체가 아니라, 두 경로가 결국 같은 decoder로
+합류하는 상황에서 median 이득과 TPOT/worst-tail isolation을 함께 만드는
+것이었습니다.
 
 ## 한눈에 보는 결과
 
 - 환경: Perlmutter A100 4노드, Qwen2.5-7B, 실제 vLLM TP4 P/D 2 replicas
 - 비교군: always-local, official LMCache always-remote, predictor, full TEMPO
-- 측정: 한 live server epoch에서 동일한 48개 요청을 arm별 paired 비교
-- TEMPO E2E delta 중앙값: **-209.356 ms** vs official LMCache
-- TEMPO E2E 승리: **45/48 (93.75%)**
-- 최악 E2E 회귀: **+79.562 ms** — 사전 guardrail 100 ms 이내
-- stream·route·KV geometry·output 검증: **전부 통과**
+- workload: C0 cool, C1 decoder-hot, cold C2 remote-hot, KV C2 remote-hot,
+  C3 both-hot, recovery; 두 counterbalanced replicate
+- Candidate C: 8개 block × 1,283개 요청 전부 유효, paired foreground 360개
+- exact output·stream·route·cache geometry·fallback·queue·credit 검증: 전부 통과
 
-```mermaid
-xychart-beta
-    title "E2E 중앙값 (ms, 낮을수록 좋음)"
-    x-axis ["Always-local", "LMCache", "Predictor", "TEMPO"]
-    y-axis "ms" 0 --> 2000
-    bar [1737.351, 1835.751, 1641.057, 1629.016]
-```
+| Candidate | 핵심 신호 | fixed median | predictor median | goodput | paired win | TPOT p99 | worst regression |
+|---|---|---:|---:|---:|---:|---:|---:|
+| A | instant scalar score | -2.92% | +3.48% | +10.17% | 68.89% | +44.53% | +2506.4 ms |
+| B | active-request watermark epoch | +7.10% | +17.46% | +7.67% | 76.11% | +64.28% | +997.9 ms |
+| C | route-pinned local-credit epoch | +7.92% | +21.30% | +4.58% | 75.56% | +49.41% | +2278.7 ms |
 
-| Arm | E2E 중앙값 (ms) | TTFT 중앙값 (ms) | TPOT 중앙값 (ms) | 요청별 TPOT-max 최댓값 (ms) |
-|---|---:|---:|---:|---:|
-| Always-local | 1737.351 | 84.000 | 22.483 | 94.509 |
-| Official LMCache always-remote | 1835.751 | 82.555 | 22.087 | 764.046 |
-| Predictor | 1641.057 | 80.861 | 21.916 | 548.637 |
-| **Full TEMPO** | **1629.016** | **79.183** | **21.789** | **531.945** |
+세 candidate 모두 10% fixed-median gate와 tail bundle을 동시에 통과한 횟수가
+0회입니다. hidden phase label을 허용한 진단용 oracle도 세 trace 모두 full
+gate에 실패했으므로 threshold를 다시 미세 조정하지 않습니다.
 
-```mermaid
-pie showData
-    title TEMPO vs official LMCache 요청별 E2E
-    "TEMPO 승리" : 45
-    "LMCache 승리" : 3
-```
-
-`-209.356 ms`는 요청별 `TEMPO - LMCache` delta의 중앙값입니다. arm별
-중앙값의 단순 차이인 `1629.016 - 1835.751 = -206.736 ms`와는 다른
-통계량입니다.
+- [최종 표와 판정](paper/tempo_pd_c4_negative_report_v1/negative_conclusion_report.md)
+- [Candidate C pooled E2E/TTFT/TPOT/goodput](paper/tempo_pd_c4_negative_report_v1/candidate_c_pooled_metrics.svg)
+- [Candidate C workload별 E2E/TTFT/TPOT/goodput](paper/tempo_pd_c4_negative_report_v1/candidate_c_phase_metrics.svg)
 
 ## 구현 구조
 
@@ -85,7 +86,8 @@ v449는 첫 streamed response chunk에서 credit을 반환합니다. 즉 credit�
 표현하는 prefill 또는 remote handoff 단계가 끝나는 시점과 lease lifetime을
 맞춥니다.
 
-48/48 TEMPO 요청에서 다음 lifecycle이 검증됐습니다.
+초기 v449의 48/48 TEMPO 요청에서 다음 lifecycle이 검증됐고, C4에서도 같은
+one-way/release invariant가 유지됐습니다.
 
 ```text
 route commit → upstream start → first response chunk / credit release
@@ -105,10 +107,11 @@ Arrival-gap window로 `remote_stable`과 `deflect_active` regime을 구분하며
 
 Controller는 `P_ONLY`, `D_ONLY`, `BOTH`, `confirmed_miss`를 구분합니다.
 검증되지 않은 cache hint는 hit로 간주하지 않고 `confirmed_miss`로
-처리합니다. 이번 GPU workload는 first-chunk marker를 요청별로 분리한 cold
-screen이므로 cache-hit 성능을 주장하지 않습니다.
+처리합니다. 초기 v449는 cold screen이었고, 현재 C4는 MISS/P_ONLY/D_ONLY/BOTH
+geometry를 route별 local/external cached-token proof로 검증합니다. 이 범위를
+넘는 cache-hit 일반화는 주장하지 않습니다.
 
-## v446에서 v449까지: 실험으로 찾은 핵심 수정
+## v446에서 v449까지: 보존된 historical mechanism evidence
 
 v446은 중앙값과 승률은 좋았지만 최악 E2E 회귀가 guardrail을 넘었습니다.
 Local credit을 1개로 줄인 v447은 phase lifetime 오류를 드러냈고, v449가
@@ -131,55 +134,87 @@ xychart-beta
 
 이 결과는 “budget을 크게 잡으면 된다”가 아니라 admission credit의 자원
 단계와 반환 시점이 일치해야 한다는 점을 보여줍니다.
+이 48-request 결과는 현재 최종 performance claim이 아니며, 위 C4 A/B/C
+screen과 terminal negative verdict가 최신 결론입니다.
 
 ## 검증 범위
 
-최종 CPU 감사에서는 controller, cache-residency policy, exact profile,
-one-way router lifecycle, cache isolation, weighted credit, strengthened
-analyzer를 포함한 **21/21 테스트**가 통과했습니다.
+최종 감사에서는 endpoint profile/service, endpoint probe, C4 node/client,
+semantic profile builder, router, semantic analyzer, negative analyzer,
+report renderer를 포함한 **89 tests + 11 subtests**가 통과했습니다. 테스트,
+artifact 분석, plot 생성도 로그인 노드가 아니라 유지 중인 4노드 GPU
+interactive allocation의 compute node에서 실행했습니다.
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 .vllm_venv/bin/python -m unittest -v \
-  tempo.test_pd_elastic_controller_v443 \
-  tempo.test_pd_elastic_cache_residency_v450 \
-  tempo.test_pd_elastic_profile_v444 \
-  eval.sota_4node.test_tempo_pd_elastic_router_v445 \
-  eval.sota_4node.test_tempo_pd_elastic_router_v449 \
-  eval.sota_4node.test_tempo_pd_elastic_cache_isolation_v446 \
-  eval.sota_4node.test_tempo_pd_elastic_weighted_local_v447 \
-  eval.sota_4node.test_analyze_tempo_pd_elastic_balanced_v450
+.vllm_venv/bin/python -m pytest -q \
+  tempo/test_pd_endpoint_profile.py \
+  eval/sota_4node/test_build_tempo_pd_endpoint_service_profile.py \
+  eval/sota_4node/test_tempo_pd_endpoint_probe.py \
+  eval/sota_4node/test_vllm_lmcache_pd_c4_phase_screen_node.py \
+  eval/sota_4node/test_build_tempo_pd_semantic_epoch_endpoint_profile.py \
+  eval/sota_4node/test_tempo_pd_endpoint_feedback_router.py \
+  eval/sota_4node/test_tempo_pd_elastic_router.py \
+  eval/sota_4node/test_analyze_tempo_pd_c4_semantic_epoch_screen.py \
+  eval/sota_4node/test_run_tempo_pd_c4_phase_screen_client.py \
+  eval/sota_4node/test_analyze_tempo_pd_c4_negative_conclusion.py \
+  eval/sota_4node/test_render_tempo_pd_c4_negative_report.py
 ```
 
-GPU 실험은 `run_tempo_pd_elastic_v449_in_allocation.sh`로 수행했으며,
-Perlmutter에서는 반드시 `NERSC_AGENT_SAFETY.md`를 먼저 읽고 명시적으로
-승인된 기존 allocation 안에서만 실행해야 합니다.
+Perlmutter GPU 실험은 계속 4노드×4시간 interactive allocation 안에서만
+수행합니다. 로그인 노드는 bounded source edit와 가벼운 상태 확인에만
+사용합니다.
 
 ## 증거와 claim boundary
 
 Authoritative local artifacts:
 
-- profile: `eval/sota_4node/real_tempo_pd_elastic_profile_v447.json`
-- result: `results/tempo_elastic_pd_v449_job_57086357/elastic_pd_final_v450.json`
-- compact evidence: `eval/sota_4node/TEMPO_ELASTIC_PD_V449_EVIDENCE.md`
+- Candidate C frozen profile:
+  `eval/sota_4node/real_tempo_pd_endpoint_service_profile_c4_semantic_credit_epoch_v2.json`
+- LMCache runtime delta and verifier:
+  `eval/sota_4node/lmcache_tempo_c4_runtime.patch`,
+  `eval/sota_4node/apply_tempo_pd_c4_lmcache_patch.sh`
+- Candidate C contract:
+  `eval/sota_4node/tempo_pd_c4_semantic_credit_epoch_candidate_v7_contract.json`
+- live result and phase analysis:
+  `results/tempo_pd_c4_semantic_credit_epoch_candidate_v7_job_57362947/`
+- terminal SHA-bound verdict:
+  `paper/tempo_pd_c4_negative_report_v1/negative_conclusion_analysis_v2.json`
+- local tables/plots and manifest: `negative_report_v3/`
+- Git compact tables/plots:
+  `paper/tempo_pd_c4_negative_report_v1/`
+- full lineage/prior-work/claim audit:
+  `paper/TEMPO_ELASTIC_PD_CONTENTION_AUDIT.md`
 
 현재 허용되는 주장은 다음과 같습니다.
 
-> Perlmutter A100 4노드, Qwen2.5-7B, 실제 vLLM TP4 P/D 2-replica,
-> frozen confirmed-miss workload에서 TEMPO ingress admission policy가 동일
-> 요청·KV geometry·GPU budget의 official LMCache always-remote arm보다 낮은
-> paired E2E를 보였고, exact output과 사전 tail guardrail을 만족했다.
+> Perlmutter A100 4노드의 실제 vLLM P/D와 unchanged official
+> `LMCacheConnectorV1:UCX` data plane에서, frozen C4 dynamic-contention
+> workload에 적용한 세 개의 request-level TEMPO admission/routing
+> candidate가 correctness와 양 route의 유용성은 입증했지만 원래의
+> median+tail gate를 동시에 만족하지 못했다.
 
-다음은 아직 증명하지 않았습니다.
+다음은 주장하지 않습니다.
 
-- 독립 allocation 재현성
-- 실제 cache-hit workload 성능
 - 다른 모델·context·topology로의 일반화
-- 새로운 transport 또는 LMCache 자체 data plane보다 빠르다는 주장
+- LMCache transport 또는 remote 경로의 보편적 열위
+- 정확한 Slingshot switch-level bottleneck 위치
 - Mooncake와의 apples-to-apples 비교
-- 보편적 SOTA 또는 “항상 더 빠르다”는 주장
+- production readiness, production-scale novelty, 보편적 SOTA
+- 모든 cluster orchestration이 답이 없다는 주장
 
-따라서 이 저장소는 검증된 Elastic-PD 연구 프로토타입이지 production-ready
-router나 보편적 최고 성능 시스템이 아닙니다.
+Production/HPC-scale 후속 연구를 한다면 decoder admission, tenant
+fairness/SLO, P/D pair dispatch, replica organization/scaling, endpoint
+recovery를 함께 다뤄야 합니다. 이는 현재 route-only 목표의 threshold를 더
+튜닝하는 것이 아니라 별도 preregistration이 필요한 새 연구 문제입니다.
+
+Frozen LMCache runtime은 upstream commit
+`227d13f5c9fdb52ddb933641d34331f678de03a0` checkout에 다음 명령으로
+복원합니다. Script는 patch 적용 전 HEAD를, 적용 후 여섯 runtime 파일의
+SHA-256을 fail-closed로 확인합니다.
+
+```bash
+bash eval/sota_4node/apply_tempo_pd_c4_lmcache_patch.sh
+```
 
 ## 저장소 구성
 

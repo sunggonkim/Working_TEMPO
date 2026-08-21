@@ -1,0 +1,38 @@
+{
+  "endpoint_service_profile": {
+    "fingerprint_sha256": "45dca4ccc938f05f44abb53d8573d2d6831e340df5520a17c1afc21715316210",
+    "path": "eval/sota_4node/real_tempo_pd_endpoint_service_profile_c4_screen_v1.json",
+    "sha256": "aa0eb9019ca6fd802901d6b8d0107dd165145c2230cfd3db03ca065c04205bcf"
+  },
+  "elastic_profile": {
+    "fingerprint_sha256": "7b161a59723c2b358e602fcce569b4e3c85d4677c1b9fce144bed6f6d548a8a3",
+    "path": "results/tempo_elastic_pd_canonical_discovery_57133688/profiles/real_tempo_pd_elastic_profile_run17_v452.json",
+    "sha256": "db65320aa1bbb7c1e095c0d7a4312749327dafbffd904009d83355aa80231a2d"
+  },
+  "offline_replay": {
+    "live_c4_screen_authorized": true,
+    "path": "results/tempo_pd_c4_endpoint_replay_v1_job_57343718.json",
+    "schema": "tempo-pd-endpoint-controller-replay-v1",
+    "sha256": "df39e54eb4d6738c6b33dacb678a6f73cbf6ecd15dc1bb0c424f218090a160a2"
+  },
+  "performance_claim_allowed": false,
+  "phase_manifest": {
+    "path": "eval/sota_4node/tempo_pd_c4_phase_screen_manifest_v1.json",
+    "sha256": "c029e24a7cfea6cd567ffd89dc2b49b9822d92514341f73f04582f0f70aa7544"
+  },
+  "physical_switch_bottleneck_claim_allowed": false,
+  "purpose": "bind the calibration-only C4 live screen without a circular manifest/profile digest",
+  "schema": "tempo-pd-c4-phase-screen-run-contract-v1",
+  "slurm": {
+    "gpus": 16,
+    "interactive_time_limit": "04:00:00",
+    "nodes": 4,
+    "perlmutter_only": true
+  },
+  "source_workload": {
+    "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+    "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+  },
+  "transport": "LMCacheConnectorV1:UCX",
+  "unchanged_pd_data_plane": true
+}

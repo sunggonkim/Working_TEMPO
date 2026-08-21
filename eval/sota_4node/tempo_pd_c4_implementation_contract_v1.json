@@ -1,0 +1,323 @@
+{
+  "environment_versions": {
+    "lmcache": "0.1.dev1",
+    "python": "3.12.11",
+    "torch": "2.11.0+cu129",
+    "transformers": "5.15.0",
+    "vllm": "0.26.0+cu129"
+  },
+  "files": [
+    {
+      "path": "eval/sota_4node/build_tempo_pd_c4_phase_manifest.py",
+      "sha256": "918dcd42054b5b4020748104769e24baee6acb7cd661550cb3e89da3bc81c17c"
+    },
+    {
+      "path": "eval/sota_4node/c4_fixed_phase_pd_node_entry.sh",
+      "sha256": "601202d81495d90a9bfab098cc1a8e8fcd9e4c3e0faf565b0392651efc22a259"
+    },
+    {
+      "path": "eval/sota_4node/require_perlmutter_4node_4h_interactive.sh",
+      "sha256": "9ffa7c8d617c26ac40de6665d89514e924edd3ce99afe4a513afb434e107b5d8"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_fixed_phase_client.py",
+      "sha256": "b3a1eb03ec0eb40f65b229bb8ab023bcf5cb1bf9a9290b9104e249a78457b836"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_fixed_phase_in_allocation.sh",
+      "sha256": "7482f2bef210dcc8aae1992bd3a1d7f3dc6366a4620223128fa903534bc346fb"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_contention_fixed_client.py",
+      "sha256": "0a8d933d8fa91770d681e79c6081daea4d2d6a72c5f9812276761a4952c0c3fc"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_elastic_stream_metrics.py",
+      "sha256": "62e1ae205b1672d209140a5012a1a2531570101ffc808efd71d2fa997fa161b8"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_elastic_stream_metrics_cache_protocol.py",
+      "sha256": "f049124aa2264a94e76cd95222f031cb2c53f8792df1fbdd27241ba157d839e8"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_elastic_stream_metrics_v445.py",
+      "sha256": "cb213f50bb5009713e232664a3898a6849f55c174ee5b79f3f71065a1f5794ce"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_balanced_client_v70.py",
+      "sha256": "f929343f9fe9a8c6e5dd4072fa07d06b6d7fa6cdf9a4b118a78a88a426a2a516"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_cache_catalog_client_v136.py",
+      "sha256": "d7186985ccf8e2e7486f49a321778119d71c631c26ef919f270bdac62163ff9a"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_cache_catalog_client_v159.py",
+      "sha256": "d071f5da473368beb311fcd7afdb2f2a0b4522741cec027762bc4b5557178768"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_cache_catalog_client_v163.py",
+      "sha256": "483b328eaeeef8ee42af818119cedfc1ae0ce3774db6e65d89bc76b6fc677253"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_hybrid_phase_client_serial_lm_warm_v230.py",
+      "sha256": "0ddb3e3fc0c4caab0f4c8650cc753f383cd8badce7c79df2204f7d83ca42b171"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_hybrid_phase_client_v182.py",
+      "sha256": "f012fff8b5edba149124028c7c50430313ca6e5ac5c230ca249dda6d815fca93"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_mixed_crossover_client_v260.py",
+      "sha256": "0c272ac5a87d0c724dbfefdc7dac486f511cf711d3c52cad2257c6494c5d2334"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_mixed_only_client_unique_chunks_v305.py",
+      "sha256": "515dd78649fe3c3403ad5853ae99267aabd1d2034958cc53eb5f6e66951ac202"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_mixed_only_client_unique_chunks_v308.py",
+      "sha256": "fdaac6b36492d7dc91c79d2afca740de837ba7586a253a14a129d346c46cff54"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_mixed_only_client_v265.py",
+      "sha256": "aa033741501e84b8068a83bc1bbdb1cb8baef7e296d57887b575db16f350e00e"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_same_server_warm_reuse_client_v131.py",
+      "sha256": "297f4c6377dd0f83a02810d5a4737ce4fbe4ed4dcd8e97451ddc9140a4d59718"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_stream_metrics_forced_v32.py",
+      "sha256": "c0fe6eea66702def5e3e75885dd07000aff7b23c45cffba6d1d5ee091b5aff90"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_stream_metrics_v1.py",
+      "sha256": "1c23ab18b9b3395ba33e899a2f7eb0bd81c2a7c22187a170ff31b48a1b61857b"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_stream_metrics_v3.py",
+      "sha256": "0c23eb120b9d461840917825d7bc06e69bc0b737a6f1786f3098f0c7d961bb39"
+    },
+    {
+      "path": "eval/sota_4node/run_vllm_stream_metrics.py",
+      "sha256": "efb0102dc4a88745bb57f07f54d2c498e973076b146a00484a4c335d79c52be9"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_cache_reuse.py",
+      "sha256": "1f809da2f26f89acf3272d314341539f7bccd8269ae949a9445f394742bf23b5"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_decoder_selecting_proxy.py",
+      "sha256": "b0c7f8c6cf8db8c919e4ce43f4b1c98b0989e0f4d0dbb377da14e2026ec85816"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_elastic_frontend.py",
+      "sha256": "5753275acff4947e6d395c9c7136b7b9f5730712abb2a0e153520edc847a7a96"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_elastic_router.py",
+      "sha256": "d77bce03c39728f7d061bc1b1e60b70e23c7b58001f4657752bf39f3f55856b8"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_elastic_router_v444.py",
+      "sha256": "dba1ddd44b4d297088d9cdd193db0cfd20451bd0d854c8ac4feccb52bc6486a1"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_elastic_router_v445.py",
+      "sha256": "95084148100c3b6917b2379f484065e4c376cda8e6cba2c676e60a83f9eac1ae"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_elastic_router_v448.py",
+      "sha256": "d69155022015caeecad96025ab682c6e436025e1b57213a0f0054a217aef840c"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_endpoint_probe.py",
+      "sha256": "bc4301757de8464989609db710cb15585ccabc96c75ae6bbd686985c0a152628"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_frontend_v1.py",
+      "sha256": "9796823fcd178318ebea0b1d2523dac37bbee20bb09eba714c52feb45a67bb4f"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_proxy_cache_control.py",
+      "sha256": "41df2c2d47d3c6230b86b5330ddb6c7b66f1a7c90767ce81cd3a2993e03278ee"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_router_v1.py",
+      "sha256": "00b1e99b308fe207a15b940596005ac768baa999d24d78943294c5704b1b45b5"
+    },
+    {
+      "path": "eval/sota_4node/verify_tempo_pd_c4_implementation.py",
+      "sha256": "d8c1c23a18ce0ee748ddb623bfbb4584a36c850df735676c6a67ae25d3d8f14e"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_capacity_candidate_node_v13.py",
+      "sha256": "f3850cebc72cf47ba3935646eadea2c2edaf7a4c1fec9f5c1d9e62112d86a423"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_chunk256_node_v7.py",
+      "sha256": "72eadb42a13effcefe457f4f0c3f6e313473369b010283dbbfac46901ce05544"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_elastic_pd_node.py",
+      "sha256": "7ae7716417264f4884e4f835e544a944351bda35b68184605b88de8e6c3146a4"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_elastic_pd_node_v445.py",
+      "sha256": "ef1b96b6a1fc6eb2bd21f8945e6b2ebcb3f89a919ef507f4aae7df511a19c1c5"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_elastic_pd_node_v446.py",
+      "sha256": "4352207b6428235459220d8104c77919040c6f8690e7b03157077583b3a1ad07"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_elastic_pd_node_v447.py",
+      "sha256": "50f5fd024a78c719eae235920da1e5babf8b81c3f8be1cb207614fe27c62045d"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_elastic_pd_node_v449.py",
+      "sha256": "fb1b4d3047da3492b06b78c5d776d405e2b2eafeebaabbabb66a64452ef4e582"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_live_pd_node_v1.py",
+      "sha256": "46b3e2208ccfb8656fd33bcd824bc138d05622f9b19ddebaec5b18be78c86835"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_live_pd_node_v2.py",
+      "sha256": "9117fcaf47dd9f21237f601629ce56d51d61d7c21b3f012f6ad471adfaf5b44e"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_nixl_hotpath_snapshot_node_v2.py",
+      "sha256": "3eecc951a427fb72f2826f7072a16827cb72ed76413c0c82cb270c157abec6d1"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_pd_c4_fixed_phase_node.py",
+      "sha256": "e53fa4fb8947806cebfd14b8b8a56fb2f7992882374d5d0813ff1233f8ff89e1"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_pd_contention_node.py",
+      "sha256": "612e901f5f833ad64f7f90d0a48cdc5a606e929a4ee6047bc018f7052369673c"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_tempo_pd_perf_node_v1.py",
+      "sha256": "6c31374723449b451142bc9b6ac41f66746723f6ce9898de63edbced054196b9"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_tempo_pd_perf_node_v2.py",
+      "sha256": "0415bcba0d4a528a2f5b918b11fda94026ee855199aee23f6b6fbc691704dea3"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_tempo_pd_perf_node_v4.py",
+      "sha256": "990ef6f1ceeb4a170ce586f64020f2a5a6154375c8bbd9a158c70f2fb9ae0e13"
+    },
+    {
+      "path": "eval/sota_4node/vllm_tempo_cache_control.py",
+      "sha256": "250086816d2f53e2a08bf24082d7a48b8dff258c5ddd5501b56fe23082078834"
+    },
+    {
+      "path": "tempo/cassini_endpoint.py",
+      "sha256": "9af976aebaeda7549a50a8d045393eeee93ca0380d2e77b8c848f59feedc8176"
+    },
+    {
+      "path": "tempo/cassini_pressure.py",
+      "sha256": "8b5f41ee37899ccacfc5e501324d646c7cde2ea5b98720a7d6472366e92700aa"
+    },
+    {
+      "path": "tempo/domain_evidence.py",
+      "sha256": "f7fe04bf8956ec7f3bf3e7b0b493e6aa057f09a7eedf3b2fbd2ad4f2b33b6327"
+    },
+    {
+      "path": "tempo/pd_admission.py",
+      "sha256": "461233142d313477a5353e7d5e12cfd6db48a6b3f8ebac5ecc8c9dfebf4299dd"
+    },
+    {
+      "path": "tempo/pd_cache_state_protocol.py",
+      "sha256": "06bee2fc5ebcbb8f6cf6497de4ed2037322ebd673ad4a845a2ac7c6dbe6d1034"
+    },
+    {
+      "path": "tempo/pd_contention_workload.py",
+      "sha256": "3473b59f1375b4f3720f52ad8716f1741468a903430289c7fd572e2203a778f0"
+    },
+    {
+      "path": "tempo/pd_decoder_cache_evidence.py",
+      "sha256": "acf8ccbd75a4d486f7355273762168d869f2efec827e64f2f56bcc65e0765652"
+    },
+    {
+      "path": "tempo/pd_elastic_controller.py",
+      "sha256": "4943f9549824a9aca18da526f2b1e14de62f404c1cc47cf0d5b48ce0fb4ee607"
+    },
+    {
+      "path": "tempo/pd_elastic_controller_v442.py",
+      "sha256": "08560fe058cf1eed1f670b79e1ed890eaee5991d5d192d07b3db57c3ac46652b"
+    },
+    {
+      "path": "tempo/pd_elastic_controller_v443.py",
+      "sha256": "7824355e511c17b13e1936ae4646a24cf48c31c1840496d4173ac7c2eea85345"
+    },
+    {
+      "path": "tempo/pd_elastic_profile.py",
+      "sha256": "27ed6bb8fe31b71df85305e8e26867bf31956b7565a170b46cb474474c8feac2"
+    },
+    {
+      "path": "tempo/pd_elastic_profile_v444.py",
+      "sha256": "4d25c796bc88b26d76659266c56d35b836a7ace294228ceff1aa78c90184d8a3"
+    },
+    {
+      "path": "tempo/pd_endpoint_controller.py",
+      "sha256": "ea62e40f64387b53e001bf2370b4046ecfcec31ab2bddc79fd30710d45df73b3"
+    },
+    {
+      "path": "tempo/pd_endpoint_evidence.py",
+      "sha256": "5b0f59698dd55feee5963208191e4678ee91e28b8d7801e98e9ec5120c49b65e"
+    },
+    {
+      "path": "tempo/pd_endpoint_profile.py",
+      "sha256": "68bd0d50ef0cfa5a3d14d3dd7cdf0798a5ea517d7e60d4e8be4518d0c730a66e"
+    },
+    {
+      "path": "tempo/pd_policy_manifest.py",
+      "sha256": "67adcd55ab06e71a83d6f98ea784238d2121593d92eae4ea7a3a8337ca0fc7fc"
+    },
+    {
+      "path": "tempo/resource_domain.py",
+      "sha256": "1e37eb6b7d2af2096765f5065ef55052afab71f2aa12e3abc46aec5a62ee56bf"
+    },
+    {
+      "path": "third_party/lmcache/examples/disagg_prefill/disagg_proxy_server.py",
+      "sha256": "7750b8d2d13474db0f6b5c5eb8920c21556fa936d33d3b4f01cacfa448289988"
+    },
+    {
+      "path": "third_party/lmcache/lmcache/integration/vllm/vllm_v1_adapter.py",
+      "sha256": "3ade8f5731735331f87ea20f2cf1d111f34e9d45f94fd77fc47b02dd4dc742fb"
+    },
+    {
+      "path": "third_party/lmcache/lmcache/v1/cache_engine.py",
+      "sha256": "550f2799ad2322ef6a493ccb0625e05f2e64c36e72de0ed544891b68ff53aa93"
+    },
+    {
+      "path": "third_party/lmcache/lmcache/v1/storage_backend/pd_backend_async.py",
+      "sha256": "54cd9db454bf5f05624985a09a20015856cb93516af1d0133f8f83ed0ea445bb"
+    },
+    {
+      "path": "third_party/lmcache/lmcache/v1/transfer_channel/tempo_nixl_hotpath.py",
+      "sha256": "38191b278510cc4357dc04aba54a2a31c9e4eebe94156a016c0ceedd12bd1f7f"
+    },
+    {
+      "path": "third_party/lmcache/lmcache/v1/transfer_channel/tempo_nixl_hotpath_v2.py",
+      "sha256": "46c8fb90d71aa494b675f93b1185a0659119eb234f75bc5954fdccdeaf1ce0d4"
+    }
+  ],
+  "fingerprint_sha256": "f62bf421d6a60a218d18ea02a7b0bf8bc7737954b656a64c60c77c32f0b4eec0",
+  "git_heads": {
+    "repository": "3894bd1f6c91d0498a970575dbbad988ce003c46",
+    "third_party_lmcache": "227d13f5c9fdb52ddb933641d34331f678de03a0"
+  },
+  "performance_claim_allowed": false,
+  "phase_manifest": {
+    "path": "eval/sota_4node/tempo_pd_c4_phase_manifest_v2.json",
+    "sha256": "780d365f1f58a7953c4a7b344fd0e9e9410afa656d56f5173131afa78455afb7"
+  },
+  "purpose": "frozen C4 characterization only",
+  "schema": "tempo-pd-c4-implementation-contract-v1"
+}

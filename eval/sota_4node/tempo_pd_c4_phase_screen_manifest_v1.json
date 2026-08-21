@@ -1,0 +1,98 @@
+{
+  "arm_order_by_replicate": [
+    [
+      "local",
+      "remote",
+      "predictor",
+      "tempo"
+    ],
+    [
+      "tempo",
+      "predictor",
+      "remote",
+      "local"
+    ]
+  ],
+  "calibration_parents": {
+    "c3_gate": {
+      "path": "results/tempo_pd_coupled_abba_v5_job_57343718/c3_abba_gate_v1.json",
+      "sha256": "560233e9e227377565a794ca875f8b51e9f0080bcb510eade348c82ff5ab2460"
+    },
+    "c3_raw": {
+      "path": "results/tempo_pd_coupled_abba_v5_job_57343718/tempo_pd_kv_only_attribution/raw.json",
+      "sha256": "ef55b567525938bcdceb592bed00bcbbe50a4bb30e2b65a66017b42fd85e2eda"
+    },
+    "elastic_profile": {
+      "fingerprint_sha256": "7b161a59723c2b358e602fcce569b4e3c85d4677c1b9fce144bed6f6d548a8a3",
+      "path": "results/tempo_elastic_pd_canonical_discovery_57133688/profiles/real_tempo_pd_elastic_profile_run17_v452.json",
+      "sha256": "db65320aa1bbb7c1e095c0d7a4312749327dafbffd904009d83355aa80231a2d"
+    },
+    "endpoint_service_raw": [
+      {
+        "path": "results/tempo_elastic_pd_canonical_discovery_57133688/run17_full_p_only/tempo_elastic_pd_v445/elastic_balanced_measured/00_local_r0.raw.json",
+        "sha256": "4afab5684a4a5708700384a6b751d4ed5743237a389eb86d6f54b5db665ceeae"
+      },
+      {
+        "path": "results/tempo_elastic_pd_canonical_discovery_57133688/run17_full_p_only/tempo_elastic_pd_v445/elastic_balanced_measured/01_remote_r0.raw.json",
+        "sha256": "296989ab254e173471401f4f7dbe8625cda169e88b7c615c3044d5106e61fdfb"
+      },
+      {
+        "path": "results/tempo_elastic_pd_canonical_discovery_57133688/run17_full_p_only/tempo_elastic_pd_v445/elastic_balanced_measured/06_remote_r1.raw.json",
+        "sha256": "4d1ab492d8c13a395fee8878cbb25a138f0b145591d6dd56cc91499a8a99a15a"
+      },
+      {
+        "path": "results/tempo_elastic_pd_canonical_discovery_57133688/run17_full_p_only/tempo_elastic_pd_v445/elastic_balanced_measured/07_local_r1.raw.json",
+        "sha256": "0f6a7d1025caa22966a58ce38de0b002a617e30e573a4339424e16dd72c37e30"
+      }
+    ]
+  },
+  "controller_profile_scope": "calibration_only",
+  "cooldown_s": 2,
+  "foreground": {
+    "cache_state": "prefill_only",
+    "geometries": [
+      {
+        "output_tokens": 16,
+        "prompt_tokens": 512
+      },
+      {
+        "output_tokens": 256,
+        "prompt_tokens": 2048
+      },
+      {
+        "output_tokens": 16,
+        "prompt_tokens": 4094
+      }
+    ],
+    "offered_rate_per_s": 2
+  },
+  "load": {
+    "decoder_hot_rate_per_s": 22.4,
+    "kv_remote_hot_rate_per_s": 12,
+    "remote_hot_rate_per_s": 4.76
+  },
+  "measurement": {
+    "e2e_slo_ms": 16000,
+    "max_workers": 128,
+    "phase_duration_ms": 15000,
+    "repetitions": 2,
+    "tpot_slo_ms": 250,
+    "ttft_slo_ms": 3000
+  },
+  "passive_background_feedback": false,
+  "performance_claim_allowed": false,
+  "phase_order": [
+    "c0_cool",
+    "c1_decoder_hot",
+    "c2_remote_hot",
+    "c2_kv_remote_hot",
+    "c3_both_hot",
+    "recovery"
+  ],
+  "physical_switch_bottleneck_claim_allowed": false,
+  "purpose": "controller calibration screen and route-counterfactual collection",
+  "schema": "tempo-pd-c4-phase-screen-manifest-v1",
+  "synthetic_network_background": false,
+  "transport": "LMCacheConnectorV1:UCX",
+  "unchanged_pd_data_plane": true
+}

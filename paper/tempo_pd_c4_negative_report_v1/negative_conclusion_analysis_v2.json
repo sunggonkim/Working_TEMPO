@@ -1,0 +1,185 @@
+{
+  "analyzer": "/pscratch/sd/s/sgkim/Skim-Tempo/eval/sota_4node/analyze_tempo_pd_c4_negative_conclusion.py",
+  "analyzer_sha256": "e910083f70e4d0348fb3bda467eb98da11e92dfddad3c0e382b9ce560b0d5596",
+  "candidate_c_semantic_analysis": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_pd_c4_semantic_credit_epoch_candidate_v7_job_57362947/semantic_epoch_analysis.json",
+  "candidate_c_semantic_analysis_sha256": "280fb6f59dafd18a94a08a7bacdbbc85bc505878b87f5b221006eb888be98d76",
+  "candidates": [
+    {
+      "all_original_gates_pass": false,
+      "analysis": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_pd_c4_phase_screen_v1_retry7_job_57352661/analysis_v2.json",
+      "analysis_sha256": "ca8823998192c7c7e68fe417cc7ba03e8aaa825894cd6fd3d6a799cbf1175f8c",
+      "diagnostic_phase_oracle": {
+        "goodput_gain_vs_fixed": 0.07457627118644068,
+        "median_gain_vs_fixed": 0.1454745493803188,
+        "paired_win_fraction_vs_fixed": 0.7111111111111111,
+        "tpot_p99_regression_vs_fixed": 0.4730596453090976,
+        "worst_paired_e2e_regression_ms": 4168.761129
+      },
+      "diagnostic_phase_oracle_full_gate_pass": false,
+      "e2e_median_gain_vs_fixed": -0.029185050019974963,
+      "e2e_median_gain_vs_predictor": 0.03483540032440019,
+      "goodput_gain_vs_fixed": 0.10169491525423734,
+      "label": "A",
+      "mechanism": "instant_score_v1",
+      "median_10pct_pass": false,
+      "paired_win_fraction_vs_fixed": 0.6888888888888889,
+      "predictor_5pct_pass": false,
+      "predictor_e2e_median_ms": 2422.452253,
+      "selected_local_counterfactual_gain": 0.08303400316091343,
+      "selected_remote_counterfactual_gain": -1.9423995409468535,
+      "slurm_job_id": "57352661",
+      "strongest_fixed_arm": "remote",
+      "strongest_fixed_e2e_median_ms": 2271.763624,
+      "tail_bundle_pass": false,
+      "tempo_e2e_median_ms": 2338.0651589999998,
+      "tpot_p99_regression_vs_fixed": 0.44534251480004117,
+      "worst_paired_e2e_regression_ms": 2506.369135000001
+    },
+    {
+      "all_original_gates_pass": false,
+      "analysis": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_pd_c4_semantic_epoch_candidate_v6_job_57362947/phase_screen_analysis.json",
+      "analysis_sha256": "7f0119b4618fe1efeea60b644c5ceb54739c4b9f14af658566715f313b5ce3fd",
+      "diagnostic_phase_oracle": {
+        "goodput_gain_vs_fixed": 0.056666666666666594,
+        "median_gain_vs_fixed": 0.12075294512056732,
+        "paired_win_fraction_vs_fixed": 0.725,
+        "tpot_p99_regression_vs_fixed": 0.5277537811499948,
+        "worst_paired_e2e_regression_ms": 3732.252330999998
+      },
+      "diagnostic_phase_oracle_full_gate_pass": false,
+      "e2e_median_gain_vs_fixed": 0.07097720732176349,
+      "e2e_median_gain_vs_predictor": 0.1746340289339673,
+      "goodput_gain_vs_fixed": 0.07666666666666666,
+      "label": "B",
+      "mechanism": "frontend_active_watermark_epoch",
+      "median_10pct_pass": false,
+      "paired_win_fraction_vs_fixed": 0.7611111111111111,
+      "predictor_5pct_pass": true,
+      "predictor_e2e_median_ms": 2469.560189,
+      "selected_local_counterfactual_gain": 0.3212643903220057,
+      "selected_remote_counterfactual_gain": 0.27293478115186176,
+      "slurm_job_id": "57362947",
+      "strongest_fixed_arm": "remote",
+      "strongest_fixed_e2e_median_ms": 2194.0160775,
+      "tail_bundle_pass": false,
+      "tempo_e2e_median_ms": 2038.2909435000001,
+      "tpot_p99_regression_vs_fixed": 0.6427654348412686,
+      "worst_paired_e2e_regression_ms": 997.9364420000002
+    },
+    {
+      "all_original_gates_pass": false,
+      "analysis": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_pd_c4_semantic_credit_epoch_candidate_v7_job_57362947/phase_screen_analysis.json",
+      "analysis_sha256": "f5b9e8994d97974cddde1fc9529ee364f029278226f3fb3a5d1aa5d21374a773",
+      "diagnostic_phase_oracle": {
+        "goodput_gain_vs_fixed": 0.03267973856209152,
+        "median_gain_vs_fixed": 0.10679101347328171,
+        "paired_win_fraction_vs_fixed": 0.7111111111111111,
+        "tpot_p99_regression_vs_fixed": 0.545039731677535,
+        "worst_paired_e2e_regression_ms": 3940.786597999999
+      },
+      "diagnostic_phase_oracle_full_gate_pass": false,
+      "e2e_median_gain_vs_fixed": 0.07917637359702535,
+      "e2e_median_gain_vs_predictor": 0.2129698806503913,
+      "goodput_gain_vs_fixed": 0.045751633986928074,
+      "label": "C",
+      "mechanism": "local_external_endpoint_credit_epoch",
+      "median_10pct_pass": false,
+      "paired_win_fraction_vs_fixed": 0.7555555555555555,
+      "predictor_5pct_pass": true,
+      "predictor_e2e_median_ms": 2531.349315,
+      "selected_local_counterfactual_gain": 0.7803776275736016,
+      "selected_remote_counterfactual_gain": 0.2590473670042982,
+      "slurm_job_id": "57362947",
+      "strongest_fixed_arm": "remote",
+      "strongest_fixed_e2e_median_ms": 2163.5502135,
+      "tail_bundle_pass": false,
+      "tempo_e2e_median_ms": 1992.2481535000002,
+      "tpot_p99_regression_vs_fixed": 0.4941153012688897,
+      "worst_paired_e2e_regression_ms": 2278.7346560000005
+    }
+  ],
+  "conclusion_scope": "negative for dynamic contention admission/routing with unchanged vLLM/LMCache P/D data plane on the frozen four-node C4 workload; not a universal LMCache or orchestration result",
+  "performance_claim_allowed": false,
+  "physical_switch_bottleneck_claim_allowed": false,
+  "same_schedule_replica_noise": {
+    "by_arm": {
+      "local": {
+        "absolute_e2e_delta_max_ms": 9468.190695000001,
+        "absolute_e2e_delta_median_ms": 48.07569750000013,
+        "absolute_e2e_delta_p90_ms": 553.8175659999997,
+        "absolute_e2e_delta_p99_ms": 2657.8979540000005,
+        "pairs": 180,
+        "phase_absolute_e2e_delta_max_ms": {
+          "c0_cool": 225.5841270000019,
+          "c1_decoder_hot": 814.6114819999998,
+          "c2_kv_remote_hot": 9468.190695000001,
+          "c2_remote_hot": 1227.2380940000003,
+          "c3_both_hot": 2657.8979540000005,
+          "recovery": 117.14976600000045
+        }
+      },
+      "predictor": {
+        "absolute_e2e_delta_max_ms": 10482.493153,
+        "absolute_e2e_delta_median_ms": 99.5880259999999,
+        "absolute_e2e_delta_p90_ms": 861.7421989999993,
+        "absolute_e2e_delta_p99_ms": 2435.9999980000002,
+        "pairs": 180,
+        "phase_absolute_e2e_delta_max_ms": {
+          "c0_cool": 347.61211699999967,
+          "c1_decoder_hot": 867.0069799999992,
+          "c2_kv_remote_hot": 10482.493153,
+          "c2_remote_hot": 1779.8942079999997,
+          "c3_both_hot": 1492.855344999999,
+          "recovery": 1130.0424510000003
+        }
+      },
+      "remote": {
+        "absolute_e2e_delta_max_ms": 5555.715344999999,
+        "absolute_e2e_delta_median_ms": 95.42365249999989,
+        "absolute_e2e_delta_p90_ms": 941.0281260000002,
+        "absolute_e2e_delta_p99_ms": 3736.9335489999994,
+        "pairs": 180,
+        "phase_absolute_e2e_delta_max_ms": {
+          "c0_cool": 991.3927839999997,
+          "c1_decoder_hot": 525.9420389999996,
+          "c2_kv_remote_hot": 5555.715344999999,
+          "c2_remote_hot": 1502.6565879999998,
+          "c3_both_hot": 3412.685531000001,
+          "recovery": 3120.4012570000004
+        }
+      },
+      "tempo": {
+        "absolute_e2e_delta_max_ms": 6373.832589000001,
+        "absolute_e2e_delta_median_ms": 59.7425030000004,
+        "absolute_e2e_delta_p90_ms": 485.95031800000106,
+        "absolute_e2e_delta_p99_ms": 2097.2917749999997,
+        "pairs": 180,
+        "phase_absolute_e2e_delta_max_ms": {
+          "c0_cool": 102.358384,
+          "c1_decoder_hot": 448.3738830000002,
+          "c2_kv_remote_hot": 6373.832589000001,
+          "c2_remote_hot": 1441.4786940000004,
+          "c3_both_hot": 1714.897986,
+          "recovery": 786.7255429999996
+        }
+      }
+    },
+    "cross_replicate_clock_subtraction_used": false,
+    "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_pd_c4_semantic_credit_epoch_candidate_v7_job_57362947/tempo_pd_c4_phase_screen/raw.json",
+    "raw_sha256": "eb3d23121dccb5aaf346b45da8e81cb22ab76638c71398cbd7cfce8b814daf03",
+    "scope": "same arm and semantic schedule cell across the two counterbalanced internal replicates; diagnostic noise floor only"
+  },
+  "schema": "tempo-pd-c4-negative-conclusion-v1",
+  "stop_rule": {
+    "diagnostic_phase_oracle_full_gate_pass_count": 0,
+    "independent_candidate_mechanisms_exact": true,
+    "median_and_tail_cannot_be_jointly_met": true,
+    "median_and_tail_joint_pass_count": 0,
+    "predictor_5pct_failure_count": 1,
+    "reproducible_negative_conclusion_allowed": true,
+    "threshold_retuning_allowed": false,
+    "two_predictor_failures": false
+  },
+  "transport": "LMCacheConnectorV1:UCX",
+  "unchanged_pd_data_plane": true
+}

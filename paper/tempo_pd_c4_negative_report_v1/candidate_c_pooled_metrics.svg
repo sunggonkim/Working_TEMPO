@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="820" viewBox="0 0 1240 820">
+<style>
+text { font-family: DejaVu Sans, Arial, sans-serif; fill: #20242a; }
+.title { font-size: 22px; font-weight: 700; }
+.panel-title { font-size: 15px; font-weight: 700; }
+.tick,.category,.legend { font-size: 11px; }
+.value { font-size: 9px; font-weight: 600; }
+</style>
+<rect width="1240" height="820" fill="#f5f7fa"/>
+<text x="620.0" y="38" text-anchor="middle" class="title">Candidate C: pooled four-arm metrics</text>
+<g transform="translate(20,75)">
+<rect x="0" y="0" width="590" height="350" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="295.0" y="24" text-anchor="middle" class="panel-title">Pooled E2E median (ms)</text>
+<line x1="64" y1="292.00" x2="574" y2="292.00" stroke="#e8ebef"/>
+<text x="56" y="296.00" text-anchor="end" class="tick">0.0</text>
+<line x1="64" y1="229.00" x2="574" y2="229.00" stroke="#e8ebef"/>
+<text x="56" y="233.00" text-anchor="end" class="tick">749.8</text>
+<line x1="64" y1="166.00" x2="574" y2="166.00" stroke="#e8ebef"/>
+<text x="56" y="170.00" text-anchor="end" class="tick">1500</text>
+<line x1="64" y1="103.00" x2="574" y2="103.00" stroke="#e8ebef"/>
+<text x="56" y="107.00" text-anchor="end" class="tick">2249</text>
+<line x1="64" y1="40.00" x2="574" y2="40.00" stroke="#e8ebef"/>
+<text x="56" y="44.00" text-anchor="end" class="tick">2999</text>
+<rect x="81.85" y="78.44" width="20.70" height="213.56" fill="#4c78a8" rx="2"/>
+<text x="92.20" y="74.44" text-anchor="middle" class="value">2542</text>
+<text x="127.75" y="312" text-anchor="middle" class="category">LOCAL</text>
+<rect x="233.05" y="110.21" width="20.70" height="181.79" fill="#f58518" rx="2"/>
+<text x="243.40" y="106.21" text-anchor="middle" class="value">2164</text>
+<text x="255.25" y="312" text-anchor="middle" class="category">REMOTE</text>
+<rect x="384.25" y="79.31" width="20.70" height="212.69" fill="#72b7b2" rx="2"/>
+<text x="394.60" y="75.31" text-anchor="middle" class="value">2531</text>
+<text x="382.75" y="312" text-anchor="middle" class="category">PREDICTOR</text>
+<rect x="535.45" y="124.61" width="20.70" height="167.39" fill="#e45756" rx="2"/>
+<text x="545.80" y="120.61" text-anchor="middle" class="value">1992</text>
+<text x="510.25" y="312" text-anchor="middle" class="category">TEMPO</text>
+<rect x="64" y="329" width="10" height="10" fill="#4c78a8"/>
+<text x="78" y="338" class="legend">LOCAL</text>
+<rect x="129" y="329" width="10" height="10" fill="#f58518"/>
+<text x="143" y="338" class="legend">REMOTE</text>
+<rect x="201" y="329" width="10" height="10" fill="#72b7b2"/>
+<text x="215" y="338" class="legend">PREDICTOR</text>
+<rect x="294" y="329" width="10" height="10" fill="#e45756"/>
+<text x="308" y="338" class="legend">TEMPO</text>
+</g>
+<g transform="translate(630,75)">
+<rect x="0" y="0" width="590" height="350" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="295.0" y="24" text-anchor="middle" class="panel-title">Pooled TTFT median (ms)</text>
+<line x1="64" y1="292.00" x2="574" y2="292.00" stroke="#e8ebef"/>
+<text x="56" y="296.00" text-anchor="end" class="tick">0.0</text>
+<line x1="64" y1="229.00" x2="574" y2="229.00" stroke="#e8ebef"/>
+<text x="56" y="233.00" text-anchor="end" class="tick">79.4</text>
+<line x1="64" y1="166.00" x2="574" y2="166.00" stroke="#e8ebef"/>
+<text x="56" y="170.00" text-anchor="end" class="tick">158.9</text>
+<line x1="64" y1="103.00" x2="574" y2="103.00" stroke="#e8ebef"/>
+<text x="56" y="107.00" text-anchor="end" class="tick">238.3</text>
+<line x1="64" y1="40.00" x2="574" y2="40.00" stroke="#e8ebef"/>
+<text x="56" y="44.00" text-anchor="end" class="tick">317.7</text>
+<rect x="81.85" y="192.22" width="20.70" height="99.78" fill="#4c78a8" rx="2"/>
+<text x="92.20" y="188.22" text-anchor="middle" class="value">125.8</text>
+<text x="127.75" y="312" text-anchor="middle" class="category">LOCAL</text>
+<rect x="233.05" y="78.44" width="20.70" height="213.56" fill="#f58518" rx="2"/>
+<text x="243.40" y="74.44" text-anchor="middle" class="value">269.2</text>
+<text x="255.25" y="312" text-anchor="middle" class="category">REMOTE</text>
+<rect x="384.25" y="193.30" width="20.70" height="98.70" fill="#72b7b2" rx="2"/>
+<text x="394.60" y="189.30" text-anchor="middle" class="value">124.4</text>
+<text x="382.75" y="312" text-anchor="middle" class="category">PREDICTOR</text>
+<rect x="535.45" y="200.90" width="20.70" height="91.10" fill="#e45756" rx="2"/>
+<text x="545.80" y="196.90" text-anchor="middle" class="value">114.9</text>
+<text x="510.25" y="312" text-anchor="middle" class="category">TEMPO</text>
+<rect x="64" y="329" width="10" height="10" fill="#4c78a8"/>
+<text x="78" y="338" class="legend">LOCAL</text>
+<rect x="129" y="329" width="10" height="10" fill="#f58518"/>
+<text x="143" y="338" class="legend">REMOTE</text>
+<rect x="201" y="329" width="10" height="10" fill="#72b7b2"/>
+<text x="215" y="338" class="legend">PREDICTOR</text>
+<rect x="294" y="329" width="10" height="10" fill="#e45756"/>
+<text x="308" y="338" class="legend">TEMPO</text>
+</g>
+<g transform="translate(20,445)">
+<rect x="0" y="0" width="590" height="350" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="295.0" y="24" text-anchor="middle" class="panel-title">Pooled TPOT p99 (ms)</text>
+<line x1="64" y1="292.00" x2="574" y2="292.00" stroke="#e8ebef"/>
+<text x="56" y="296.00" text-anchor="end" class="tick">0.0</text>
+<line x1="64" y1="229.00" x2="574" y2="229.00" stroke="#e8ebef"/>
+<text x="56" y="233.00" text-anchor="end" class="tick">84.3</text>
+<line x1="64" y1="166.00" x2="574" y2="166.00" stroke="#e8ebef"/>
+<text x="56" y="170.00" text-anchor="end" class="tick">168.6</text>
+<line x1="64" y1="103.00" x2="574" y2="103.00" stroke="#e8ebef"/>
+<text x="56" y="107.00" text-anchor="end" class="tick">252.9</text>
+<line x1="64" y1="40.00" x2="574" y2="40.00" stroke="#e8ebef"/>
+<text x="56" y="44.00" text-anchor="end" class="tick">337.2</text>
+<rect x="81.85" y="78.44" width="20.70" height="213.56" fill="#4c78a8" rx="2"/>
+<text x="92.20" y="74.44" text-anchor="middle" class="value">285.8</text>
+<text x="127.75" y="312" text-anchor="middle" class="category">LOCAL</text>
+<rect x="233.05" y="153.78" width="20.70" height="138.22" fill="#f58518" rx="2"/>
+<text x="243.40" y="149.78" text-anchor="middle" class="value">184.9</text>
+<text x="255.25" y="312" text-anchor="middle" class="category">REMOTE</text>
+<rect x="384.25" y="88.30" width="20.70" height="203.70" fill="#72b7b2" rx="2"/>
+<text x="394.60" y="84.30" text-anchor="middle" class="value">272.6</text>
+<text x="382.75" y="312" text-anchor="middle" class="category">PREDICTOR</text>
+<rect x="535.45" y="85.48" width="20.70" height="206.52" fill="#e45756" rx="2"/>
+<text x="545.80" y="81.48" text-anchor="middle" class="value">276.3</text>
+<text x="510.25" y="312" text-anchor="middle" class="category">TEMPO</text>
+<rect x="64" y="329" width="10" height="10" fill="#4c78a8"/>
+<text x="78" y="338" class="legend">LOCAL</text>
+<rect x="129" y="329" width="10" height="10" fill="#f58518"/>
+<text x="143" y="338" class="legend">REMOTE</text>
+<rect x="201" y="329" width="10" height="10" fill="#72b7b2"/>
+<text x="215" y="338" class="legend">PREDICTOR</text>
+<rect x="294" y="329" width="10" height="10" fill="#e45756"/>
+<text x="308" y="338" class="legend">TEMPO</text>
+</g>
+<g transform="translate(630,445)">
+<rect x="0" y="0" width="590" height="350" rx="8" fill="#ffffff" stroke="#d9dde3"/>
+<text x="295.0" y="24" text-anchor="middle" class="panel-title">Pooled request goodput</text>
+<line x1="64" y1="292.00" x2="574" y2="292.00" stroke="#e8ebef"/>
+<text x="56" y="296.00" text-anchor="end" class="tick">0.0%</text>
+<line x1="64" y1="229.00" x2="574" y2="229.00" stroke="#e8ebef"/>
+<text x="56" y="233.00" text-anchor="end" class="tick">26.2%</text>
+<line x1="64" y1="166.00" x2="574" y2="166.00" stroke="#e8ebef"/>
+<text x="56" y="170.00" text-anchor="end" class="tick">52.4%</text>
+<line x1="64" y1="103.00" x2="574" y2="103.00" stroke="#e8ebef"/>
+<text x="56" y="107.00" text-anchor="end" class="tick">78.7%</text>
+<line x1="64" y1="40.00" x2="574" y2="40.00" stroke="#e8ebef"/>
+<text x="56" y="44.00" text-anchor="end" class="tick">104.9%</text>
+<rect x="81.85" y="82.44" width="20.70" height="209.56" fill="#4c78a8" rx="2"/>
+<text x="92.20" y="78.44" text-anchor="middle" class="value">87.2%</text>
+<text x="127.75" y="312" text-anchor="middle" class="category">LOCAL</text>
+<rect x="233.05" y="87.78" width="20.70" height="204.22" fill="#f58518" rx="2"/>
+<text x="243.40" y="83.78" text-anchor="middle" class="value">85.0%</text>
+<text x="255.25" y="312" text-anchor="middle" class="category">REMOTE</text>
+<rect x="384.25" y="79.78" width="20.70" height="212.22" fill="#72b7b2" rx="2"/>
+<text x="394.60" y="75.78" text-anchor="middle" class="value">88.3%</text>
+<text x="382.75" y="312" text-anchor="middle" class="category">PREDICTOR</text>
+<rect x="535.45" y="78.44" width="20.70" height="213.56" fill="#e45756" rx="2"/>
+<text x="545.80" y="74.44" text-anchor="middle" class="value">88.9%</text>
+<text x="510.25" y="312" text-anchor="middle" class="category">TEMPO</text>
+<rect x="64" y="329" width="10" height="10" fill="#4c78a8"/>
+<text x="78" y="338" class="legend">LOCAL</text>
+<rect x="129" y="329" width="10" height="10" fill="#f58518"/>
+<text x="143" y="338" class="legend">REMOTE</text>
+<rect x="201" y="329" width="10" height="10" fill="#72b7b2"/>
+<text x="215" y="338" class="legend">PREDICTOR</text>
+<rect x="294" y="329" width="10" height="10" fill="#e45756"/>
+<text x="308" y="338" class="legend">TEMPO</text>
+</g>
+</svg>
