@@ -1,0 +1,692 @@
+{
+  "analysis": {
+    "actual_native_transport": true,
+    "all": {
+      "block_names": [
+        "06_control_b",
+        "05_p_only_dual_decoder_hot",
+        "04_combined_hot_d1",
+        "03_remote_cool_hot_d1",
+        "02_combined_hot_d0",
+        "01_remote_cool_hot_d0",
+        "00_control_a"
+      ],
+      "completed_victims": 210,
+      "edge_counts": {
+        "local:d1": 210
+      },
+      "failures": 0,
+      "global_rejects": 0,
+      "offered_victims": 210,
+      "route_counts": {
+        "decoder_local_chunked_prefill": 210
+      },
+      "slo_attainment_fraction_of_offered": 0.7476190476190476,
+      "slo_good_victims": 157,
+      "victim": {
+        "count": 210,
+        "e2e_ms": {
+          "mean": 7408.604112390476,
+          "p50": 3091.26935,
+          "p95": 29961.408545,
+          "p99": 32584.677535
+        },
+        "tpot_ms": {
+          "mean": 47.23752714649419,
+          "p50": 23.308450653543307,
+          "p95": 162.7268861968504,
+          "p99": 192.85635717322836
+        },
+        "ttft_ms": {
+          "mean": 1409.3604980761907,
+          "p50": 132.263527,
+          "p95": 11437.965952,
+          "p99": 12246.357148
+        }
+      }
+    },
+    "arm": "fixed_local_d1",
+    "blocks": [
+      {
+        "aggressor_rate_per_s": 0.0,
+        "completed_victims": 30,
+        "decoder_counts": {
+          "1": 30
+        },
+        "edge_counts": {
+          "local:d1": 30
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "hot_decoder_index": null,
+        "hot_decoder_indices": [],
+        "name": "06_control_b",
+        "offered_victims": 30,
+        "pressure_regime": "control",
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/tempo_go_c8_independent_validation/c8_dual_fixed_local_d1_measured/06_control_b.raw.json",
+        "raw_sha256": "61167b51edb7be49af9cbaaf2cfc527ec0b0571622c600212f2db0ca39759887",
+        "route_counts": {
+          "decoder_local_chunked_prefill": 30
+        },
+        "slo_attainment_fraction_of_offered": 1.0,
+        "slo_good_victims": 30,
+        "terminal_counts_by_business_tenant": {
+          "interactive": {
+            "complete": 30
+          }
+        },
+        "terminal_counts_by_role": {
+          "victim": {
+            "complete": 30
+          }
+        },
+        "victim": {
+          "count": 30,
+          "e2e_ms": {
+            "mean": 3037.7222723666664,
+            "p50": 3025.088825,
+            "p95": 3112.147874,
+            "p99": 3155.738714
+          },
+          "tpot_ms": {
+            "mean": 22.857681760629923,
+            "p50": 22.836112118110236,
+            "p95": 23.426050244094487,
+            "p99": 23.72870711023622
+          },
+          "ttft_ms": {
+            "mean": 134.7093142,
+            "p50": 127.638041,
+            "p95": 143.518922,
+            "p99": 351.681328
+          }
+        },
+        "victim_cache_state": "miss"
+      },
+      {
+        "aggressor_rate_per_s": 0.0,
+        "completed_victims": 30,
+        "decoder_counts": {
+          "1": 30
+        },
+        "edge_counts": {
+          "local:d1": 30
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "hot_decoder_index": 0,
+        "hot_decoder_indices": [
+          0,
+          1
+        ],
+        "name": "05_p_only_dual_decoder_hot",
+        "offered_victims": 30,
+        "pressure_regime": "dual_decoder_hot_p_only_remote_favorable",
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/tempo_go_c8_independent_validation/c8_dual_fixed_local_d1_measured/05_p_only_dual_decoder_hot.raw.json",
+        "raw_sha256": "a8ec9a2b60e37a5ef7b6417143c96c6be89e05d9e6031a8e24cac71191888e21",
+        "remote_activation_receipt": {
+          "all_cross_pair_remote_completions_use_source_balance": true,
+          "all_managed_remote_completions_use_decoder_business_admission": true,
+          "all_managed_remote_completions_use_priority_lane": true,
+          "all_remote_completions_exact_full_source_hits": false,
+          "cross_pair_remote_receipts": 0,
+          "cross_pair_source_balance_receipts": 0,
+          "decoder_business_admission_receipts": 0,
+          "exact_official_lmcache_full_source_hits": 0,
+          "managed_priority_lane_receipts": 0,
+          "remote_completed_victims": 0,
+          "source_balance_receipts": 0
+        },
+        "route_counts": {
+          "decoder_local_chunked_prefill": 30
+        },
+        "slo_attainment_fraction_of_offered": 0.0,
+        "slo_good_victims": 0,
+        "terminal_counts_by_business_tenant": {
+          "background_local_decoder": {
+            "complete": 1344
+          },
+          "interactive": {
+            "complete": 30
+          }
+        },
+        "terminal_counts_by_role": {
+          "local_aggressor": {
+            "complete": 1344
+          },
+          "victim": {
+            "complete": 30
+          }
+        },
+        "victim": {
+          "count": 30,
+          "e2e_ms": {
+            "mean": 27389.697806666667,
+            "p50": 26879.950335,
+            "p95": 33281.759514,
+            "p99": 39559.230702
+          },
+          "tpot_ms": {
+            "mean": 144.6388722879265,
+            "p50": 154.6476687165354,
+            "p95": 205.46384586614172,
+            "p99": 220.90165577165354
+          },
+          "ttft_ms": {
+            "mean": 9020.489758766667,
+            "p50": 10104.923741,
+            "p95": 12329.005931,
+            "p99": 12595.119882
+          }
+        },
+        "victim_cache_state": "p_only"
+      },
+      {
+        "aggressor_rate_per_s": 7.8,
+        "completed_victims": 30,
+        "decoder_counts": {
+          "1": 30
+        },
+        "edge_counts": {
+          "local:d1": 30
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "hot_decoder_index": 1,
+        "hot_decoder_indices": [
+          1
+        ],
+        "name": "04_combined_hot_d1",
+        "offered_victims": 30,
+        "pressure_regime": "decoder_hot_remote_fabric_hot",
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/tempo_go_c8_independent_validation/c8_dual_fixed_local_d1_measured/04_combined_hot_d1.raw.json",
+        "raw_sha256": "f78ce456c9d517496b7318a3506b0b7018f1b8c3a0f21b458f6ff09e3b755935",
+        "route_counts": {
+          "decoder_local_chunked_prefill": 30
+        },
+        "slo_attainment_fraction_of_offered": 0.23333333333333334,
+        "slo_good_victims": 7,
+        "terminal_counts_by_business_tenant": {
+          "background": {
+            "complete": 234
+          },
+          "background_local_decoder": {
+            "complete": 234
+          },
+          "interactive": {
+            "complete": 30
+          }
+        },
+        "terminal_counts_by_role": {
+          "aggressor": {
+            "complete": 234
+          },
+          "local_aggressor": {
+            "complete": 234
+          },
+          "victim": {
+            "complete": 30
+          }
+        },
+        "victim": {
+          "count": 30,
+          "e2e_ms": {
+            "mean": 8631.981387566666,
+            "p50": 9490.006958,
+            "p95": 9849.107199,
+            "p99": 10033.61422
+          },
+          "tpot_ms": {
+            "mean": 66.46114542624672,
+            "p50": 73.14342930708662,
+            "p95": 75.75138011811023,
+            "p99": 76.31607511023623
+          },
+          "ttft_ms": {
+            "mean": 191.35048876666667,
+            "p50": 187.256702,
+            "p95": 289.627602,
+            "p99": 341.414107
+          }
+        },
+        "victim_cache_state": "miss"
+      },
+      {
+        "aggressor_rate_per_s": 7.8,
+        "completed_victims": 30,
+        "decoder_counts": {
+          "1": 30
+        },
+        "edge_counts": {
+          "local:d1": 30
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "hot_decoder_index": 1,
+        "hot_decoder_indices": [
+          1
+        ],
+        "name": "03_remote_cool_hot_d1",
+        "offered_victims": 30,
+        "pressure_regime": "decoder_hot_remote_edge_selective",
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/tempo_go_c8_independent_validation/c8_dual_fixed_local_d1_measured/03_remote_cool_hot_d1.raw.json",
+        "raw_sha256": "effa8ef2e1fc04bc68c5b72f1953477a4729557dede15f40a2eceb610e71ef82",
+        "route_counts": {
+          "decoder_local_chunked_prefill": 30
+        },
+        "slo_attainment_fraction_of_offered": 1.0,
+        "slo_good_victims": 30,
+        "terminal_counts_by_business_tenant": {
+          "background": {
+            "complete": 234
+          },
+          "interactive": {
+            "complete": 30
+          }
+        },
+        "terminal_counts_by_role": {
+          "aggressor": {
+            "complete": 234
+          },
+          "victim": {
+            "complete": 30
+          }
+        },
+        "victim": {
+          "count": 30,
+          "e2e_ms": {
+            "mean": 3700.8044842,
+            "p50": 3816.651502,
+            "p95": 4091.585975,
+            "p99": 4259.243026
+          },
+          "tpot_ms": {
+            "mean": 28.05607052073491,
+            "p50": 29.10009211023622,
+            "p95": 31.17716722047244,
+            "p99": 31.21856605511811
+          },
+          "ttft_ms": {
+            "mean": 137.60317756666666,
+            "p50": 131.107559,
+            "p95": 148.753587,
+            "p99": 294.406886
+          }
+        },
+        "victim_cache_state": "miss"
+      },
+      {
+        "aggressor_rate_per_s": 7.8,
+        "completed_victims": 30,
+        "decoder_counts": {
+          "1": 30
+        },
+        "edge_counts": {
+          "local:d1": 30
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "hot_decoder_index": 0,
+        "hot_decoder_indices": [
+          0
+        ],
+        "name": "02_combined_hot_d0",
+        "offered_victims": 30,
+        "pressure_regime": "decoder_hot_remote_fabric_hot",
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/tempo_go_c8_independent_validation/c8_dual_fixed_local_d1_measured/02_combined_hot_d0.raw.json",
+        "raw_sha256": "3e25adb920bfed2c70db3f418e3933ec8f0e6204bbb13451a8fa4b75734efe3d",
+        "route_counts": {
+          "decoder_local_chunked_prefill": 30
+        },
+        "slo_attainment_fraction_of_offered": 1.0,
+        "slo_good_victims": 30,
+        "terminal_counts_by_business_tenant": {
+          "background": {
+            "complete": 234
+          },
+          "background_local_decoder": {
+            "complete": 234
+          },
+          "interactive": {
+            "complete": 30
+          }
+        },
+        "terminal_counts_by_role": {
+          "aggressor": {
+            "complete": 234
+          },
+          "local_aggressor": {
+            "complete": 234
+          },
+          "victim": {
+            "complete": 30
+          }
+        },
+        "victim": {
+          "count": 30,
+          "e2e_ms": {
+            "mean": 3035.147828766667,
+            "p50": 3030.051435,
+            "p95": 3101.909145,
+            "p99": 3114.396698
+          },
+          "tpot_ms": {
+            "mean": 22.902025366666667,
+            "p50": 22.811530622047247,
+            "p95": 23.47436633070866,
+            "p99": 23.50672181889764
+          },
+          "ttft_ms": {
+            "mean": 126.52629936666668,
+            "p50": 123.899971,
+            "p95": 137.756849,
+            "p99": 143.349431
+          }
+        },
+        "victim_cache_state": "miss"
+      },
+      {
+        "aggressor_rate_per_s": 7.8,
+        "completed_victims": 30,
+        "decoder_counts": {
+          "1": 30
+        },
+        "edge_counts": {
+          "local:d1": 30
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "hot_decoder_index": 0,
+        "hot_decoder_indices": [
+          0
+        ],
+        "name": "01_remote_cool_hot_d0",
+        "offered_victims": 30,
+        "pressure_regime": "decoder_hot_remote_edge_selective",
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/tempo_go_c8_independent_validation/c8_dual_fixed_local_d1_measured/01_remote_cool_hot_d0.raw.json",
+        "raw_sha256": "6f4967449a6b279f3bb0b95422f5f8d6beddf284f7f10414c50a421cf4ae45c5",
+        "route_counts": {
+          "decoder_local_chunked_prefill": 30
+        },
+        "slo_attainment_fraction_of_offered": 1.0,
+        "slo_good_victims": 30,
+        "terminal_counts_by_business_tenant": {
+          "background": {
+            "complete": 234
+          },
+          "interactive": {
+            "complete": 30
+          }
+        },
+        "terminal_counts_by_role": {
+          "aggressor": {
+            "complete": 234
+          },
+          "victim": {
+            "complete": 30
+          }
+        },
+        "victim": {
+          "count": 30,
+          "e2e_ms": {
+            "mean": 3040.3648831,
+            "p50": 3026.678032,
+            "p95": 3123.348276,
+            "p99": 3149.678648
+          },
+          "tpot_ms": {
+            "mean": 22.93303355643045,
+            "p50": 22.872091866141734,
+            "p95": 23.403912007874016,
+            "p99": 23.67927509448819
+          },
+          "ttft_ms": {
+            "mean": 127.7818647,
+            "p50": 122.738831,
+            "p95": 138.93214,
+            "p99": 202.474424
+          }
+        },
+        "victim_cache_state": "miss"
+      },
+      {
+        "aggressor_rate_per_s": 0.0,
+        "completed_victims": 30,
+        "decoder_counts": {
+          "1": 30
+        },
+        "edge_counts": {
+          "local:d1": 30
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "hot_decoder_index": null,
+        "hot_decoder_indices": [],
+        "name": "00_control_a",
+        "offered_victims": 30,
+        "pressure_regime": "control",
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/tempo_go_c8_independent_validation/c8_dual_fixed_local_d1_measured/00_control_a.raw.json",
+        "raw_sha256": "7efc403702cd45bd66f946bd76276319f50eb25b9978ab30ab8958779b92379c",
+        "route_counts": {
+          "decoder_local_chunked_prefill": 30
+        },
+        "slo_attainment_fraction_of_offered": 1.0,
+        "slo_good_victims": 30,
+        "terminal_counts_by_business_tenant": {
+          "interactive": {
+            "complete": 30
+          }
+        },
+        "terminal_counts_by_role": {
+          "victim": {
+            "complete": 30
+          }
+        },
+        "victim": {
+          "count": 30,
+          "e2e_ms": {
+            "mean": 3024.510124066667,
+            "p50": 3004.307565,
+            "p95": 3115.954457,
+            "p99": 3156.117188
+          },
+          "tpot_ms": {
+            "mean": 22.81386110682415,
+            "p50": 22.60181,
+            "p95": 23.46629137007874,
+            "p99": 23.85693414173228
+          },
+          "ttft_ms": {
+            "mean": 127.06258316666667,
+            "p50": 126.209553,
+            "p95": 136.447839,
+            "p99": 137.216113
+          }
+        },
+        "victim_cache_state": "miss"
+      }
+    ],
+    "edge_counts": {
+      "local:d1": 210
+    },
+    "hot": {
+      "block_names": [
+        "04_combined_hot_d1",
+        "03_remote_cool_hot_d1",
+        "02_combined_hot_d0",
+        "01_remote_cool_hot_d0",
+        "05_p_only_dual_decoder_hot"
+      ],
+      "completed_victims": 150,
+      "edge_counts": {
+        "local:d1": 150
+      },
+      "failures": 0,
+      "global_rejects": 0,
+      "offered_victims": 150,
+      "route_counts": {
+        "decoder_local_chunked_prefill": 150
+      },
+      "slo_attainment_fraction_of_offered": 0.6466666666666666,
+      "slo_good_victims": 97,
+      "victim": {
+        "count": 150,
+        "e2e_ms": {
+          "mean": 9159.59927806,
+          "p50": 3816.651502,
+          "p95": 31078.331455,
+          "p99": 33281.759514
+        },
+        "tpot_ms": {
+          "mean": 56.998229431601054,
+          "p50": 29.10009211023622,
+          "p95": 167.9507891968504,
+          "p99": 205.46384586614172
+        },
+        "ttft_ms": {
+          "mean": 1920.7503178333332,
+          "p50": 134.782776,
+          "p95": 11585.499268,
+          "p99": 12329.005931
+        }
+      }
+    },
+    "miss_hot": {
+      "block_names": [
+        "04_combined_hot_d1",
+        "03_remote_cool_hot_d1",
+        "02_combined_hot_d0",
+        "01_remote_cool_hot_d0"
+      ],
+      "completed_victims": 120,
+      "edge_counts": {
+        "local:d1": 120
+      },
+      "failures": 0,
+      "global_rejects": 0,
+      "offered_victims": 120,
+      "route_counts": {
+        "decoder_local_chunked_prefill": 120
+      },
+      "slo_attainment_fraction_of_offered": 0.8083333333333333,
+      "slo_good_victims": 97,
+      "victim": {
+        "count": 120,
+        "e2e_ms": {
+          "mean": 4602.074645908333,
+          "p50": 3149.678648,
+          "p95": 9684.059809,
+          "p99": 9849.107199
+        },
+        "tpot_ms": {
+          "mean": 35.08806871751969,
+          "p50": 23.67927509448819,
+          "p95": 74.96712447244094,
+          "p99": 75.75138011811023
+        },
+        "ttft_ms": {
+          "mean": 145.8154576,
+          "p50": 131.671584,
+          "p95": 219.324066,
+          "p99": 294.406886
+        }
+      }
+    },
+    "normal": {
+      "block_names": [
+        "06_control_b",
+        "00_control_a"
+      ],
+      "completed_victims": 60,
+      "edge_counts": {
+        "local:d1": 60
+      },
+      "failures": 0,
+      "global_rejects": 0,
+      "offered_victims": 60,
+      "route_counts": {
+        "decoder_local_chunked_prefill": 60
+      },
+      "slo_attainment_fraction_of_offered": 1.0,
+      "slo_good_victims": 60,
+      "victim": {
+        "count": 60,
+        "e2e_ms": {
+          "mean": 3031.116198216667,
+          "p50": 3016.979352,
+          "p95": 3112.147874,
+          "p99": 3156.117188
+        },
+        "tpot_ms": {
+          "mean": 22.835771433727032,
+          "p50": 22.745982905511813,
+          "p95": 23.426050244094487,
+          "p99": 23.85693414173228
+        },
+        "ttft_ms": {
+          "mean": 130.88594868333334,
+          "p50": 126.837061,
+          "p95": 137.887899,
+          "p99": 351.681328
+        }
+      }
+    },
+    "performance_claim_allowed": false,
+    "remote_favorable": {
+      "block_names": [
+        "05_p_only_dual_decoder_hot"
+      ],
+      "completed_victims": 30,
+      "edge_counts": {
+        "local:d1": 30
+      },
+      "failures": 0,
+      "global_rejects": 0,
+      "offered_victims": 30,
+      "route_counts": {
+        "decoder_local_chunked_prefill": 30
+      },
+      "slo_attainment_fraction_of_offered": 0.0,
+      "slo_good_victims": 0,
+      "victim": {
+        "count": 30,
+        "e2e_ms": {
+          "mean": 27389.697806666667,
+          "p50": 26879.950335,
+          "p95": 33281.759514,
+          "p99": 39559.230702
+        },
+        "tpot_ms": {
+          "mean": 144.6388722879265,
+          "p50": 154.6476687165354,
+          "p95": 205.46384586614172,
+          "p99": 220.90165577165354
+        },
+        "ttft_ms": {
+          "mean": 9020.489758766667,
+          "p50": 10104.923741,
+          "p95": 12329.005931,
+          "p99": 12595.119882
+        }
+      }
+    },
+    "route_counts": {
+      "decoder_local_chunked_prefill": 210
+    },
+    "same_population_ready_for_campaign_analysis": true,
+    "schema": "tempo-go-c8-dual-regime-arm-analysis-v1",
+    "terminal_contract_valid_for_every_block": true
+  },
+  "controller_performance_run_allowed": true,
+  "performance_claim_allowed": false,
+  "profile": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+  "profile_sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53",
+  "purpose": "One-shot fresh-allocation C9 validation with reverse temporal order, held-out arrivals/prompts, background fairness, and telemetry gates",
+  "qualification_contract": "/pscratch/sd/s/sgkim/Skim-Tempo/eval/sota_4node/tempo_go_c8_independent_validation_contract_v3.json",
+  "qualification_contract_sha256": "e2d07e8c50316620cee29a82ae06bbb4e3efd5e8c18c07347a34a4f532f07a76",
+  "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/tempo_go_c8_independent_validation/raw.json",
+  "raw_sha256": "7e4d806c17c15e76f692f14fb948b6c8924606f9fd2301a7b97851f5ef639596",
+  "schema": "tempo-go-c8-independent-validation-node-result-v1",
+  "slurm_job_id": "57586612",
+  "source_workload": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl"
+}

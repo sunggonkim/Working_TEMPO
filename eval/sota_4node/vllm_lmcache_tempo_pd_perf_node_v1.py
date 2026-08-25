@@ -44,9 +44,9 @@ def _decode_hosts(
     placement = os.environ.get(
         "TEMPO_PD_REMOTE_DECODE_PLACEMENT", "paired")
     _require(
-        placement in ("paired", "cross", "long_decode_cross"),
+        placement in ("paired", "cross", "long_decode_cross", "global_mesh"),
         "TEMPO_PD_REMOTE_DECODE_PLACEMENT must be "
-        "paired, cross, or long_decode_cross",
+        "paired, cross, long_decode_cross, or global_mesh",
     )
     local_decode_host = hosts[pair * 2 + 1]
     remote_decode_host = (
@@ -295,7 +295,7 @@ def _lifecycle(
     )
     env["TEMPO_PD_LOCAL_DECODER_INDEX"] = str(pair)
     env["TEMPO_PD_REQUIRE_DECODER_INDEX"] = (
-        "1" if placement == "long_decode_cross" else "0"
+        "1" if placement in {"long_decode_cross", "global_mesh"} else "0"
     )
     vllm = args.repo_root / ".vllm_venv/bin/vllm"
     proxy_script = (
@@ -321,7 +321,7 @@ def _lifecycle(
         if is_prefill:
             target_decode_hosts = (
                 (hosts[1], hosts[3])
-                if placement == "long_decode_cross"
+                if placement in {"long_decode_cross", "global_mesh"}
                 else (decode_host, remote_decode_host)
             )
             for target_decode_host in dict.fromkeys(
@@ -335,7 +335,7 @@ def _lifecycle(
                 prefill_host=prefill_host,
                 decode_host=remote_decode_host, ports=ports,
             )
-            if placement == "long_decode_cross":
+            if placement in {"long_decode_cross", "global_mesh"}:
                 proxy_command = _multi_decoder_proxy_command(
                     proxy_command, hosts, selector_script)
             proxy, handle = common._spawn(

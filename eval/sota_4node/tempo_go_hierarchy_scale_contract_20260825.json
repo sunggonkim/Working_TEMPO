@@ -1,0 +1,21 @@
+{
+  "schema": "tempo-go-hierarchy-scale-run-contract-v1",
+  "frozen_utc": "2026-08-25T16:10:03Z",
+  "scope": "CPU control-plane scale only",
+  "claim_boundary": "No native GPU, NCCL, LMCache, Slingshot, inference latency, goodput, or production-scale performance claim.",
+  "same_population_paths": [
+    "full global candidate scan",
+    "prepartitioned pair-agent frontier plus bounded shard/global fan-in"
+  ],
+  "pair_counts": [2, 8, 32, 128, 512, 1024],
+  "repeats": 15,
+  "shard_count": 64,
+  "max_pairs_per_shard": 2,
+  "max_routes_per_pair": 2,
+  "output": "results/tempo_go_hierarchy_scale_20260825_c9_c10_r15.json",
+  "source_inventory": {
+    "eval/sota_4node/benchmark_tempo_go_hierarchy_scale.py": "ddcd77a71dfb3be016b572f9fd175a748868b453a92d638014c65081b4d85557",
+    "tempo/pd_global_hierarchy.py": "1a4fbe548ed2325c351154633d1d93ea4fa71a00da599e5a0bbb9e8b94ac75e9",
+    "tempo/pd_global_orchestrator.py": "ba5039f0e4be36b54409fd1806297b40591e9366738084757a5f181a71947716"
+  }
+}

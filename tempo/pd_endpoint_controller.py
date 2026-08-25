@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from enum import Enum
 import math
 import threading
-from typing import Deque
+from typing import Deque, Mapping
 
 
 SCHEMA = "tempo-pd-endpoint-controller-v1"
@@ -207,6 +207,8 @@ class _RouteFeedback:
     denied_until_ns: int = 0
     probe_request_id: str | None = None
     failures: int = 0
+    last_failure_kind: str | None = None
+    last_failure_ns: int | None = None
     active_samples: int = 0
     passive_samples: int = 0
     passive_failures: int = 0
@@ -303,29 +305,60 @@ class EndpointFeedbackController:
         external = self._external_resource_snapshot()
         return {name: owned[name] + external[name] for name in owned}
 
-    def _fits(self, request: EndpointRequest, route: EndpointRoute) -> bool:
+    def _resource_limits(
+        self, resource_limits: Mapping[str, int] | None,
+    ) -> dict[str, int]:
+        defaults = {
+            "local_token_ms": self.config.local_token_ms_window,
+            "remote_prefill_token_ms": (
+                self.config.remote_prefill_token_ms_window),
+            "remote_kv_bytes": self.config.remote_kv_bytes_window,
+            "remote_semantic_ops": self.config.remote_semantic_ops_window,
+        }
+        if resource_limits is None:
+            return defaults
+        if not isinstance(resource_limits, Mapping):
+            raise TypeError("resource_limits must be a mapping")
+        if set(resource_limits) != set(defaults):
+            raise ValueError("resource_limits keys do not match endpoint resources")
+        result = {}
+        for name, default in defaults.items():
+            value = resource_limits[name]
+            if type(value) is not int or value <= 0 or value > default:
+                raise ValueError(
+                    f"resource_limits.{name} must be in [1, {default}]")
+            result[name] = value
+        return result
+
+    def _fits(
+        self,
+        request: EndpointRequest,
+        route: EndpointRoute,
+        limits: Mapping[str, int] | None = None,
+    ) -> bool:
+        limits = self._resource_limits(limits)
         work = request.work
         if route is EndpointRoute.LOCAL:
             return (
                 self._local_token_ms_used
                 + self._external_local_token_ms_used
                 + work.local_token_ms
-                <= self.config.local_token_ms_window
+                <= limits["local_token_ms"]
             )
         if route is EndpointRoute.REMOTE:
             return (
                 self._remote_prefill_token_ms_used
                 + self._external_remote_prefill_token_ms_used
                 + work.remote_prefill_token_ms
-                <= self.config.remote_prefill_token_ms_window
+                <= limits["remote_prefill_token_ms"]
                 and self._remote_kv_bytes_used
                 + self._external_remote_kv_bytes_used
                 + work.remote_kv_bytes
-                <= self.config.remote_kv_bytes_window
+                <= limits["remote_kv_bytes"]
                 and self._remote_semantic_ops_used
                 + self._external_remote_semantic_ops_used
                 + work.remote_semantic_ops
-                <= self.config.remote_semantic_ops_window
+                <= limits["remote_semantic_ops"]
             )
         return False
 
@@ -411,11 +444,19 @@ class EndpointFeedbackController:
         )
         return age >= delay
 
-    def submit(self, request: EndpointRequest, *, now_ns: int) -> EndpointDecision:
+    def submit(
+        self,
+        request: EndpointRequest,
+        *,
+        now_ns: int,
+        resource_limits: Mapping[str, int] | None = None,
+    ) -> EndpointDecision:
+        """Admit one request under the endpoint's physical service window."""
         if not isinstance(request, EndpointRequest):
             raise TypeError("request must be EndpointRequest")
         if type(now_ns) is not int or now_ns < 0:
             raise ValueError("now_ns must be a non-negative int")
+        limits = self._resource_limits(resource_limits)
         with self._lock:
             if (
                 request.request_id in self._inflight
@@ -439,7 +480,7 @@ class EndpointFeedbackController:
                 for route in (EndpointRoute.LOCAL, EndpointRoute.REMOTE)
                 if request.allowed(route)
                 and states[route] is RouteHealth.GOOD
-                and self._fits(request, route)
+                and self._fits(request, route, limits)
                 and scores[route] <= request.e2e_deadline_ms
             ]
             healthy.sort(key=lambda route: (scores[route], route.value))
@@ -464,8 +505,17 @@ class EndpointFeedbackController:
                 if request.allowed(route)
                 and states[route] in {RouteHealth.SKIP, RouteHealth.DENIED}
                 and self._probe_due(route, now_ns)
-                and self._fits(request, route)
-                and scores[route] <= request.e2e_deadline_ms
+                and self._fits(request, route, limits)
+                and (
+                    scores[route] <= request.e2e_deadline_ms
+                    or (
+                        states[route] is RouteHealth.SKIP
+                        and self._feedback[route].failures == 0
+                        and request.e2e_prior_ms(route)
+                        + float(request.uncertainty_ms)
+                        <= request.e2e_deadline_ms
+                    )
+                )
             ]
             probe_candidates.sort(key=lambda route: (
                 self._feedback[route].last_feedback_ns or now_ns,
@@ -550,6 +600,8 @@ class EndpointFeedbackController:
                 feedback.last_feedback_ns = now_ns
                 feedback.active_samples += 1
                 feedback.failures += 1
+                feedback.last_failure_kind = "active_slo_violation"
+                feedback.last_failure_ns = now_ns
                 feedback.denied_until_ns = now_ns + self.config.denied_probe_after_ns
                 accepted = True
             elif reservation.decision.probe:
@@ -663,6 +715,8 @@ class EndpointFeedbackController:
                 feedback.failures += 1
                 feedback.passive_samples += 1
                 feedback.passive_failures += 1
+                feedback.last_failure_kind = "external_slo_violation"
+                feedback.last_failure_ns = now_ns
                 feedback.denied_until_ns = (
                     now_ns + self.config.denied_probe_after_ns)
                 accepted = True
@@ -699,6 +753,8 @@ class EndpointFeedbackController:
             feedback.last_feedback_ns = now_ns
             feedback.failures += 1
             feedback.passive_failures += 1
+            feedback.last_failure_kind = "external_upstream_failure"
+            feedback.last_failure_ns = now_ns
             feedback.denied_until_ns = (
                 now_ns + self.config.denied_probe_after_ns)
             self._passive_completed.add(sample_id)
@@ -785,6 +841,8 @@ class EndpointFeedbackController:
                 now_ns, feedback.last_feedback_ns or now_ns)
             feedback.failures += 1
             feedback.passive_failures += 1
+            feedback.last_failure_kind = "passive_upstream_failure"
+            feedback.last_failure_ns = now_ns
             feedback.denied_until_ns = (
                 now_ns + self.config.denied_probe_after_ns)
             self._passive_completed.add(sample_id)
@@ -811,6 +869,8 @@ class EndpointFeedbackController:
                 feedback.probe_request_id = None
             feedback.last_feedback_ns = now_ns
             feedback.failures += 1
+            feedback.last_failure_kind = "active_upstream_failure"
+            feedback.last_failure_ns = now_ns
             feedback.denied_until_ns = now_ns + self.config.denied_probe_after_ns
             self._completed.add(request_id)
 
@@ -829,6 +889,8 @@ class EndpointFeedbackController:
                     "denied_until_ns": feedback.denied_until_ns,
                     "probe_request_id": feedback.probe_request_id,
                     "failures": feedback.failures,
+                    "last_failure_kind": feedback.last_failure_kind,
+                    "last_failure_ns": feedback.last_failure_ns,
                     "active_samples": feedback.active_samples,
                     "passive_samples": feedback.passive_samples,
                     "passive_failures": feedback.passive_failures,
@@ -846,6 +908,13 @@ class EndpointFeedbackController:
                 "external_inflight": len(self._external_inflight),
                 "completed": len(self._completed),
                 "passive_completed": len(self._passive_completed),
+                "completion": {
+                    "schema": "tempo-go-endpoint-completion-v1",
+                    "completed_first_responses": (
+                        len(self._completed) + len(self._passive_completed)),
+                    "residual_inflight": (
+                        len(self._inflight) + len(self._external_inflight)),
+                },
                 "routes": routes,
             }
 

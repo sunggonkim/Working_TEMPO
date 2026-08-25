@@ -20,7 +20,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from eval.sota_4node import tempo_pd_elastic_router_v444 as v444
 from eval.sota_4node import tempo_pd_elastic_router_v445 as prior
@@ -268,18 +268,67 @@ def build_app(
                 output_tokens=output_tokens,
                 remaining_deadline_ms=deadline,
             )
+            service_lane_reservation = getattr(
+                core, "service_lane_reservation", lambda _request_id: None
+            )(request_id)
+            if (
+                isinstance(service_lane_reservation, dict)
+                and service_lane_reservation.get("status") == "unavailable"
+            ):
+                core.fail(
+                    request_id,
+                    "endpoint service-lane reservation unavailable",
+                )
+                detail = {
+                    "code": "tempo_go_service_lane_reservation_unavailable",
+                    "reason": service_lane_reservation.get("reason"),
+                    "request_id": request_id,
+                }
+                return JSONResponse(
+                    status_code=503,
+                    content=detail,
+                    headers={
+                        "X-Tempo-Service-Lane-Reservation": "unavailable",
+                        "X-Tempo-Service-Lane-Reason": str(
+                            service_lane_reservation.get("reason")
+                        ),
+                        "X-Tempo-PD-Request-Id": request_id,
+                    },
+                )
             queue_started_ns = time.perf_counter_ns()
+            queue_wait_for_request_ms = queue_wait_ms
+            endpoint_queue_timeout_reason = (
+                "endpoint_bounded_queue_lease_timeout"
+                if isinstance(service_lane_reservation, dict)
+                and service_lane_reservation.get("queue_lease", False)
+                else "endpoint_bounded_global_route_timeout"
+            )
+            global_queue_wait = getattr(core, "global_queue_wait_ms", None)
+            if global_queue_wait is not None:
+                queue_wait_for_request_ms = global_queue_wait(
+                    request_id,
+                    default_queue_wait_ms=queue_wait_ms,
+                    remaining_deadline_ms=deadline,
+                )
             while record.route is ElasticRoute.QUEUE:
                 elapsed_ms = (
                     time.perf_counter_ns() - queue_started_ns
                 ) / 1_000_000
-                if elapsed_ms >= queue_wait_ms:
+                if elapsed_ms >= queue_wait_for_request_ms:
                     core.fail(request_id, "bounded ingress queue timeout")
                     raise HTTPException(
-                        status_code=503, detail="elastic ingress queue timeout"
+                        status_code=503,
+                        detail="elastic ingress queue timeout",
+                        headers={
+                            "X-Tempo-Service-Lane-Reservation": "timeout",
+                            "X-Tempo-Service-Lane-Reason": (
+                                endpoint_queue_timeout_reason
+                            ),
+                            "X-Tempo-PD-Request-Id": request_id,
+                        },
                     )
                 await asyncio.sleep(
-                    min(0.001, (queue_wait_ms - elapsed_ms) / 1000)
+                    min(0.001, (queue_wait_for_request_ms - elapsed_ms) / 1000)
                 )
                 remaining = (
                     deadline - elapsed_ms
@@ -293,6 +342,13 @@ def build_app(
                     raise HTTPException(
                         status_code=503,
                         detail="deadline expired in ingress queue",
+                        headers={
+                            "X-Tempo-Service-Lane-Reservation": "timeout",
+                            "X-Tempo-Service-Lane-Reason": (
+                                "endpoint_ingress_queue_deadline_expired"
+                            ),
+                            "X-Tempo-PD-Request-Id": request_id,
+                        },
                     )
                 record = core.retry(request_id, remaining)
 
@@ -382,8 +438,16 @@ def build_app(
                 if upstream is not None:
                     await upstream.aclose()
 
+        response_headers = _headers(record)
+        if service_lane_reservation is not None:
+            response_headers.update({
+                "X-Tempo-Service-Lane-Reservation": str(
+                    service_lane_reservation.get("status")),
+                "X-Tempo-Service-Lane-Reason": str(
+                    service_lane_reservation.get("reason")),
+            })
         return StreamingResponse(
-            generate(), media_type="text/event-stream", headers=_headers(record)
+            generate(), media_type="text/event-stream", headers=response_headers
         )
 
     return app

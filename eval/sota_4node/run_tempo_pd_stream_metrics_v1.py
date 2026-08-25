@@ -23,6 +23,158 @@ ROUTER_SCHEMA = "tempo-live-pd-router-1"
 # unset; the completion-backed C4 wrapper installs it only long enough to
 # publish the exact client ``perf_counter_ns`` workload epoch to its parent.
 RUN_START_OBSERVER: Callable[[int], None] | None = None
+_GLOBAL_REJECTION_KINDS = frozenset({
+    "global_admission_queue_timeout",
+    "global_telemetry_refresh_timeout",
+    "global_telemetry_refresh_failed",
+    "global_telemetry_validation_failed",
+})
+_SERVICE_LANE_FAILURE_KINDS = frozenset({
+    "endpoint_bounded_global_route_timeout",
+    "endpoint_bounded_queue_lease_timeout",
+    "endpoint_service_lane_preflight_unavailable",
+    "endpoint_service_lane_reservation_unavailable",
+})
+
+
+def _classify_http_error(exc: error.HTTPError) -> str:
+    """Classify known global terminal responses without trusting status alone."""
+
+    if not isinstance(exc, error.HTTPError):
+        raise TypeError("exc must be urllib.error.HTTPError")
+    fragments = [str(exc), str(getattr(exc, "reason", ""))]
+    try:
+        body = exc.read(16 * 1024)
+    except (OSError, ValueError):
+        body = b""
+    if isinstance(body, bytes):
+        fragments.append(body.decode("utf-8", errors="replace"))
+    text = " ".join(fragments)
+    # The frontend emits both the human-readable legacy detail and the
+    # structured TEMPO-GO receipt.  Keep both spellings equivalent so the
+    # client cannot turn an explicitly receipted business rejection into an
+    # unclassified HTTP failure.
+    if (
+        "global telemetry refresh timed out" in text
+        or "global_telemetry_refresh_timeout" in text
+    ):
+        return "global_telemetry_refresh_timeout"
+    if (
+        "global telemetry refresh failed" in text
+        or "global_telemetry_refresh_failed" in text
+    ):
+        return "global_telemetry_refresh_failed"
+    if (
+        "global telemetry validation failed" in text
+        or "global_telemetry_validation_failed" in text
+    ):
+        return "global_telemetry_validation_failed"
+    if (
+        "global admission queue timed out" in text
+        or "global_admission_queue_timeout" in text
+        or "tempo_go_global_reject" in text
+    ):
+        return "global_admission_queue_timeout"
+    if "endpoint_bounded_queue_lease_timeout" in text:
+        return "endpoint_bounded_queue_lease_timeout"
+    if "endpoint_bounded_global_route_timeout" in text:
+        return "endpoint_bounded_global_route_timeout"
+    if (
+        "tempo_go_service_lane_reservation_timeout" in text
+        or "tempo_go_service_lane_reservation_unavailable" in text
+        or "endpoint service-lane reservation unavailable" in text
+    ):
+        return "endpoint_service_lane_reservation_unavailable"
+    if (
+        "tempo_go_service_lane_preflight_failed" in text
+        or "endpoint_service_lane_preflight_unavailable" in text
+    ):
+        return "endpoint_service_lane_preflight_unavailable"
+    return "http_503" if int(exc.code) == 503 else "http_error"
+
+
+def _is_terminal_global_reject(row: dict[str, Any]) -> bool:
+    return (
+        row.get("phase") == "rejected"
+        and row.get("tempo_go_rejected") is True
+        and row.get("global_decision_kind") == "reject"
+        and row.get("error") is None
+    )
+
+
+def _is_terminal_service_lane_failure(row: dict[str, Any]) -> bool:
+    """Recognize an explicit endpoint reservation failure receipt."""
+
+    failure = row.get("frontend_tempo_go_reservation_failure")
+    failure_kind = row.get("frontend_tempo_go_failure_kind")
+    return (
+        row.get("phase") == "failed"
+        and row.get("error") in {None, failure_kind}
+        and row.get("frontend_tempo_go_failure_scope") == "service_lane"
+        and isinstance(failure, dict)
+        and failure.get("schema") == "tempo-go-service-lane-reservation-v1"
+        and failure.get("failure_kind") == failure_kind
+    )
+
+
+def _apply_decision_receipts(
+    records: list[dict[str, Any]],
+    decision_rows: list[dict[str, Any]],
+) -> bool:
+    """Close request terminal states against the router's decision ledger."""
+
+    by_id = {row.get("request_id"): row for row in decision_rows}
+    request_ids = {row.get("request_id") for row in records}
+    decision_ids = [row.get("request_id") for row in decision_rows]
+    exact = (
+        len(decision_ids) == len(request_ids)
+        and set(decision_ids) == request_ids
+        and len(decision_ids) == len(set(decision_ids))
+        and all(
+            row.get("phase") == "complete" and row.get("error") is None
+            or _is_terminal_global_reject(row)
+            or _is_terminal_service_lane_failure(row)
+            for row in decision_rows
+        )
+    )
+    for record in records:
+        decision = by_id.get(record.get("request_id"))
+        if record.get("terminal_reject_candidate"):
+            if isinstance(decision, dict) and _is_terminal_global_reject(decision):
+                record["terminal_kind"] = "global_reject"
+                record["terminal_reason"] = decision.get(
+                    "global_decision_reason")
+                record["contract_violations"] = []
+                record["error"] = None
+                record["valid"] = True
+                continue
+            record["contract_violations"] = [
+                "unreceipted_terminal_reject",
+            ]
+            record["valid"] = False
+            continue
+        if record.get("terminal_service_lane_failure_candidate"):
+            if isinstance(decision, dict) and _is_terminal_service_lane_failure(
+                    decision):
+                record["terminal_kind"] = "service_lane_failure"
+                record["terminal_reason"] = decision.get(
+                    "frontend_tempo_go_failure_kind")
+                record["contract_violations"] = []
+                record["error"] = None
+                record["valid"] = True
+                continue
+            record["contract_violations"] = [
+                "unreceipted_terminal_service_lane_failure",
+            ]
+            record["valid"] = False
+            continue
+        record["valid"] = (
+            record.get("valid") is True
+            and isinstance(decision, dict)
+            and decision.get("phase") == "complete"
+            and decision.get("error") is None
+        )
+    return exact
 
 
 def _require(condition: bool, message: str) -> None:
@@ -218,6 +370,9 @@ def execute_request(
         "Content-Type": "application/json",
         "X-Tempo-Request-Id": item.request_id,
     }
+    tenant_id = _business_tenant_id(item.request_id)
+    if tenant_id is not None:
+        headers["X-Tempo-Tenant-Id"] = tenant_id
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     http_request = request.Request(
@@ -229,10 +384,12 @@ def execute_request(
     common = {
         "request_index": item.index,
         "request_id": item.request_id,
+        "ingress_lane": _ingress_lane(item),
         "prompt_sha256": base._sha256_bytes(item.prompt.encode("utf-8")),
         "prompt_utf8_bytes": len(item.prompt.encode("utf-8")),
         "requested_max_tokens": item.max_tokens,
         "scheduled_dispatch_offset_ns": item.arrival_offset_ns,
+        "tempo_business_tenant_id": tenant_id,
     }
     try:
         with opener(http_request, timeout=timeout_s) as response:
@@ -250,6 +407,14 @@ def execute_request(
             record = {**common, "router": router, **streamed}
     except (base.ContractError, error.HTTPError, error.URLError, TimeoutError, OSError) as exc:
         end_ns = clock_ns()
+        terminal_error_kind = (
+            _classify_http_error(exc)
+            if isinstance(exc, error.HTTPError)
+            else "request_or_stream_error"
+        )
+        global_reject_candidate = terminal_error_kind in _GLOBAL_REJECTION_KINDS
+        service_lane_failure_candidate = (
+            terminal_error_kind in _SERVICE_LANE_FAILURE_KINDS)
         record = {
             **common,
             "router": None,
@@ -266,11 +431,51 @@ def execute_request(
             "done_seen": False,
             "response_ids": [],
             "response_models": [],
-            "contract_violations": ["request_or_stream_error"],
-            "error": f"{type(exc).__name__}: {exc}",
+            "contract_violations": (
+                [] if global_reject_candidate or service_lane_failure_candidate
+                else [terminal_error_kind]),
+            "error": None if global_reject_candidate or service_lane_failure_candidate
+            else f"{type(exc).__name__}: {exc}",
+            "terminal_reject_candidate": global_reject_candidate,
+            "terminal_service_lane_failure_candidate": (
+                service_lane_failure_candidate),
+            "terminal_error_kind": terminal_error_kind,
+            "transport_error": f"{type(exc).__name__}: {exc}",
         }
     record["valid"] = not record["contract_violations"] and record["error"] is None
     return record
+
+
+def _ingress_lane(item: base.WorkItem) -> str:
+    """Classify the already-frozen request identity for ingress scheduling.
+
+    The C7 manifest embeds the business tenant in the request ID.  This is
+    only a client-side ingress lane; it is not sent as a controller phase,
+    route, or future-arrival hint.  Keeping the classification here makes the
+    shared-pool artifact and the reserved-interactive artifact differ only in
+    client admission, with identical request bodies and arrival timestamps.
+    """
+
+    request_id = item.request_id
+    if any(marker in request_id for marker in (
+        "-interactive-", "-latency-", "-foreground-",
+    )):
+        return "interactive"
+    return "background"
+
+
+def _business_tenant_id(request_id: str) -> str | None:
+    """Return the frozen business class encoded in a request ID.
+
+    This is an ingress identity only: it carries no phase, route, or future
+    arrival information.  C7's managed-background arm maps both local and
+    remote background traffic to the profile's single ``background`` budget.
+    """
+
+    for tenant in ("latency", "interactive", "batch", "background"):
+        if f"-{tenant}-" in request_id:
+            return tenant
+    return None
 
 
 def run_workload(
@@ -280,17 +485,34 @@ def run_workload(
     served_model_name: str,
     timeout_s: float,
     max_workers: int,
+    ingress_policy: str = "shared_pool",
+    interactive_reserved_workers: int = 0,
     seed: int,
     api_key: str | None,
 ) -> tuple[int, int, list[dict[str, Any]]]:
     _require(type(max_workers) is int and max_workers > 0, "max_workers must be positive")
+    _require(ingress_policy in {"shared_pool", "interactive_reserved"},
+             "unsupported ingress policy")
+    _require(
+        type(interactive_reserved_workers) is int
+        and interactive_reserved_workers >= 0,
+        "interactive_reserved_workers must be a non-negative int",
+    )
+    if ingress_policy == "shared_pool":
+        _require(interactive_reserved_workers == 0,
+                 "shared_pool cannot reserve interactive workers")
+    else:
+        _require(
+            0 < interactive_reserved_workers < max_workers,
+            "interactive_reserved_workers must leave background workers",
+        )
     start_ns = time.perf_counter_ns()
     observer = RUN_START_OBSERVER
     if observer is not None:
         observer(start_ns)
     records: list[dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = [pool.submit(
+    def submit(pool, selected):
+        return [pool.submit(
             execute_request,
             item,
             endpoint=endpoint,
@@ -299,9 +521,30 @@ def run_workload(
             timeout_s=timeout_s,
             seed=seed,
             api_key=api_key,
-        ) for item in items]
-        for future in as_completed(futures):
-            records.append(future.result())
+        ) for item in selected]
+
+    if ingress_policy == "shared_pool":
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = submit(pool, items)
+            for future in as_completed(futures):
+                records.append(future.result())
+    else:
+        interactive = [item for item in items if _ingress_lane(item) == "interactive"]
+        background = [item for item in items if _ingress_lane(item) == "background"]
+        background_workers = max_workers - interactive_reserved_workers
+        # Separate pools are deliberate: submitting background futures first
+        # must never consume the business-reserved interactive lane.  Both
+        # pools share the same open-loop clock and the same frozen workload.
+        with (
+            ThreadPoolExecutor(max_workers=interactive_reserved_workers)
+            as interactive_pool,
+            ThreadPoolExecutor(max_workers=background_workers)
+            as background_pool,
+        ):
+            futures = submit(interactive_pool, interactive)
+            futures.extend(submit(background_pool, background))
+            for future in as_completed(futures):
+                records.append(future.result())
     end_ns = time.perf_counter_ns()
     records.sort(key=lambda value: value["request_index"])
     return start_ns, end_ns, records
@@ -329,6 +572,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--default-max-tokens", type=int, default=32)
     parser.add_argument("--max-workers", type=int, default=1)
+    parser.add_argument(
+        "--ingress-policy",
+        choices=("shared_pool", "interactive_reserved"),
+        default="shared_pool",
+    )
+    parser.add_argument("--interactive-reserved-workers", type=int, default=0)
     parser.add_argument("--request-rate", type=float)
     parser.add_argument("--timeout-s", type=float, default=300.0)
     parser.add_argument("--seed", type=int, default=20260815)
@@ -358,21 +607,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         served_model_name=args.served_model_name,
         timeout_s=args.timeout_s,
         max_workers=args.max_workers,
+        ingress_policy=args.ingress_policy,
+        interactive_reserved_workers=args.interactive_reserved_workers,
         seed=args.seed,
         api_key=api_key,
     )
     decisions = _fetch_decisions(args.base_url, args.timeout_s)
     request_ids = {item.request_id for item in items}
-    decision_rows = [row for row in decisions["decisions"] if row.get("request_id") in request_ids]
-    decision_ids = [row.get("request_id") for row in decision_rows]
-    decisions_exact = (
-        len(decision_ids) == len(request_ids)
-        and set(decision_ids) == request_ids
-        and len(decision_ids) == len(set(decision_ids))
-        and all(row.get("phase") == "complete" and row.get("error") is None
-                for row in decision_rows)
-    )
-    valid = all(row["valid"] for row in records) and decisions_exact
+    decision_rows = [
+        row for row in decisions["decisions"]
+        if row.get("request_id") in request_ids
+    ]
+    decisions_exact = _apply_decision_receipts(records, decision_rows)
+    terminal_contract_valid = (
+        all(row["valid"] for row in records) and decisions_exact)
+    global_rejected_count = sum(
+        row.get("terminal_kind") == "global_reject" for row in records)
+    terminal_error_counts: dict[str, int] = {}
+    for row in records:
+        kind = row.get("terminal_error_kind")
+        if isinstance(kind, str):
+            terminal_error_counts[kind] = terminal_error_counts.get(kind, 0) + 1
+    performance_claim_allowed = (
+        terminal_contract_valid and global_rejected_count == 0)
     artifact = {
         "schema": SCHEMA,
         "evidence": "actual_vllm_pd_router_client_stream",
@@ -395,6 +652,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "sha256": workload_sha256,
             "request_count": len(items),
             "max_workers": args.max_workers,
+            "ingress_policy": args.ingress_policy,
+            "interactive_reserved_workers": args.interactive_reserved_workers,
             "request_rate_per_s": args.request_rate,
             "seed": args.seed,
         },
@@ -406,8 +665,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         },
         "validation": {
             "all_streams_valid": all(row["valid"] for row in records),
+            "completed_count": sum(
+                row.get("terminal_kind") != "global_reject" for row in records),
+            "global_rejected_count": global_rejected_count,
+            "terminal_error_counts": dict(sorted(terminal_error_counts.items())),
             "router_decisions_exact": decisions_exact,
-            "performance_claim_allowed": valid,
+            "terminal_contract_valid": terminal_contract_valid,
+            "performance_claim_allowed": performance_claim_allowed,
         },
         "metric_contract": {
             "clock": "client time.perf_counter_ns",
@@ -420,7 +684,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(artifact, sort_keys=True, indent=2) + "\n",
                            encoding="utf-8")
-    return 0 if valid else 2
+    # A fully receipted overload reject is a valid terminal contract and must
+    # still produce a native raw artifact. It is not, by itself, a performance
+    # claim; that remains false whenever any request was globally rejected.
+    return 0 if terminal_contract_valid else 2
 
 
 if __name__ == "__main__":

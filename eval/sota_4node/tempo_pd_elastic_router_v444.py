@@ -45,6 +45,9 @@ class ElasticExperimentArm(str, Enum):
     ALWAYS_LOCAL = "always_local"
     OFFICIAL_LMCACHE_REMOTE = "official_lmcache_remote"
     PREDICTOR = "predictor"
+    QUEUE_GPU_ONLY = "queue_gpu_only"
+    NETWORK_REQUEST_ONLY = "network_request_only"
+    APP_GLOBAL_ONLY = "app_global_only"
     TEMPO = "tempo"
 
 
@@ -52,6 +55,9 @@ _ARM_MARKERS = {
     "local": ElasticExperimentArm.ALWAYS_LOCAL,
     "remote": ElasticExperimentArm.OFFICIAL_LMCACHE_REMOTE,
     "predictor": ElasticExperimentArm.PREDICTOR,
+    "queue_gpu": ElasticExperimentArm.QUEUE_GPU_ONLY,
+    "network_request_only": ElasticExperimentArm.NETWORK_REQUEST_ONLY,
+    "app_global_only": ElasticExperimentArm.APP_GLOBAL_ONLY,
     "tempo": ElasticExperimentArm.TEMPO,
 }
 

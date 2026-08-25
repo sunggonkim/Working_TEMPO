@@ -1,0 +1,55 @@
+{
+  "schema": "tempo-go-c10-paper-sota-extension-v1",
+  "frozen_utc": "2026-08-25T16:07:58Z",
+  "analysis_only_successor": {
+    "performance_manifest": "eval/sota_4node/tempo_go_c10_paper_sota_extension_v3.json",
+    "performance_manifest_sha256": "61814ce1afae9d61f9f32b90ea22193408ada07043abb284dd2ed168537393e0",
+    "performance_rerun": false,
+    "change": "Read motivational effects from parent.base_campaign.effects and define service dominance when a baseline has zero completed requests and therefore no latency quantile."
+  },
+  "claim_boundary": {
+    "post_hoc_extension": true,
+    "actual_vllm_lmcache_performance_measurement_allowed": true,
+    "independent_validation_claim_allowed": false,
+    "reason": "C10 is a same-allocation post-hoc SOTA extension. A fresh unchanged execution is required before an independent SOTA claim."
+  },
+  "parent_independent_validation": {
+    "path": "eval/sota_4node/tempo_go_c8_independent_validation_contract_v3.json",
+    "sha256": "e2d07e8c50316620cee29a82ae06bbb4e3efd5e8c18c07347a34a4f532f07a76",
+    "analysis": "results/tempo_go_c8_independent_validation_job_57586612_v3/analysis.json",
+    "analysis_sha256": "844d7b317c0c4839f62feb9a748785a328f9b86b05b52949d81486de09719c47",
+    "tempo_result": "results/tempo_go_c8_independent_validation_job_57586612_v3/full_c7_managed_background/result.json",
+    "tempo_result_sha256": "0e2069313073001dac277726cfe01dc607defd2eea69e48d3f414d0a7d68de64"
+  },
+  "policies": {
+    "kairos_x512": {
+      "identity": "Kairos paper-policy reproduction, X={512}",
+      "paper": "https://arxiv.org/html/2607.02043",
+      "result": "results/tempo_go_c10_paper_sota_job_57586612_v2/kairos_x512/result.json",
+      "result_sha256": "49c5f7ec0831c86b6a03401aa4af44188dbf074e90a6efdf5235d9362509c3c8",
+      "raw_sha256": "6aed8344222667427e3f003ca7c5dad9b68659fd5ca31f982143f3d97108d16c"
+    },
+    "netkv": {
+      "identity": "NetKV Algorithm-1 paper-policy reproduction",
+      "paper": "https://arxiv.org/html/2606.03910",
+      "result": "results/tempo_go_c10_paper_sota_job_57586612_v3/netkv/result.json",
+      "result_sha256": "2cbeffd87337961806e448af43e111fc4ef1a202aa8a72acc3f51bee82940759",
+      "raw_sha256": "b77665f61bae34c7aa2f97a4b004de41055abbfa59feda5e14929dfbee7819f3"
+    }
+  },
+  "same_population_contract": {
+    "slurm_job_id": "57586612",
+    "nodes": 4,
+    "gpus": 16,
+    "request_seed": 20260825,
+    "same_parent_block_order": true,
+    "same_arrival_jitter": true,
+    "same_prompt_namespace_transform": true,
+    "same_model_and_tensor_parallelism": true,
+    "same_background_and_victim_offered_population": true
+  },
+  "analysis_source_inventory": {
+    "eval/sota_4node/analyze_tempo_go_c10_paper_sota.py": "401296d47a7f92a56f7e184235744f227e1167707557fdf02cf45eb8cec1889b",
+    "eval/sota_4node/test_tempo_go_c10_paper_baselines.py": "69c299a5e57b65193f2859440de0dbafc1bb2bc2307e61a63b6a7df24f8f3762"
+  }
+}

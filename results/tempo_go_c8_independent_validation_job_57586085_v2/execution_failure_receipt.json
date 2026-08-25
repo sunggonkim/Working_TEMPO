@@ -1,0 +1,8 @@
+{
+  "schema": "tempo-go-c8-independent-failure-v1",
+  "slurm_job_id": "57586085",
+  "failed_arm": "full_c7_managed_background",
+  "contract_sha256": "7f457f65091d738005e6e2dff8666163def2228fe3d3f2fc8539f6bf56e651d9",
+  "terminal": false,
+  "retry_allowed": false
+}

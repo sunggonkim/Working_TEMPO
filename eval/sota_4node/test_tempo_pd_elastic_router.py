@@ -169,6 +169,53 @@ class CanonicalRouterIntegrationTest(unittest.TestCase):
             self.assertEqual(
                 decisions.json()["schema"], router.ROUTER_SCHEMA)
 
+    def test_runtime_telemetry_reuses_bounded_vllm_metrics_sample(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            path.write_text(json.dumps(profile_payload()))
+            profile = load_elastic_profile(path)
+            app = router.build_app(config(), profile, allow_screen_profile=True)
+
+        class FakeResponse:
+            text = (
+                'vllm:num_requests_running{model_name="served",engine="0"} 3\n'
+                'vllm:num_requests_waiting{model_name="served",engine="0"} 1\n'
+                'vllm:kv_cache_usage_perc{model_name="served",engine="0"} 0.25\n'
+            )
+
+            def raise_for_status(self):
+                return None
+
+        class FakeLocal:
+            def __init__(self):
+                self.paths = []
+
+            async def get(self, path):
+                self.paths.append(path)
+                return FakeResponse()
+
+            async def aclose(self):
+                return None
+
+        async def exercise_app():
+            async with app.router.lifespan_context(app):
+                fake_local = FakeLocal()
+                app.state.local = fake_local
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(
+                    transport=transport, base_url="http://testserver"
+                ) as http:
+                    first = await http.get("/tempo/runtime_telemetry")
+                    second = await http.get("/tempo/runtime_telemetry")
+                return first, second, fake_local.paths
+
+        first, second, paths = asyncio.run(exercise_app())
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(paths, ["/metrics"])
+        self.assertFalse(first.json()["vllm_scheduler_fetch"]["cache_hit"])
+        self.assertTrue(second.json()["vllm_scheduler_fetch"]["cache_hit"])
+
     def test_fixed_contention_geometry_is_profile_independent_only(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "profile.json"
@@ -246,6 +293,38 @@ class CanonicalRouterIntegrationTest(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 router.parse_vllm_load_metrics(
                     invalid, served_model_name="served")
+
+    def test_queue_gpu_arm_uses_request_start_scheduler_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            path.write_text(json.dumps(profile_payload()))
+            profile = load_elastic_profile(path)
+            with patch.dict(
+                "os.environ",
+                {router.VLLM_LOAD_SNAPSHOT_MODE_ENV: "observe_only"},
+                clear=False,
+            ):
+                core = router.ElasticPDRouterCore(
+                    config(), profile, allow_screen_profile=True,
+                    cache_residency=lambda _request_id: router.CacheResidency.MISS,
+                )
+        request_id = "epd-queue_gpu-r0-measured-item-0"
+        # The actual HTTP path is covered by the parser/fixture above; inject
+        # the same validated snapshot here to isolate the arm's policy.
+        with core._lock:
+            core._request_vllm_load_snapshots[request_id] = {
+                "schema": router.VLLM_LOAD_SNAPSHOT_SCHEMA,
+                "source": "local_decoder_prometheus_request_start",
+                "decision_mode": "observe_only",
+                "num_requests_running": 16,
+                "num_requests_waiting": 1,
+                "kv_cache_usage_perc": 0.9,
+            }
+        record = core.decide(
+            request_id=request_id, prompt_tokens=10, output_tokens=64)
+        self.assertEqual(record.arm, router.ElasticExperimentArm.QUEUE_GPU_ONLY)
+        self.assertEqual(record.route, router.ElasticRoute.REMOTE)
+        self.assertEqual(record.reason, "queue_gpu_waiting_remote")
 
     def test_analyzer_explicit_cold_contract_is_route_exact(self):
         contract = {
@@ -536,6 +615,52 @@ class CanonicalRouterIntegrationTest(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 perf._decode_hosts(hosts, 0)
+
+    def test_cross_proxy_topology_is_preserved_in_terminal_decoder_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            path.write_text(json.dumps(profile_payload()))
+            profile = load_elastic_profile(path)
+            with patch.dict(
+                "os.environ",
+                {
+                    "TEMPO_PD_LOCAL_DECODER_INDEX": "0",
+                    "TEMPO_PD_REMOTE_DECODE_PLACEMENT": "cross",
+                },
+                clear=False,
+            ):
+                core = router.ElasticPDRouterCore(
+                    config(), profile, allow_screen_profile=True)
+
+        request_id = "epd-remote-r0-cache-miss-measured-cross-receipt-0"
+        core.prepare_prompt_namespace(request_id, "cross-receipt-key")
+        record = core.decide(
+            request_id=request_id, prompt_tokens=10, output_tokens=64)
+        self.assertIs(record.route, router.ElasticRoute.REMOTE)
+        core.mark_upstream_started(request_id)
+        core.mark_first_response_chunk(request_id)
+        core.observe_backend_completion(
+            request_id,
+            route=record.route.value,
+            upstream_headers={
+                "X-Tempo-LMCache-PD-Transfer": "complete",
+                "X-Tempo-LMCache-PD-Prompt-Tokens": "11",
+                "X-Tempo-LMCache-PD-Cached-Tokens": "0",
+                "X-Tempo-LMCache-PD-KV-Bytes": "1100",
+                "X-Tempo-LMCache-PD-Request-Id": request_id,
+            },
+        )
+        core.complete(request_id)
+        row = {
+            value["request_id"]: value for value in core.records()
+        }[request_id]
+        self.assertEqual(row["local_decoder_index"], 0)
+        self.assertEqual(row["remote_decoder_index"], 1)
+        self.assertEqual(
+            row["remote_decoder_index_source"],
+            "fixed_cross_proxy_topology",
+        )
+        self.assertTrue(row["remote_decoder_crossed"])
 
     def test_long_decode_cross_proxy_and_header_selection_are_strict(self):
         hosts = ["prefill-0", "decode-0", "prefill-1", "decode-1"]
@@ -1054,7 +1179,7 @@ class CanonicalRouterIntegrationTest(unittest.TestCase):
                 max_tokens=2, prompt_key="remote-key",
                 cached_tokens=0)
             self.assertIs(seed.route, router.ElasticRoute.REMOTE)
-            self.assertIsNone(seed_event)
+            self.assertIs(seed_event.residency, router.CacheResidency.P_ONLY)
             _, probe_event = complete(
                 "epd-remote-r0-warm-item-00",
                 max_tokens=64, prompt_key="remote-key",
@@ -1136,7 +1261,7 @@ class CanonicalRouterIntegrationTest(unittest.TestCase):
             prompt_key="p-only-key",
             cached_tokens=0,
         )
-        self.assertIsNone(seed_event)
+        self.assertIs(seed_event.residency, router.CacheResidency.P_ONLY)
         complete(
             "epd-remote-r0-warm-item-00",
             prompt_key="p-only-key",

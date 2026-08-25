@@ -206,6 +206,14 @@ def _child_command(
         "--timeout-s", str(args.timeout_s),
         "--seed", str(args.seed),
     ]
+    ingress_policy = getattr(args, "ingress_policy", "shared_pool")
+    interactive_reserved_workers = getattr(
+        args, "interactive_reserved_workers", 0)
+    command.extend((
+        "--ingress-policy", str(ingress_policy),
+        "--interactive-reserved-workers",
+        str(interactive_reserved_workers),
+    ))
     if args.api_key_env:
         command.extend(("--api-key-env", args.api_key_env))
     return command
@@ -248,7 +256,12 @@ def _fetch_endpoint_snapshot(url: str) -> dict[str, object]:
 def _capture_endpoint_evidence(
     urls: list[str], *, stage: str, require_valid_delta: bool,
 ) -> dict[str, object]:
-    _require(stage in {"before", "midpoint", "after"},
+    bridge_stage = (
+        stage.startswith("bridge-")
+        and len(stage) == len("bridge-") + 3
+        and stage[len("bridge-"):].isdigit()
+    )
+    _require(stage in {"before", "midpoint", "after"} or bridge_stage,
              "endpoint evidence stage is invalid")
     _require(len(urls) == 4 and len(set(urls)) == 4,
              "exactly four unique endpoint evidence URLs are required")
@@ -357,14 +370,86 @@ def _validate_endpoint_evidence_bundle(raw: object) -> None:
     _require(isinstance(raw, dict), "endpoint evidence bundle is not an object")
     _require(raw.get("schema") == ENDPOINT_EVIDENCE_SCHEMA,
              "endpoint evidence bundle schema mismatch")
-    _require(raw.get("sampling_policy") ==
-             "on_demand_block_boundary_and_midpoint",
-             "endpoint evidence sampling policy mismatch")
+    policy = raw.get("sampling_policy")
+    _require(
+        policy in {
+            "on_demand_block_boundary_and_midpoint",
+            "on_demand_block_boundary_midpoint_and_cassini_bridges",
+        },
+        "endpoint evidence sampling policy mismatch",
+    )
     _require(raw.get("cross_endpoint_clock_subtraction_allowed") is False,
              "cross-endpoint clock subtraction must be forbidden")
+
+    timeline: list[tuple[str, object]] = [("before", raw.get("before"))]
+    if policy == "on_demand_block_boundary_midpoint_and_cassini_bridges":
+        bridges = raw.get("cassini_bridges")
+        _require(isinstance(bridges, list) and len(bridges) >= 2,
+                 "Cassini bridge evidence is incomplete")
+        _require(
+            [row.get("ordinal") for row in bridges if isinstance(row, dict)]
+            == list(range(len(bridges))),
+            "Cassini bridge ordinals differ",
+        )
+        interval_s = raw.get("cassini_bridge_interval_s")
+        midpoint_s = raw.get("midpoint_target_elapsed_s")
+        _require(
+            isinstance(interval_s, (int, float))
+            and not isinstance(interval_s, bool)
+            and 0.0 < float(interval_s) < 10.0,
+            "Cassini bridge interval is invalid",
+        )
+        _require(
+            isinstance(midpoint_s, (int, float))
+            and not isinstance(midpoint_s, bool)
+            and float(midpoint_s) > float(interval_s),
+            "Cassini midpoint target is invalid",
+        )
+        elapsed: list[float] = []
+        before_bridges: list[tuple[str, object]] = []
+        after_bridges: list[tuple[str, object]] = []
+        for ordinal, row in enumerate(bridges):
+            _require(isinstance(row, dict), "Cassini bridge row is malformed")
+            _require(set(row) == {
+                "ordinal", "segment", "captured_elapsed_s", "evidence",
+            }, "Cassini bridge row inventory differs")
+            segment = row["segment"]
+            _require(segment in {"before_midpoint", "after_midpoint"},
+                     "Cassini bridge segment differs")
+            captured = row["captured_elapsed_s"]
+            _require(
+                isinstance(captured, (int, float))
+                and not isinstance(captured, bool)
+                and float(captured) >= 0.0,
+                "Cassini bridge elapsed time is invalid",
+            )
+            elapsed.append(float(captured))
+            expected_stage = f"bridge-{ordinal:03d}"
+            target = (expected_stage, row["evidence"])
+            if segment == "before_midpoint":
+                _require(float(captured) < float(midpoint_s),
+                         "before-midpoint bridge crossed midpoint")
+                before_bridges.append(target)
+            else:
+                _require(float(captured) >= float(midpoint_s),
+                         "after-midpoint bridge precedes midpoint")
+                after_bridges.append(target)
+        _require(elapsed == sorted(set(elapsed)),
+                 "Cassini bridge elapsed times did not increase")
+        _require(before_bridges and after_bridges,
+                 "Cassini bridge segments are incomplete")
+        timeline.extend(before_bridges)
+        timeline.append(("midpoint", raw.get("midpoint")))
+        timeline.extend(after_bridges)
+        timeline.append(("after", raw.get("after")))
+    else:
+        timeline.extend((
+            ("midpoint", raw.get("midpoint")),
+            ("after", raw.get("after")),
+        ))
+
     histories: dict[str, list[tuple[int, int]]] = collections.defaultdict(list)
-    for expected_stage in ("before", "midpoint", "after"):
-        stage = raw.get(expected_stage)
+    for expected_stage, stage in timeline:
         _require(isinstance(stage, dict), "endpoint evidence stage is missing")
         _require(stage.get("schema") == ENDPOINT_EVIDENCE_SCHEMA,
                  "endpoint evidence stage schema mismatch")
@@ -376,12 +461,20 @@ def _validate_endpoint_evidence_bundle(raw: object) -> None:
         for row in snapshots:
             endpoint = row["probe"]["endpoint"]
             cassini = row["probe"]["cassini"]
+            if (
+                policy ==
+                "on_demand_block_boundary_midpoint_and_cassini_bridges"
+                and expected_stage != "before"
+            ):
+                _require(cassini.get("valid") is True,
+                         "cadenced Cassini evidence contains an invalid delta")
             histories[endpoint["endpoint_id"]].append((
                 endpoint["sequence"], cassini["sequence"]
             ))
     _require(len(histories) == 4, "endpoint evidence identity count differs")
     for history in histories.values():
-        _require(len(history) == 3, "endpoint evidence history is incomplete")
+        _require(len(history) == len(timeline),
+                 "endpoint evidence history is incomplete")
         endpoint_sequences = [item[0] for item in history]
         cassini_sequences = [item[1] for item in history]
         _require(endpoint_sequences == sorted(set(endpoint_sequences)),
@@ -399,10 +492,22 @@ def _expected_route(metadata: dict[str, object]) -> str:
     raise ValueError("fixed screen contains a non-fixed route")
 
 
-def _cold_completion_valid(decision: dict[str, object]) -> bool:
+def _cold_completion_valid(
+    decision: dict[str, object], *, require_explicit_miss: bool = False,
+) -> bool:
+    if type(require_explicit_miss) is not bool:
+        raise TypeError("require_explicit_miss must be bool")
+    expected_decision_residency = (
+        "confirmed_miss" if require_explicit_miss else "unknown"
+    )
     if (
         decision.get("benchmark_cold_measured") is not True
-        or decision.get("decision_cache_residency") != "unknown"
+        or decision.get("decision_cache_residency")
+        != expected_decision_residency
+        or (
+            require_explicit_miss
+            and decision.get("request_cache_contract") != "miss"
+        )
     ):
         return False
     route = decision.get("route")

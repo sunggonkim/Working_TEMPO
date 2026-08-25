@@ -28,7 +28,9 @@ def _router_headers(response, request_id):
     v1._require(result["schema"] == ROUTER_SCHEMA, "elastic router schema mismatch")
     v1._require(result["request_id"] == request_id, "elastic request ID mismatch")
     v1._require(result["arm"] in {
-        "always_local", "official_lmcache_remote", "predictor", "tempo"
+        "always_local", "official_lmcache_remote", "predictor",
+        "queue_gpu_only", "network_request_only", "app_global_only",
+        "tempo"
     }, "elastic arm header mismatch")
     v1._require(result["route"] in {LOCAL_ROUTE, REMOTE_ROUTE},
                 "elastic route header mismatch")

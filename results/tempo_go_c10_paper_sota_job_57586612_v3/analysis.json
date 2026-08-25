@@ -1,0 +1,571 @@
+{
+  "actual_sota_extension_positive": true,
+  "actual_system": {
+    "carrier": "vLLM-0.26.0+cu129/LMCacheConnectorV1/NIXL-CXI/Slingshot11",
+    "gpus": 16,
+    "model": "Qwen2.5-7B-Instruct",
+    "nodes": 4,
+    "tensor_parallel_per_engine": 4
+  },
+  "claim_boundary": {
+    "parent_tempo_independent_validation_positive": true,
+    "post_hoc_extension": true,
+    "reason": "baseline policies were frozen after the parent allocation started; rerun the unchanged C10 contract on a fresh allocation before an independent SOTA claim",
+    "sota_extension_independent_validation_claim_allowed": false,
+    "sota_extension_is_actual_vllm_lmcache": true
+  },
+  "comparisons": {
+    "miss_hot": {
+      "kairos_x512": {
+        "baseline_completed_tail_defined": false,
+        "tempo_completion_delta": 120,
+        "tempo_e2e_p50_reduction_fraction": null,
+        "tempo_e2e_p95_reduction_fraction": null,
+        "tempo_e2e_p99_reduction_fraction": null,
+        "tempo_slo_good_delta": 120,
+        "tempo_strict_service_dominance": true
+      },
+      "netkv": {
+        "baseline_completed_tail_defined": true,
+        "tempo_completion_delta": 3,
+        "tempo_e2e_p50_reduction_fraction": 0.42965057331727735,
+        "tempo_e2e_p95_reduction_fraction": 0.7622033581095617,
+        "tempo_e2e_p99_reduction_fraction": 0.757855813581089,
+        "tempo_slo_good_delta": 47,
+        "tempo_strict_service_dominance": true
+      }
+    },
+    "normal": {
+      "kairos_x512": {
+        "baseline_completed_tail_defined": true,
+        "tempo_completion_delta": 30,
+        "tempo_e2e_p50_reduction_fraction": 0.07522818370405168,
+        "tempo_e2e_p95_reduction_fraction": 0.057903031835913804,
+        "tempo_e2e_p99_reduction_fraction": 0.02275161533102646,
+        "tempo_slo_good_delta": 30,
+        "tempo_strict_service_dominance": true
+      },
+      "netkv": {
+        "baseline_completed_tail_defined": true,
+        "tempo_completion_delta": 0,
+        "tempo_e2e_p50_reduction_fraction": 0.06265396677482885,
+        "tempo_e2e_p95_reduction_fraction": 0.04964854305610231,
+        "tempo_e2e_p99_reduction_fraction": 0.045382342212131214,
+        "tempo_slo_good_delta": 0,
+        "tempo_strict_service_dominance": true
+      }
+    },
+    "remote_favorable": {
+      "kairos_x512": {
+        "baseline_completed_tail_defined": true,
+        "tempo_completion_delta": 29,
+        "tempo_e2e_p50_reduction_fraction": 0.3679370313072522,
+        "tempo_e2e_p95_reduction_fraction": 0.32048497526564856,
+        "tempo_e2e_p99_reduction_fraction": 0.3081794379584378,
+        "tempo_slo_good_delta": 29,
+        "tempo_strict_service_dominance": true
+      },
+      "netkv": {
+        "baseline_completed_tail_defined": true,
+        "tempo_completion_delta": 29,
+        "tempo_e2e_p50_reduction_fraction": 0.9431093972252175,
+        "tempo_e2e_p95_reduction_fraction": 0.9388383416424282,
+        "tempo_e2e_p99_reduction_fraction": 0.9377307471944847,
+        "tempo_slo_good_delta": 30,
+        "tempo_strict_service_dominance": true
+      }
+    }
+  },
+  "gates": {
+    "normal_p50_regression_fraction": -0.06265396677482885,
+    "normal_p50_regression_within_5pct": true,
+    "tempo_beats_every_defined_sota_stressed_p99": true,
+    "tempo_retains_every_sota_stressed_slo_good": true,
+    "tempo_strictly_dominates_every_sota_stressed_service": true
+  },
+  "manifest": "/pscratch/sd/s/sgkim/Skim-Tempo/eval/sota_4node/tempo_go_c10_paper_sota_analysis_contract_v4.json",
+  "manifest_sha256": "60d4958f73774d932b44a9b95f5b5247952ba5fffdc6fae84c0969619a2b0525",
+  "motivational_independent_c9_effects": {
+    "fixed_local_d1": {
+      "miss_hot": {
+        "e2e_p50_reduction_fraction": 0.028951810705483805,
+        "e2e_p99_reduction_fraction": 0.6612196127443124,
+        "slo_good_ratio": 1.2371134020618557
+      },
+      "normal_e2e_p50_regression_fraction": -0.03551306240427987,
+      "remote_favorable": {
+        "e2e_p50_reduction_fraction": 0.8858920842942845,
+        "e2e_p99_reduction_fraction": 0.9151348239734534,
+        "slo_good_ratio": Infinity
+      }
+    },
+    "fixed_remote_p1d0": {
+      "miss_hot": {
+        "e2e_p50_reduction_fraction": 0.7217767742213534,
+        "e2e_p99_reduction_fraction": 0.8611423222767612,
+        "slo_good_ratio": 3.1578947368421053
+      },
+      "normal_e2e_p50_regression_fraction": -0.06124306294852544,
+      "remote_favorable": {
+        "e2e_p50_reduction_fraction": 0.8839247240282685,
+        "e2e_p99_reduction_fraction": 0.9054521394730536,
+        "slo_good_ratio": Infinity
+      }
+    },
+    "predictor": {
+      "miss_hot": {
+        "e2e_p50_reduction_fraction": 0.015463514717487081,
+        "e2e_p99_reduction_fraction": 0.6168744569971273,
+        "slo_good_ratio": 1.2
+      },
+      "normal_e2e_p50_regression_fraction": 0.0019190340111649995,
+      "remote_favorable": {
+        "e2e_p50_reduction_fraction": 0.9248866556702101,
+        "e2e_p99_reduction_fraction": 0.9335958185873513,
+        "slo_good_ratio": 2.3076923076923075
+      }
+    },
+    "queue_gpu": {
+      "miss_hot": {
+        "e2e_p50_reduction_fraction": -0.01680480310690524,
+        "e2e_p99_reduction_fraction": 0.5847610194078742,
+        "slo_good_ratio": 1.0344827586206897
+      },
+      "normal_e2e_p50_regression_fraction": 0.007880091109284226,
+      "remote_favorable": {
+        "e2e_p50_reduction_fraction": 0.9235445908545049,
+        "e2e_p99_reduction_fraction": 0.9354044018249156,
+        "slo_good_ratio": 2.3076923076923075
+      }
+    }
+  },
+  "paper_baseline_non_tempo_admission_gate": true,
+  "paper_baselines": {
+    "kairos_x512": {
+      "execution": {
+        "arrival_jitter": {
+          "algorithm": "sha256_centered_subspacing_v1",
+          "controller_input": false,
+          "maximum_spacing_fraction": 0.25,
+          "same_count_rate_duration_in_every_arm": true
+        },
+        "block_order": [
+          "06_control_b",
+          "05_p_only_dual_decoder_hot",
+          "04_combined_hot_d1",
+          "03_remote_cool_hot_d1",
+          "02_combined_hot_d0",
+          "01_remote_cool_hot_d0",
+          "00_control_a"
+        ],
+        "p_only_prompt_namespace": {
+          "algorithm": "c8_marker_offset_v1",
+          "base_marker": 240000,
+          "controller_input": false,
+          "marker_offset": 8192
+        },
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c10_paper_sota_job_57586612_v2/kairos_x512/tempo_go_c10_paper_sota/raw.json",
+        "raw_sha256": "6aed8344222667427e3f003ca7c5dad9b68659fd5ca31f982143f3d97108d16c",
+        "request_seed": 20260825
+      },
+      "metrics": {
+        "miss_hot": {
+          "completed": 0,
+          "e2e_ms": {
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "p99": null
+          },
+          "edge_counts": {},
+          "failures": 0,
+          "global_rejects": 120,
+          "offered": 120,
+          "route_counts": {},
+          "slo_attainment": 0.0,
+          "slo_good": 0,
+          "tpot_ms": {
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "p99": null
+          },
+          "ttft_ms": {
+            "mean": null,
+            "p50": null,
+            "p95": null,
+            "p99": null
+          }
+        },
+        "normal": {
+          "completed": 30,
+          "e2e_ms": {
+            "mean": 3151.933927366667,
+            "p50": 3146.546126,
+            "p95": 3215.449245,
+            "p99": 3223.210701
+          },
+          "edge_counts": {
+            "remote:p0->d0": 30
+          },
+          "failures": 0,
+          "global_rejects": 30,
+          "offered": 60,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 30
+          },
+          "slo_attainment": 0.5,
+          "slo_good": 30,
+          "tpot_ms": {
+            "mean": 22.081027130446195,
+            "p50": 22.039658039370078,
+            "p95": 22.508345937007874,
+            "p99": 22.51729469291339
+          },
+          "ttft_ms": {
+            "mean": 347.3142946666667,
+            "p50": 339.690158,
+            "p95": 384.415012,
+            "p99": 384.924777
+          }
+        },
+        "remote_favorable": {
+          "completed": 1,
+          "e2e_ms": {
+            "mean": 4852.704966,
+            "p50": 4852.704966,
+            "p95": 4852.704966,
+            "p99": 4852.704966
+          },
+          "edge_counts": {
+            "remote:p0->d1": 1
+          },
+          "failures": 0,
+          "global_rejects": 29,
+          "offered": 30,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 1
+          },
+          "slo_attainment": 0.03333333333333333,
+          "slo_good": 1,
+          "tpot_ms": {
+            "mean": 35.721613228346456,
+            "p50": 35.721613228346456,
+            "p95": 35.721613228346456,
+            "p99": 35.721613228346456
+          },
+          "ttft_ms": {
+            "mean": 315.994619,
+            "p50": 315.994619,
+            "p95": 315.994619,
+            "p99": 315.994619
+          }
+        }
+      },
+      "non_tempo_admission_evidence": {
+        "admission_classes": {
+          "background": 2748,
+          "protected": 31
+        },
+        "artifact_count": 7,
+        "gate": true,
+        "max_wait_ns": 0,
+        "mode": "evidence_only_no_throttle",
+        "policy_effect": "none",
+        "receipt_count": 2779,
+        "released_count": 2779,
+        "snapshot_count": 7
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c10_paper_sota_job_57586612_v2/kairos_x512/result.json",
+      "result_sha256": "49c5f7ec0831c86b6a03401aa4af44188dbf074e90a6efdf5235d9362509c3c8"
+    },
+    "netkv": {
+      "execution": {
+        "arrival_jitter": {
+          "algorithm": "sha256_centered_subspacing_v1",
+          "controller_input": false,
+          "maximum_spacing_fraction": 0.25,
+          "same_count_rate_duration_in_every_arm": true
+        },
+        "block_order": [
+          "06_control_b",
+          "05_p_only_dual_decoder_hot",
+          "04_combined_hot_d1",
+          "03_remote_cool_hot_d1",
+          "02_combined_hot_d0",
+          "01_remote_cool_hot_d0",
+          "00_control_a"
+        ],
+        "p_only_prompt_namespace": {
+          "algorithm": "c8_marker_offset_v1",
+          "base_marker": 240000,
+          "controller_input": false,
+          "marker_offset": 8192
+        },
+        "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c10_paper_sota_job_57586612_v3/netkv/tempo_go_c10_paper_sota/raw.json",
+        "raw_sha256": "b77665f61bae34c7aa2f97a4b004de41055abbfa59feda5e14929dfbee7819f3",
+        "request_seed": 20260825
+      },
+      "metrics": {
+        "miss_hot": {
+          "completed": 117,
+          "e2e_ms": {
+            "mean": 7116.118450512821,
+            "p50": 5362.484128,
+            "p95": 13586.958484,
+            "p99": 13779.741733
+          },
+          "edge_counts": {
+            "local:d0": 51,
+            "local:d1": 29,
+            "remote:p0->d0": 33,
+            "remote:p0->d1": 3,
+            "remote:p1->d1": 1
+          },
+          "failures": 0,
+          "global_rejects": 3,
+          "offered": 120,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 80,
+            "official_lmcache_remote_prefill": 37
+          },
+          "slo_attainment": 0.6083333333333333,
+          "slo_good": 73,
+          "tpot_ms": {
+            "mean": 42.727342920519554,
+            "p50": 24.999498141732282,
+            "p95": 88.8937977480315,
+            "p99": 90.38997351181102
+          },
+          "ttft_ms": {
+            "mean": 1689.6276553247862,
+            "p50": 2193.677639,
+            "p95": 2371.36184,
+            "p99": 2444.824514
+          }
+        },
+        "normal": {
+          "completed": 60,
+          "e2e_ms": {
+            "mean": 3110.79668545,
+            "p50": 3104.33615,
+            "p95": 3187.520746,
+            "p99": 3299.622027
+          },
+          "edge_counts": {
+            "remote:p0->d0": 30,
+            "remote:p1->d1": 30
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 60,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 60
+          },
+          "slo_attainment": 1.0,
+          "slo_good": 60,
+          "tpot_ms": {
+            "mean": 21.750224406036747,
+            "p50": 21.665886874015747,
+            "p95": 22.360883866141734,
+            "p99": 22.773263929133858
+          },
+          "ttft_ms": {
+            "mean": 348.32432443333335,
+            "p50": 347.291195,
+            "p95": 384.218878,
+            "p99": 452.586471
+          }
+        },
+        "remote_favorable": {
+          "completed": 1,
+          "e2e_ms": {
+            "mean": 53914.266283,
+            "p50": 53914.266283,
+            "p95": 53914.266283,
+            "p99": 53914.266283
+          },
+          "edge_counts": {
+            "remote:p0->d1": 1
+          },
+          "failures": 0,
+          "global_rejects": 29,
+          "offered": 30,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 1
+          },
+          "slo_attainment": 0.0,
+          "slo_good": 0,
+          "tpot_ms": {
+            "mean": 421.88791637007876,
+            "p50": 421.88791637007876,
+            "p95": 421.88791637007876,
+            "p99": 421.88791637007876
+          },
+          "ttft_ms": {
+            "mean": 334.177279,
+            "p50": 334.177279,
+            "p95": 334.177279,
+            "p99": 334.177279
+          }
+        }
+      },
+      "non_tempo_admission_evidence": {
+        "admission_classes": {
+          "background": 2748,
+          "protected": 178
+        },
+        "artifact_count": 7,
+        "gate": true,
+        "max_wait_ns": 0,
+        "mode": "evidence_only_no_throttle",
+        "policy_effect": "none",
+        "receipt_count": 2926,
+        "released_count": 2926,
+        "snapshot_count": 7
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c10_paper_sota_job_57586612_v3/netkv/result.json",
+      "result_sha256": "2cbeffd87337961806e448af43e111fc4ef1a202aa8a72acc3f51bee82940759"
+    }
+  },
+  "same_allocation_gate": true,
+  "same_heldout_workload_identity_gate": true,
+  "schema": "tempo-go-c10-paper-sota-analysis-v1",
+  "slurm_job_ids": [
+    "57586612"
+  ],
+  "tempo": {
+    "execution": {
+      "arrival_jitter": {
+        "algorithm": "sha256_centered_subspacing_v1",
+        "controller_input": false,
+        "maximum_spacing_fraction": 0.25,
+        "same_count_rate_duration_in_every_arm": true
+      },
+      "block_order": [
+        "06_control_b",
+        "05_p_only_dual_decoder_hot",
+        "04_combined_hot_d1",
+        "03_remote_cool_hot_d1",
+        "02_combined_hot_d0",
+        "01_remote_cool_hot_d0",
+        "00_control_a"
+      ],
+      "p_only_prompt_namespace": {
+        "algorithm": "c8_marker_offset_v1",
+        "base_marker": 240000,
+        "controller_input": false,
+        "marker_offset": 8192
+      },
+      "raw": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/full_c7_managed_background/tempo_go_c8_independent_validation/raw.json",
+      "raw_sha256": "d58df76277058472825ff98a7e9221b6acb618bde682052f9a2bb80e0a336ea6",
+      "request_seed": 20260825
+    },
+    "metrics": {
+      "miss_hot": {
+        "completed": 120,
+        "e2e_ms": {
+          "mean": 3068.1454928666667,
+          "p50": 3058.489748,
+          "p95": 3230.933101,
+          "p99": 3336.684351
+        },
+        "edge_counts": {
+          "local:d1": 120
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "offered": 120,
+        "route_counts": {
+          "decoder_local_chunked_prefill": 120
+        },
+        "slo_attainment": 1.0,
+        "slo_good": 120,
+        "tpot_ms": {
+          "mean": 22.75709920597113,
+          "p50": 22.808859566929137,
+          "p95": 23.594725362204723,
+          "p99": 24.136794811023623
+        },
+        "ttft_ms": {
+          "mean": 177.92005155,
+          "p50": 150.773984,
+          "p95": 264.286809,
+          "p99": 365.203982
+        }
+      },
+      "normal": {
+        "completed": 60,
+        "e2e_ms": {
+          "mean": 2906.2418574666667,
+          "p50": 2909.837176,
+          "p95": 3029.264985,
+          "p99": 3149.877451
+        },
+        "edge_counts": {
+          "local:d0": 35,
+          "local:d1": 25
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "offered": 60,
+        "route_counts": {
+          "decoder_local_chunked_prefill": 60
+        },
+        "slo_attainment": 1.0,
+        "slo_good": 60,
+        "tpot_ms": {
+          "mean": 21.59770907742782,
+          "p50": 21.710853992125983,
+          "p95": 22.2816871496063,
+          "p99": 22.815429267716535
+        },
+        "ttft_ms": {
+          "mean": 163.24025993333333,
+          "p50": 157.293929,
+          "p95": 175.291342,
+          "p99": 361.08209
+        }
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "e2e_ms": {
+          "mean": 3111.351765433333,
+          "p50": 3067.215107,
+          "p95": 3297.485935,
+          "p99": 3357.201077
+        },
+        "edge_counts": {
+          "local:d1": 1,
+          "remote:p0->d0": 9,
+          "remote:p0->d1": 6,
+          "remote:p1->d0": 8,
+          "remote:p1->d1": 6
+        },
+        "failures": 0,
+        "global_rejects": 0,
+        "offered": 30,
+        "route_counts": {
+          "decoder_local_chunked_prefill": 1,
+          "official_lmcache_remote_prefill": 29
+        },
+        "slo_attainment": 1.0,
+        "slo_good": 30,
+        "tpot_ms": {
+          "mean": 22.130350362729658,
+          "p50": 21.876542149606298,
+          "p95": 23.406030433070864,
+          "p99": 23.851650716535435
+        },
+        "ttft_ms": {
+          "mean": 300.6094381666666,
+          "p50": 288.522687,
+          "p95": 424.174552,
+          "p99": 463.21636
+        }
+      }
+    },
+    "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c8_independent_validation_job_57586612_v3/full_c7_managed_background/result.json",
+    "result_sha256": "0e2069313073001dac277726cfe01dc607defd2eea69e48d3f414d0a7d68de64"
+  }
+}

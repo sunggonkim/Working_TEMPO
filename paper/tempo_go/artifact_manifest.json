@@ -1,0 +1,123 @@
+{
+  "schema": "tempo-go-paper-artifact-manifest-v1",
+  "frozen_utc": "2026-08-25T16:25:05Z",
+  "branch": "codex/tempo-rd-prototype",
+  "paper": {
+    "source": {
+      "path": "paper/tempo_go/main.tex",
+      "sha256": "24487c089816a2758b66aed4c77d6068dde02c6be5a54c427bba2d0268e9e98b"
+    },
+    "bibliography": {
+      "path": "paper/tempo_go/references.bib",
+      "sha256": "09ccf566a4c7b2fbd2f15e48586b3d257f67a93f4ba6d87abd3e44f598d094dc"
+    },
+    "pdf": {
+      "path": "paper/tempo_go/main.pdf",
+      "sha256": "3e35c65a92230ceef4576bff1ac5aa7ed42a33b82d76ab57a2d5cb2e3877f60f",
+      "pages": 7,
+      "build_diagnostics": {
+        "latex_errors": 0,
+        "undefined_citations": 0,
+        "undefined_references": 0,
+        "overfull_boxes": 0
+      }
+    },
+    "unified_goal_state": {
+      "path": "paper/TEMPO_GO_UNIFIED_GOAL_STATE_AND_EXECUTION_PLAN.ko.md",
+      "sha256": "fdb2f0c99f08cf085881db3cb8d76aaff7c80fc3fbf30d185c9bb1df413e3e4a"
+    }
+  },
+  "c9_independent_validation": {
+    "claim_boundary": "Fresh-allocation, one-shot, source-frozen independent four-node whole-system claim.",
+    "independent_validation_claim_allowed": true,
+    "contract": {
+      "path": "eval/sota_4node/tempo_go_c8_independent_validation_contract_v3.json",
+      "sha256": "e2d07e8c50316620cee29a82ae06bbb4e3efd5e8c18c07347a34a4f532f07a76"
+    },
+    "analysis": {
+      "path": "results/tempo_go_c8_independent_validation_job_57586612_v3/analysis.json",
+      "sha256": "844d7b317c0c4839f62feb9a748785a328f9b86b05b52949d81486de09719c47"
+    },
+    "tempo_result": {
+      "path": "results/tempo_go_c8_independent_validation_job_57586612_v3/full_c7_managed_background/result.json",
+      "sha256": "0e2069313073001dac277726cfe01dc607defd2eea69e48d3f414d0a7d68de64"
+    },
+    "headline": {
+      "normal": {"slo_good": 60, "offered": 60, "e2e_p99_ms": 3149.877},
+      "miss_hot": {"slo_good": 120, "offered": 120, "e2e_p99_ms": 3336.684},
+      "remote_favorable": {"slo_good": 30, "offered": 30, "e2e_p99_ms": 3357.201},
+      "stressed_p99_reduction_percent": {
+        "strongest_fixed": [66.12, 90.55],
+        "predictor": [61.69, 93.36],
+        "queue_gpu": [58.48, 93.54]
+      },
+      "background_completion_fraction": 0.85755,
+      "minimum_block_tenant_completion_fraction": 0.76496,
+      "background_jain_fairness": 0.99787,
+      "telemetry_overhead_p50_ms": 28.62,
+      "telemetry_overhead_p99_ms": 132.42
+    },
+    "aggregate_arm_results": {
+      "fixed_local_d0": "f7c6310896a597c22903a074efa2c721a988e1f913bb324ba7898c050bb5d53c",
+      "fixed_local_d1": "f3a84e793db84ddefd99d1a3273bfaf40ee785c714162e65a21ed0c98ea708df",
+      "fixed_remote_p0d1": "23a03a9bb237301238366d64b5d178b14d14c28d63b9988b9e6b55b70844c133",
+      "fixed_remote_p1d0": "3936e2f02dc138765745bd3d5738083599577cfea556e4921b29896159534387",
+      "full_c7_managed_background": "0e2069313073001dac277726cfe01dc607defd2eea69e48d3f414d0a7d68de64",
+      "predictor": "f7db052fd0a77fbcd020237247ba71ac578401c4c2815dd6a033cc0402e5e6ce",
+      "queue_gpu": "00128b06e99833e1c24839a2223b5a8dec31a9bd5bd62a54eddca73b3ffaed03"
+    },
+    "unsupported_in_headline_run": [
+      "nccl_collective_p99_ms",
+      "nccl_arrival_spread_ms",
+      "lmcache_transfer_p99_ms"
+    ]
+  },
+  "c10_paper_policy_extension": {
+    "claim_boundary": "Actual four-node same-carrier post-hoc extension; not an independent SOTA claim.",
+    "independent_validation_claim_allowed": false,
+    "kairos_scope": "Restricted X={512} stock-vLLM subset reproduction; not full Kairos.",
+    "contract": {
+      "path": "eval/sota_4node/tempo_go_c10_paper_sota_analysis_contract_v4.json",
+      "sha256": "60d4958f73774d932b44a9b95f5b5247952ba5fffdc6fae84c0969619a2b0525"
+    },
+    "analysis": {
+      "path": "results/tempo_go_c10_paper_sota_job_57586612_v3/analysis.json",
+      "sha256": "bdf8604b96715cd31163101cdb4c684feb8fc26aa0d9af0bcf285c558e9a5d0f"
+    },
+    "baseline_results": {
+      "kairos_x512": {
+        "path": "results/tempo_go_c10_paper_sota_job_57586612_v2/kairos_x512/result.json",
+        "sha256": "49c5f7ec0831c86b6a03401aa4af44188dbf074e90a6efdf5235d9362509c3c8"
+      },
+      "netkv": {
+        "path": "results/tempo_go_c10_paper_sota_job_57586612_v3/netkv/result.json",
+        "sha256": "2cbeffd87337961806e448af43e111fc4ef1a202aa8a72acc3f51bee82940759"
+      }
+    },
+    "tempo_vs_netkv_p99_reduction_percent": {
+      "normal": 4.54,
+      "miss_hot": 75.79,
+      "remote_favorable": 93.77
+    },
+    "tempo_vs_kairos_x512_p99_reduction_percent": {
+      "normal": 2.28,
+      "miss_hot": null,
+      "remote_favorable": 30.82
+    }
+  },
+  "logical_hierarchy_scale": {
+    "claim_boundary": "CPU control-plane only; no native scale, GPU, transport, or inference-performance claim.",
+    "contract": {
+      "path": "eval/sota_4node/tempo_go_hierarchy_scale_contract_20260825.json",
+      "sha256": "7f7753a4bdb0de4fe4f5effdd750b5ba189fb6678060f1e3904772d9880772a2"
+    },
+    "result": {
+      "path": "results/tempo_go_hierarchy_scale_20260825_c9_c10_r15.json",
+      "sha256": "90f4e2ab3b3645e7c4ee62c3c95a11f1debb0cb2eb400bb189ac85b36e047088"
+    },
+    "pairs": 1024,
+    "global_payload_reduction_percent": 87.499,
+    "bounded_total_p50_ms": 85.329,
+    "bounded_total_p99_ms": 158.241
+  }
+}

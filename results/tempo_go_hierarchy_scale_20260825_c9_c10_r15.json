@@ -1,0 +1,245 @@
+{
+  "bounded_path": {
+    "max_pairs_per_shard": 2,
+    "max_routes_per_pair": 2,
+    "shard_count": 64
+  },
+  "claim_boundary": "No GPU, NCCL, LMCache, Slingshot, latency, goodput, or production claim",
+  "full_global_scan": "all pair candidates reach one reducer",
+  "pair_agent_input_prepartitioned": true,
+  "pair_agent_timing_scope": "local frontier ranking and receipt construction after ownership partition; input partition is not charged to each agent",
+  "repeats": 15,
+  "same_population": true,
+  "scales": [
+    {
+      "bounded_fingerprint_sha256": "7fa5a067340e411fd728034b7a57f649d2906e967818a0c69b9eedf4a3f807ed",
+      "bounded_forwarded_candidate_count": 4,
+      "bounded_global_payload_bytes": 1296,
+      "bounded_global_reduction": {
+        "max_ms": 1.941149,
+        "min_ms": 1.7083,
+        "p50_ms": 1.731956,
+        "p99_ms": 1.941149
+      },
+      "bounded_omitted_pair_count": 0,
+      "bounded_selected_identity_count": 4,
+      "bounded_total_control_path": {
+        "max_ms": 2.049839,
+        "min_ms": 1.779448,
+        "p50_ms": 1.804767,
+        "p99_ms": 2.049839
+      },
+      "full_forwarded_candidate_count": 4,
+      "full_payload_bytes": 1296,
+      "full_reduction": {
+        "max_ms": 0.421094,
+        "min_ms": 0.178856,
+        "p50_ms": 0.183324,
+        "p99_ms": 0.421094
+      },
+      "full_selected_identity_count": 4,
+      "pair_agent_frontier_build": {
+        "max_ms": 0.10869,
+        "min_ms": 0.069594,
+        "p50_ms": 0.07237,
+        "p99_ms": 0.10869
+      },
+      "pair_count": 2,
+      "payload_reduction_fraction": 0.0,
+      "raw_candidate_count": 4,
+      "receipt_schema": "tempo-go-reduction-receipt-v1"
+    },
+    {
+      "bounded_fingerprint_sha256": "4d9dfcc9342bd329f6a414511f5866232ce022890c80dd336c74619b17c2b85d",
+      "bounded_forwarded_candidate_count": 16,
+      "bounded_global_payload_bytes": 5181,
+      "bounded_global_reduction": {
+        "max_ms": 2.132709,
+        "min_ms": 2.074187,
+        "p50_ms": 2.108072,
+        "p99_ms": 2.132709
+      },
+      "bounded_omitted_pair_count": 0,
+      "bounded_selected_identity_count": 16,
+      "bounded_total_control_path": {
+        "max_ms": 2.3891440000000004,
+        "min_ms": 2.3261329999999996,
+        "p50_ms": 2.365279,
+        "p99_ms": 2.3891440000000004
+      },
+      "full_forwarded_candidate_count": 16,
+      "full_payload_bytes": 5181,
+      "full_reduction": {
+        "max_ms": 0.499073,
+        "min_ms": 0.46591,
+        "p50_ms": 0.474807,
+        "p99_ms": 0.499073
+      },
+      "full_selected_identity_count": 16,
+      "pair_agent_frontier_build": {
+        "max_ms": 0.259111,
+        "min_ms": 0.247518,
+        "p50_ms": 0.25373,
+        "p99_ms": 0.259111
+      },
+      "pair_count": 8,
+      "payload_reduction_fraction": 0.0,
+      "raw_candidate_count": 16,
+      "receipt_schema": "tempo-go-reduction-receipt-v1"
+    },
+    {
+      "bounded_fingerprint_sha256": "c236c42eb944c0f05b8213f89d3f6998a68f31577c11eb3effd1a06ad330edc4",
+      "bounded_forwarded_candidate_count": 64,
+      "bounded_global_payload_bytes": 20760,
+      "bounded_global_reduction": {
+        "max_ms": 3.648347,
+        "min_ms": 3.541481,
+        "p50_ms": 3.563403,
+        "p99_ms": 3.648347
+      },
+      "bounded_omitted_pair_count": 0,
+      "bounded_selected_identity_count": 64,
+      "bounded_total_control_path": {
+        "max_ms": 4.624613,
+        "min_ms": 4.50345,
+        "p50_ms": 4.528628,
+        "p99_ms": 4.624613
+      },
+      "full_forwarded_candidate_count": 64,
+      "full_payload_bytes": 20760,
+      "full_reduction": {
+        "max_ms": 2.11755,
+        "min_ms": 1.601493,
+        "p50_ms": 1.609018,
+        "p99_ms": 2.11755
+      },
+      "full_selected_identity_count": 64,
+      "pair_agent_frontier_build": {
+        "max_ms": 0.987067,
+        "min_ms": 0.952159,
+        "p50_ms": 0.964543,
+        "p99_ms": 0.987067
+      },
+      "pair_count": 32,
+      "payload_reduction_fraction": 0.0,
+      "raw_candidate_count": 64,
+      "receipt_schema": "tempo-go-reduction-receipt-v1"
+    },
+    {
+      "bounded_fingerprint_sha256": "eded345312eb5df622d1b0f28d36a9624513c4734b532718b45853f60eb6db17",
+      "bounded_forwarded_candidate_count": 256,
+      "bounded_global_payload_bytes": 83153,
+      "bounded_global_reduction": {
+        "max_ms": 9.502163,
+        "min_ms": 9.312227,
+        "p50_ms": 9.395007,
+        "p99_ms": 9.502163
+      },
+      "bounded_omitted_pair_count": 0,
+      "bounded_selected_identity_count": 256,
+      "bounded_total_control_path": {
+        "max_ms": 13.256366,
+        "min_ms": 13.022484,
+        "p50_ms": 13.142666,
+        "p99_ms": 13.256366
+      },
+      "full_forwarded_candidate_count": 256,
+      "full_payload_bytes": 83153,
+      "full_reduction": {
+        "max_ms": 64.006451,
+        "min_ms": 6.123197,
+        "p50_ms": 6.193823,
+        "p99_ms": 64.006451
+      },
+      "full_selected_identity_count": 256,
+      "pair_agent_frontier_build": {
+        "max_ms": 3.855899,
+        "min_ms": 3.702882,
+        "p50_ms": 3.735004,
+        "p99_ms": 3.855899
+      },
+      "pair_count": 128,
+      "payload_reduction_fraction": 0.0,
+      "raw_candidate_count": 256,
+      "receipt_schema": "tempo-go-reduction-receipt-v1"
+    },
+    {
+      "bounded_fingerprint_sha256": "aba15f7d5cca5aa1aa4d8977b531098921e9ae605b05ff5ae5d6c0c9bad1a960",
+      "bounded_forwarded_candidate_count": 256,
+      "bounded_global_payload_bytes": 83322,
+      "bounded_global_reduction": {
+        "max_ms": 30.774291,
+        "min_ms": 28.147989,
+        "p50_ms": 29.151367,
+        "p99_ms": 30.774291
+      },
+      "bounded_omitted_pair_count": 384,
+      "bounded_selected_identity_count": 256,
+      "bounded_total_control_path": {
+        "max_ms": 47.827469,
+        "min_ms": 42.756487,
+        "p50_ms": 43.962806,
+        "p99_ms": 47.827469
+      },
+      "full_forwarded_candidate_count": 1024,
+      "full_payload_bytes": 333274,
+      "full_reduction": {
+        "max_ms": 88.104287,
+        "min_ms": 24.071285,
+        "p50_ms": 24.824871,
+        "p99_ms": 88.104287
+      },
+      "full_selected_identity_count": 1024,
+      "pair_agent_frontier_build": {
+        "max_ms": 17.053178,
+        "min_ms": 14.596674,
+        "p50_ms": 14.780008,
+        "p99_ms": 17.053178
+      },
+      "pair_count": 512,
+      "payload_reduction_fraction": 0.7499894981306672,
+      "raw_candidate_count": 1024,
+      "receipt_schema": "tempo-go-reduction-receipt-v1"
+    },
+    {
+      "bounded_fingerprint_sha256": "dc8737e4530a304b66cf76e24e40377a2fff5466191d28ecd0ec5d8a784a3e75",
+      "bounded_forwarded_candidate_count": 256,
+      "bounded_global_payload_bytes": 83358,
+      "bounded_global_reduction": {
+        "max_ms": 128.983628,
+        "min_ms": 54.002709,
+        "p50_ms": 55.428553,
+        "p99_ms": 128.983628
+      },
+      "bounded_omitted_pair_count": 896,
+      "bounded_selected_identity_count": 256,
+      "bounded_total_control_path": {
+        "max_ms": 158.24089,
+        "min_ms": 82.94105400000001,
+        "p50_ms": 85.328867,
+        "p99_ms": 158.24089
+      },
+      "full_forwarded_candidate_count": 2048,
+      "full_payload_bytes": 666815,
+      "full_reduction": {
+        "max_ms": 152.842072,
+        "min_ms": 48.843714,
+        "p50_ms": 49.743072,
+        "p99_ms": 152.842072
+      },
+      "full_selected_identity_count": 2048,
+      "pair_agent_frontier_build": {
+        "max_ms": 82.594465,
+        "min_ms": 28.938345,
+        "p50_ms": 29.646874,
+        "p99_ms": 82.594465
+      },
+      "pair_count": 1024,
+      "payload_reduction_fraction": 0.874990814543764,
+      "raw_candidate_count": 2048,
+      "receipt_schema": "tempo-go-reduction-receipt-v1"
+    }
+  ],
+  "schema": "tempo-go-hierarchy-scale-receipt-v1",
+  "scope": "CPU control-plane only"
+}

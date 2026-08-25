@@ -23,7 +23,7 @@ from tempo.domain_evidence import CounterSupport
 from tempo.pd_endpoint_evidence import PDEndpointIdentity, PDEndpointRole
 
 
-SCHEMA = "tempo-cassini-endpoint-v2"
+SCHEMA = "tempo-cassini-endpoint-v4"
 
 _TRAFFIC_CLASSES = tuple(range(8))
 _CORE_COUNTERS = (
@@ -44,6 +44,9 @@ _OPTIONAL_COUNTER_GROUPS: dict[str, tuple[str, ...]] = {
         *(f"hni_pkts_recv_by_tc_{traffic_class}"
           for traffic_class in _TRAFFIC_CLASSES),
     ),
+    "oxe_channel_idle_fraction": (
+        "oxe_channel_idle",
+    ),
     "receive_overflow_fraction": (
         "lpe_net_match_priority_0",
         "lpe_net_match_overflow_0",
@@ -63,6 +66,11 @@ _OPTIONAL_COUNTER_GROUPS: dict[str, tuple[str, ...]] = {
         "pct_spt_timeouts",
     ),
 }
+_OPTIONAL_COUNTER_TO_GROUP = {
+    counter: group
+    for group, counters in _OPTIONAL_COUNTER_GROUPS.items()
+    for counter in counters
+}
 
 _SIGNAL_KEYS = frozenset({
     "rx_pause_fraction_max",
@@ -73,6 +81,13 @@ _SIGNAL_KEYS = frozenset({
     "host_nonposted_cycles_per_packet_max",
     "tx_packets",
     "rx_packets",
+    "tx_packets_per_s",
+    "rx_packets_per_s",
+    "oxe_channel_idle_fraction_min",
+    "oxe_channel_idle_fraction_mean",
+    "oxe_channel_idle_fraction_max",
+    "oxe_channel_active_fraction_max",
+    "oxe_channel_active_fraction_mean",
     "receive_overflow_fraction_max",
     "receive_overflow_fraction_mean",
     "ecn_fraction_max",
@@ -187,7 +202,34 @@ class CassiniEndpointSampler:
     def _empty_signals(self) -> dict[str, None]:
         return {key: None for key in sorted(_SIGNAL_KEYS)}
 
-    def _base(self) -> dict[str, object]:
+    def _empty_nic_signals(self) -> list[dict[str, object]]:
+        return [
+            {
+                "nic_index": nic,
+                "traffic_classes": [
+                    {
+                        "traffic_class": traffic_class,
+                        "rx_pause_fraction": None,
+                        "tx_pause_fraction": None,
+                    }
+                    for traffic_class in _TRAFFIC_CLASSES
+                ],
+                "host_posted_cycles_per_packet": None,
+                "tx_packets": None,
+                "rx_packets": None,
+                "tx_packets_per_s": None,
+                "rx_packets_per_s": None,
+                "oxe_channel_idle_fraction": None,
+                "oxe_channel_active_fraction": None,
+            }
+            for nic in range(self.nic_count)
+        ]
+
+    def _base(
+        self,
+        support: dict[str, CounterSupport] | None = None,
+    ) -> dict[str, object]:
+        selected = self._support if support is None else support
         return {
             "schema": SCHEMA,
             "endpoint_id": self.identity.endpoint_id,
@@ -196,8 +238,8 @@ class CassiniEndpointSampler:
             "source": "cassini_sysfs_endpoint_delta",
             "nic_count": self.nic_count,
             "support": {
-                name: self._support[name].value
-                for name in sorted(self._support)
+                name: selected[name].value
+                for name in sorted(selected)
             },
         }
 
@@ -214,6 +256,7 @@ class CassiniEndpointSampler:
             "cache_age_ms": 0.0,
             "window_ms": None,
             "signals": self._empty_signals(),
+            "by_nic": self._empty_nic_signals(),
         }
 
     def sample(self, *, force: bool = False) -> dict[str, Any]:
@@ -260,11 +303,17 @@ class CassiniEndpointSampler:
                 return self._with_age(result, sampled_ns)
 
             deltas: dict[tuple[int, str], tuple[int, int]] = {}
+            sample_support = dict(self._support)
+            unavailable_optional_groups: set[str] = set()
             for key, (value, timestamp_ns) in current.items():
                 prior_value, prior_timestamp_ns = previous[key]
                 delta = value - prior_value
                 window_ns = timestamp_ns - prior_timestamp_ns
                 if delta < 0 or window_ns <= 0:
+                    optional_group = _OPTIONAL_COUNTER_TO_GROUP.get(key[1])
+                    if optional_group is not None:
+                        unavailable_optional_groups.add(optional_group)
+                        continue
                     result = self._invalid(
                         sampled_ns=sampled_ns,
                         read_ms=read_ms,
@@ -273,6 +322,10 @@ class CassiniEndpointSampler:
                     self._last_result = result
                     return self._with_age(result, sampled_ns)
                 if window_ns > self.max_window_ns:
+                    optional_group = _OPTIONAL_COUNTER_TO_GROUP.get(key[1])
+                    if optional_group is not None:
+                        unavailable_optional_groups.add(optional_group)
+                        continue
                     result = self._invalid(
                         sampled_ns=sampled_ns,
                         read_ms=read_ms,
@@ -281,6 +334,11 @@ class CassiniEndpointSampler:
                     self._last_result = result
                     return self._with_age(result, sampled_ns)
                 deltas[key] = (delta, window_ns)
+            for group in unavailable_optional_groups:
+                sample_support[group] = CounterSupport.AMBIGUOUS
+                for nic in range(self.nic_count):
+                    for counter in _OPTIONAL_COUNTER_GROUPS[group]:
+                        deltas.pop((nic, counter), None)
 
             def delta(nic: int, counter: str) -> int:
                 return deltas[(nic, counter)][0]
@@ -289,7 +347,9 @@ class CassiniEndpointSampler:
             rx_pause: list[float] = []
             tx_pause: list[float] = []
             posted: list[float] = []
+            by_nic = self._empty_nic_signals()
             for nic in range(self.nic_count):
+                nic_traffic = by_nic[nic]["traffic_classes"]
                 for direction, target in (("rx", rx_pause), ("tx", tx_pause)):
                     for traffic_class in _TRAFFIC_CLASSES:
                         value, window_ns = deltas[
@@ -305,9 +365,13 @@ class CassiniEndpointSampler:
                             self._last_result = result
                             return self._with_age(result, sampled_ns)
                         target.append(min(1.0, fraction))
+                        nic_traffic[traffic_class][
+                            f"{direction}_pause_fraction"] = min(1.0, fraction)
                 blocked = delta(nic, "parbs_tarb_pi_posted_blocked_cnt")
                 packets = delta(nic, "parbs_tarb_pi_posted_pkts")
-                posted.append(blocked / packets if packets else 0.0)
+                posted_value = blocked / packets if packets else 0.0
+                posted.append(posted_value)
+                by_nic[nic]["host_posted_cycles_per_packet"] = posted_value
 
             signals: dict[str, int | float | None] = self._empty_signals()
             signals.update({
@@ -318,7 +382,7 @@ class CassiniEndpointSampler:
                 "host_posted_cycles_per_packet_max": max(posted),
             })
 
-            if self._support["host_nonposted_cycles_per_packet"] is CounterSupport.SUPPORTED:
+            if sample_support["host_nonposted_cycles_per_packet"] is CounterSupport.SUPPORTED:
                 ratios = []
                 for nic in range(self.nic_count):
                     blocked = delta(
@@ -327,19 +391,71 @@ class CassiniEndpointSampler:
                     ratios.append(blocked / packets if packets else 0.0)
                 signals["host_nonposted_cycles_per_packet_max"] = max(ratios)
 
-            if self._support["packet_counts"] is CounterSupport.SUPPORTED:
-                signals["tx_packets"] = sum(
-                    delta(nic, f"hni_pkts_sent_by_tc_{traffic_class}")
-                    for nic in range(self.nic_count)
-                    for traffic_class in _TRAFFIC_CLASSES
-                )
-                signals["rx_packets"] = sum(
-                    delta(nic, f"hni_pkts_recv_by_tc_{traffic_class}")
-                    for nic in range(self.nic_count)
-                    for traffic_class in _TRAFFIC_CLASSES
-                )
+            if sample_support["packet_counts"] is CounterSupport.SUPPORTED:
+                tx_packets = 0
+                rx_packets = 0
+                tx_rates = []
+                rx_rates = []
+                for nic in range(self.nic_count):
+                    nic_tx = sum(
+                        delta(nic, f"hni_pkts_sent_by_tc_{traffic_class}")
+                        for traffic_class in _TRAFFIC_CLASSES
+                    )
+                    nic_rx = sum(
+                        delta(nic, f"hni_pkts_recv_by_tc_{traffic_class}")
+                        for traffic_class in _TRAFFIC_CLASSES
+                    )
+                    tx_window_ns = max(
+                        deltas[(nic, f"hni_pkts_sent_by_tc_{traffic_class}")][1]
+                        for traffic_class in _TRAFFIC_CLASSES
+                    )
+                    rx_window_ns = max(
+                        deltas[(nic, f"hni_pkts_recv_by_tc_{traffic_class}")][1]
+                        for traffic_class in _TRAFFIC_CLASSES
+                    )
+                    nic_tx_rate = nic_tx * 1.0e9 / tx_window_ns
+                    nic_rx_rate = nic_rx * 1.0e9 / rx_window_ns
+                    tx_packets += nic_tx
+                    rx_packets += nic_rx
+                    tx_rates.append(nic_tx_rate)
+                    rx_rates.append(nic_rx_rate)
+                    by_nic[nic]["tx_packets"] = nic_tx
+                    by_nic[nic]["rx_packets"] = nic_rx
+                    by_nic[nic]["tx_packets_per_s"] = nic_tx_rate
+                    by_nic[nic]["rx_packets_per_s"] = nic_rx_rate
+                signals["tx_packets"] = tx_packets
+                signals["rx_packets"] = rx_packets
+                signals["tx_packets_per_s"] = sum(tx_rates)
+                signals["rx_packets_per_s"] = sum(rx_rates)
 
-            if self._support["receive_overflow_fraction"] is CounterSupport.SUPPORTED:
+            if sample_support["oxe_channel_idle_fraction"] is CounterSupport.SUPPORTED:
+                idle_fractions = []
+                for nic in range(self.nic_count):
+                    idle_cycles, window_ns = deltas[(nic, "oxe_channel_idle")]
+                    idle_fraction = idle_cycles / window_ns
+                    if not 0.0 <= idle_fraction <= 1.05:
+                        result = self._invalid(
+                            sampled_ns=sampled_ns,
+                            read_ms=read_ms,
+                            reason="oxe_channel_idle_fraction_outside_hardware_range",
+                        )
+                        self._last_result = result
+                        return self._with_age(result, sampled_ns)
+                    idle_fraction = min(1.0, idle_fraction)
+                    idle_fractions.append(idle_fraction)
+                    by_nic[nic]["oxe_channel_idle_fraction"] = idle_fraction
+                    by_nic[nic]["oxe_channel_active_fraction"] = (
+                        1.0 - idle_fraction)
+                utilizations = [1.0 - value for value in idle_fractions]
+                signals["oxe_channel_idle_fraction_min"] = min(idle_fractions)
+                signals["oxe_channel_idle_fraction_mean"] = (
+                    sum(idle_fractions) / len(idle_fractions))
+                signals["oxe_channel_idle_fraction_max"] = max(idle_fractions)
+                signals["oxe_channel_active_fraction_max"] = max(utilizations)
+                signals["oxe_channel_active_fraction_mean"] = (
+                    sum(utilizations) / len(utilizations))
+
+            if sample_support["receive_overflow_fraction"] is CounterSupport.SUPPORTED:
                 fractions = []
                 for nic in range(self.nic_count):
                     priority = delta(nic, "lpe_net_match_priority_0")
@@ -351,7 +467,7 @@ class CassiniEndpointSampler:
                     sum(fractions) / len(fractions)
                 )
 
-            if self._support["ecn_fraction"] is CounterSupport.SUPPORTED:
+            if sample_support["ecn_fraction"] is CounterSupport.SUPPORTED:
                 fractions = []
                 for nic in range(self.nic_count):
                     marked = sum(
@@ -369,7 +485,7 @@ class CassiniEndpointSampler:
                 signals["ecn_fraction_max"] = max(fractions)
                 signals["ecn_fraction_mean"] = sum(fractions) / len(fractions)
 
-            if self._support["transport_fault_counts"] is CounterSupport.SUPPORTED:
+            if sample_support["transport_fault_counts"] is CounterSupport.SUPPORTED:
                 signals["resource_nacks"] = sum(
                     delta(nic, counter)
                     for nic in range(self.nic_count)
@@ -390,7 +506,7 @@ class CassiniEndpointSampler:
                 )
 
             result = {
-                **self._base(),
+                **self._base(support=sample_support),
                 "valid": True,
                 "invalid_reason": None,
                 "sequence": self._sequence,
@@ -399,6 +515,7 @@ class CassiniEndpointSampler:
                 "cache_age_ms": 0.0,
                 "window_ms": max(windows) / 1_000_000,
                 "signals": signals,
+                "by_nic": by_nic,
             }
             validate_cassini_endpoint_sample(result)
             self._last_result = result
@@ -414,6 +531,7 @@ def validate_cassini_endpoint_sample(raw: object) -> None:
         "schema", "endpoint_id", "role", "pair_index", "source",
         "nic_count", "support", "valid", "invalid_reason", "sequence",
         "sampled_ns", "read_ms", "cache_age_ms", "window_ms", "signals",
+        "by_nic",
     }
     if set(raw) != expected_keys:
         raise ValueError("Cassini endpoint sample keys are not exact")
@@ -448,10 +566,32 @@ def validate_cassini_endpoint_sample(raw: object) -> None:
             raise ValueError(f"Cassini {name} must be finite and non-negative")
     support = raw["support"]
     signals = raw["signals"]
+    by_nic = raw["by_nic"]
     if type(support) is not dict or set(support) != _SUPPORT_KEYS:
         raise ValueError("Cassini support inventory is not exact")
     if type(signals) is not dict or set(signals) != _SIGNAL_KEYS:
         raise ValueError("Cassini signal inventory is not exact")
+    if (
+        type(by_nic) is not list
+        or len(by_nic) != raw["nic_count"]
+    ):
+        raise ValueError("Cassini per-NIC inventory is not exact")
+    for nic_index, nic in enumerate(by_nic):
+        if type(nic) is not dict or set(nic) != {
+            "nic_index", "traffic_classes", "host_posted_cycles_per_packet",
+            "tx_packets", "rx_packets", "tx_packets_per_s",
+            "rx_packets_per_s", "oxe_channel_idle_fraction",
+            "oxe_channel_active_fraction",
+        } or nic["nic_index"] != nic_index:
+            raise ValueError("Cassini per-NIC identity is invalid")
+        traffic = nic["traffic_classes"]
+        if type(traffic) is not list or len(traffic) != len(_TRAFFIC_CLASSES):
+            raise ValueError("Cassini traffic-class inventory is not exact")
+        for traffic_class, value in enumerate(traffic):
+            if type(value) is not dict or set(value) != {
+                "traffic_class", "rx_pause_fraction", "tx_pause_fraction",
+            } or value["traffic_class"] != traffic_class:
+                raise ValueError("Cassini traffic-class identity is invalid")
     try:
         parsed_support = {
             name: CounterSupport(value) for name, value in support.items()
@@ -474,6 +614,24 @@ def validate_cassini_endpoint_sample(raw: object) -> None:
             raise ValueError("invalid Cassini sample cannot expose window_ms")
         if any(value is not None for value in signals.values()):
             raise ValueError("invalid Cassini samples cannot expose signal values")
+        if any(
+            value["host_posted_cycles_per_packet"] is not None
+            or any(
+                value[name] is not None
+                for name in (
+                    "tx_packets", "rx_packets", "tx_packets_per_s",
+                    "rx_packets_per_s", "oxe_channel_idle_fraction",
+                    "oxe_channel_active_fraction",
+                )
+            )
+            or any(
+                sample[name] is not None
+                for sample in value["traffic_classes"]
+                for name in ("rx_pause_fraction", "tx_pause_fraction")
+            )
+            for value in by_nic
+        ):
+            raise ValueError("invalid Cassini samples cannot expose per-NIC values")
         return
     if raw["invalid_reason"] is not None:
         raise ValueError("valid Cassini sample cannot have invalid_reason")
@@ -492,11 +650,28 @@ def validate_cassini_endpoint_sample(raw: object) -> None:
     )
     if any(signals[name] is None for name in required_values):
         raise ValueError("valid Cassini sample lacks a core signal")
+    for nic in by_nic:
+        if nic["host_posted_cycles_per_packet"] is None:
+            raise ValueError("valid Cassini sample lacks per-NIC host values")
+        for traffic in nic["traffic_classes"]:
+            if (
+                traffic["rx_pause_fraction"] is None
+                or traffic["tx_pause_fraction"] is None
+            ):
+                raise ValueError("valid Cassini sample lacks per-TC pause values")
     group_signals = {
         "host_nonposted_cycles_per_packet": (
             "host_nonposted_cycles_per_packet_max",
         ),
-        "packet_counts": ("tx_packets", "rx_packets"),
+        "packet_counts": (
+            "tx_packets", "rx_packets", "tx_packets_per_s",
+            "rx_packets_per_s",
+        ),
+        "oxe_channel_idle_fraction": (
+            "oxe_channel_idle_fraction_min", "oxe_channel_idle_fraction_mean",
+            "oxe_channel_idle_fraction_max", "oxe_channel_active_fraction_max",
+            "oxe_channel_active_fraction_mean",
+        ),
         "receive_overflow_fraction": (
             "receive_overflow_fraction_max",
             "receive_overflow_fraction_mean",
@@ -521,6 +696,11 @@ def validate_cassini_endpoint_sample(raw: object) -> None:
         "receive_overflow_fraction_mean",
         "ecn_fraction_max",
         "ecn_fraction_mean",
+        "oxe_channel_idle_fraction_min",
+        "oxe_channel_idle_fraction_mean",
+        "oxe_channel_idle_fraction_max",
+        "oxe_channel_active_fraction_max",
+        "oxe_channel_active_fraction_mean",
     }
     integer_signals = {
         "tx_packets", "rx_packets", "resource_nacks", "retries", "timeouts",
@@ -541,6 +721,64 @@ def validate_cassini_endpoint_sample(raw: object) -> None:
             raise ValueError(f"Cassini {name} must be finite and non-negative")
         if name in fraction_signals and float(value) > 1.0:
             raise ValueError(f"Cassini {name} must be in [0, 1]")
+    for nic in by_nic:
+        value = nic["host_posted_cycles_per_packet"]
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or float(value) < 0.0
+        ):
+            raise ValueError("Cassini per-NIC host value is invalid")
+        for traffic in nic["traffic_classes"]:
+            for name in ("rx_pause_fraction", "tx_pause_fraction"):
+                value = traffic[name]
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not math.isfinite(float(value))
+                    or not 0.0 <= float(value) <= 1.0
+                ):
+                    raise ValueError("Cassini per-TC pause value is invalid")
+        packet_values = {
+            name: nic[name]
+            for name in (
+                "tx_packets", "rx_packets", "tx_packets_per_s",
+                "rx_packets_per_s",
+            )
+        }
+        if parsed_support["packet_counts"] is CounterSupport.SUPPORTED:
+            if any(value is None for value in packet_values.values()):
+                raise ValueError("supported Cassini per-NIC packets lack values")
+            for name in ("tx_packets", "rx_packets"):
+                if type(packet_values[name]) is not int or packet_values[name] < 0:
+                    raise ValueError("Cassini per-NIC packet count is invalid")
+            for name in ("tx_packets_per_s", "rx_packets_per_s"):
+                value = packet_values[name]
+                if (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not math.isfinite(float(value))
+                    or float(value) < 0.0
+                ):
+                    raise ValueError("Cassini per-NIC packet rate is invalid")
+        elif any(value is not None for value in packet_values.values()):
+            raise ValueError("unavailable Cassini per-NIC packets have values")
+        idle_values = (
+            nic["oxe_channel_idle_fraction"],
+            nic["oxe_channel_active_fraction"],
+        )
+        if parsed_support["oxe_channel_idle_fraction"] is CounterSupport.SUPPORTED:
+            if any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or not 0.0 <= float(value) <= 1.0
+                for value in idle_values
+            ):
+                raise ValueError("Cassini per-NIC link fraction is invalid")
+        elif any(value is not None for value in idle_values):
+            raise ValueError("unavailable Cassini per-NIC link has values")
 
 
 __all__ = [

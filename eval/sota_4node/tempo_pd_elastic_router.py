@@ -4,19 +4,28 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 from dataclasses import replace
 import hashlib
 import json
 import math
 import os
 from pathlib import Path
+import re
+import socket
 import time
-from typing import Any
-from fastapi import HTTPException
+from typing import Any, Mapping
+from fastapi import HTTPException, Request
 from prometheus_client.parser import text_string_to_metric_families
 
 
+from tempo.cassini_endpoint import CassiniEndpointSampler
 from tempo.cassini_pressure import CassiniPressureSampler
+from tempo.cross_layer_observer import (
+    NCCLObserverSnapshot,
+    read_observer_snapshot,
+    snapshot_age_ms,
+)
 from tempo.pd_decoder_cache_evidence import (
     DEFAULT_BLOCK_SIZE as DECODER_CACHE_BLOCK_SIZE,
     VLLMDecoderCacheSSEParser,
@@ -37,11 +46,13 @@ from tempo.pd_endpoint_controller import (
     EndpointRoute,
     EndpointWork,
 )
+from tempo.pd_endpoint_evidence import PDEndpointIdentity, PDEndpointRole
 from tempo.pd_endpoint_profile import (
     SCHEMA_V2 as ENDPOINT_PROFILE_V2_SCHEMA,
     SEMANTIC_EPOCH_POLICY as PROFILE_SEMANTIC_EPOCH_POLICY,
     load_endpoint_service_profile,
 )
+from tempo.pd_global_profile import load_global_profile
 
 
 ROUTER_SCHEMA = "tempo-elastic-pd-router-canonical"
@@ -51,6 +62,7 @@ TRANSFER_EVIDENCE_COMPLETE = "complete"
 TRANSFER_EVIDENCE_OVERLAPPED = "eof_complete_after_control_overlap"
 ElasticRouterRecord = wire.ElasticRouterRecord
 VLLM_LOAD_SNAPSHOT_SCHEMA = "tempo-vllm-load-snapshot-v1"
+GLOBAL_SCHEDULER_SCHEMA = "tempo-go-vllm-scheduler-snapshot-v1"
 VLLM_LOAD_DECISION_MODE = "observe_only"
 VLLM_LOAD_DISABLED_MODE = "disabled"
 VLLM_LOAD_DISABLED_SOURCE = "explicitly_disabled_no_request_rpc"
@@ -62,6 +74,8 @@ BOTH_MEASURED_MARKER = "-cache-both-measured-"
 MISS_MEASURED_MARKER = "-cache-miss-measured-"
 D_CACHE_SEED_MARKER = "-cache-d-seed-"
 D_CACHE_PROBE_MARKER = "-cache-d-probe-"
+C4_PHYSICAL_WARM_PREFIX = "-c4-cache-p-only-warm"
+C4_PHYSICAL_MARKER = "-physical-"
 VLLM_SKIP_LOCAL_PREFIX_READ_XARG = "tempo_skip_local_prefix_cache_read"
 PROXY_DECODER_SKIP_LOCAL_PREFIX_READ_FIELD = (
     "tempo_decoder_skip_local_prefix_cache_read"
@@ -72,6 +86,16 @@ PRESSURE_DISABLED_MODE = "disabled"
 PRESSURE_OBSERVE_MODE = "observe_only"
 PRESSURE_ADAPTIVE_MODE = "adaptive"
 FRONTEND_SEMANTIC_LOAD_SCHEMA = "tempo-frontend-semantic-load-v1"
+GLOBAL_COMMIT_SCHEMA = "tempo-go-route-commit-v1"
+GLOBAL_JOINT_COMMIT_SCHEMA = "tempo-go-joint-commit-v1"
+GLOBAL_MESH_COMMIT_SCHEMA = "tempo-go-mesh-commit-v1"
+GLOBAL_MESH_JOINT_COMMIT_SCHEMA = "tempo-go-mesh-joint-commit-v1"
+JOINT_ACTUATION_SCHEMA = "tempo-go-joint-actuation-v1"
+JOINT_ACTUATION_SCHEMA_V2 = "tempo-go-joint-actuation-v2"
+JOINT_ACTUATION_SCHEMA_V3 = "tempo-go-joint-actuation-v3"
+GLOBAL_PROFILE_SHA_ENV = "TEMPO_GO_PROFILE_SHA256"
+GLOBAL_PROFILE_ENV = "TEMPO_GO_PROFILE"
+NCCL_OBSERVER_MAX_AGE_MS_ENV = "TEMPO_GO_NCCL_OBSERVER_MAX_AGE_MS"
 ENDPOINT_FEEDBACK_MODE_ENV = "TEMPO_PD_ENDPOINT_FEEDBACK_MODE"
 ENDPOINT_FEEDBACK_DISABLED_MODE = "disabled"
 ENDPOINT_FEEDBACK_ADAPTIVE_MODE = "adaptive"
@@ -85,6 +109,14 @@ ENDPOINT_WORKLOAD_MANIFEST_SHA256_ENV = (
 )
 ENDPOINT_PASSIVE_FEEDBACK_ENV = "TEMPO_PD_ENDPOINT_PASSIVE_FEEDBACK"
 ENDPOINT_PASSIVE_MARKER = "-endpoint-observed-"
+EXOGENOUS_FIXED_REMOTE_PATTERN = re.compile(
+    r"-tempo-go-exogenous-fixed-remote-d([01])-"
+)
+GLOBAL_MESH_PAIRED_BASELINE_ARMS = frozenset({
+    ElasticExperimentArm.PREDICTOR,
+    ElasticExperimentArm.QUEUE_GPU_ONLY,
+    ElasticExperimentArm.NETWORK_REQUEST_ONLY,
+})
 REMOTE_PRESSURE_MS_PER_PROMPT_TOKEN_ENV = (
     "TEMPO_PD_REMOTE_PRESSURE_MS_PER_PROMPT_TOKEN")
 LOCAL_PRESSURE_MS_PER_PROMPT_TOKEN_ENV = (
@@ -101,6 +133,27 @@ _VLLM_LOAD_METRICS = (
     "vllm:num_requests_waiting",
     "vllm:kv_cache_usage_perc",
 )
+# The global coordinator consumes this endpoint as a control-plane snapshot.
+# Keep the actual Prometheus read out of every admission RPC: under a loaded
+# vLLM engine the /metrics handler can be slower than the telemetry refresh
+# budget and would make TEMPO reject work because its observer is contended.
+# The cached sample carries its real sample time in vllm_scheduler_fetch; the
+# global envelope still uses the frontend collection interval as its clock.
+RUNTIME_TELEMETRY_SCHEDULER_CACHE_NS = 100_000_000
+
+
+def _source_full_hit_tokens(header_prompt_tokens: int) -> int:
+    """Return the exact source-hit count expected after a P-only seed.
+
+    The official proxy reports the tokenized source prompt before appending
+    the prefill head token.  Therefore the exact source request has one fewer
+    reusable token than the proxy header.  A partial LMCache chunk hit is
+    accepted only as seed observation; it is never promoted to P_ONLY by
+    itself.
+    """
+    if type(header_prompt_tokens) is not int or header_prompt_tokens <= 0:
+        raise ValueError("header prompt token count must be positive")
+    return header_prompt_tokens - 1
 
 
 def explicit_cache_contract(request_id: str) -> str | None:
@@ -118,6 +171,16 @@ def explicit_cache_contract(request_id: str) -> str | None:
     if len(matches) > 1:
         raise ValueError("request_id has conflicting cache contracts")
     return matches[0] if matches else None
+
+
+def exogenous_fixed_remote_decoder(request_id: str) -> int | None:
+    """Parse C7's exact, route-pinned receiver-incast destination marker."""
+    if not isinstance(request_id, str) or not request_id:
+        raise ValueError("request_id must be nonempty")
+    matches = EXOGENOUS_FIXED_REMOTE_PATTERN.findall(request_id)
+    if len(matches) > 1:
+        raise ValueError("request_id has conflicting exogenous destinations")
+    return int(matches[0]) if matches else None
 
 
 def enforce_explicit_cache_contract(
@@ -286,12 +349,27 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         self._request_decision_cache_residencies = {}
         self._request_vllm_load_snapshots = {}
         self._request_pressure_snapshots = {}
+        self._request_network_route_evidence = {}
         self._request_endpoint_decisions = {}
+        self._request_endpoint_service_lookups = {}
         self._request_endpoint_feedback = {}
         self._endpoint_requests = {}
         self._passive_endpoint_requests = {}
         self._request_frontend_semantic_loads = {}
         self._request_semantic_epoch_decisions = {}
+        self._request_global_commits = {}
+        # A global route header is provisional while the endpoint controller
+        # performs the physical service-lane preflight.  It is intentionally
+        # kept separate from _request_global_commits so an endpoint credit is
+        # acquired before the immutable pair×route commit is recorded.
+        self._request_pending_global_commits = {}
+        # A queue offer is the endpoint half of two-phase admission.  It owns
+        # no physical route credit, but preserves the exact route/actuation
+        # identity while the global controller decides whether that bounded
+        # downstream debt is safe and business-approved.
+        self._request_service_lane_queue_offers = {}
+        self._request_global_queue_wait_ms = {}
+        self._request_service_lane_reservations = {}
         self._semantic_epoch_route = EndpointRoute.LOCAL
         self._semantic_epoch_generation = 0
         self._semantic_high_streak = 0
@@ -331,11 +409,11 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         self.remote_decode_placement = os.environ.get(
             "TEMPO_PD_REMOTE_DECODE_PLACEMENT", "paired")
         if self.remote_decode_placement not in (
-            "paired", "cross", "long_decode_cross",
+            "paired", "cross", "long_decode_cross", "global_mesh",
         ):
             raise ValueError(
                 "TEMPO_PD_REMOTE_DECODE_PLACEMENT must be "
-                "paired, cross, or long_decode_cross")
+                "paired, cross, long_decode_cross, or global_mesh")
         raw_decoder_index = os.environ.get(
             "TEMPO_PD_LOCAL_DECODER_INDEX")
         self.local_decoder_index = None
@@ -347,11 +425,23 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                     "TEMPO_PD_LOCAL_DECODER_INDEX must be 0 or 1") from exc
         if (
             self.local_decoder_index not in (None, 0, 1)
-            or self.remote_decode_placement == "long_decode_cross"
+            or self.remote_decode_placement in {
+                "long_decode_cross", "global_mesh",
+            }
             and self.local_decoder_index is None
         ):
             raise ValueError(
                 "TEMPO_PD_LOCAL_DECODER_INDEX must be 0 or 1")
+        self.global_profile_sha256 = os.environ.get(GLOBAL_PROFILE_SHA_ENV)
+        if self.global_profile_sha256 is not None and (
+            len(self.global_profile_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.global_profile_sha256
+            )
+        ):
+            raise ValueError(
+                f"{GLOBAL_PROFILE_SHA_ENV} must be a lowercase SHA-256")
 
         raw_priority = os.environ.get(
             "TEMPO_PD_REMOTE_CATCHUP_PRIORITY", "0")
@@ -444,6 +534,34 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         if priority_enabled and scheduling_policy != "priority":
             raise ValueError(
                 "TEMPO request priorities require vLLM priority scheduling")
+        self.global_priority_service_lane_enabled = False
+        raw_global_profile = os.environ.get(GLOBAL_PROFILE_ENV)
+        if priority_enabled and raw_global_profile:
+            global_profile = load_global_profile(
+                Path(raw_global_profile).resolve())
+            global_config = global_profile.orchestrator_config()
+            if global_profile.fingerprint_sha256 != self.global_profile_sha256:
+                raise ValueError(
+                    "priority service-lane global profile identity differs")
+            if global_config.priority_service_lane_mode == (
+                "vllm_priority_remote_cache_v1"
+            ):
+                if (
+                    self.strong_remote_catchup_priority
+                    != global_config.priority_service_lane_priority
+                    or any((
+                        self.remote_catchup_priority,
+                        self.long_remote_catchup_priority,
+                        self.median_guard_priority,
+                        self.medium_remote_catchup_priority,
+                    ))
+                    or scheduling_policy != "priority"
+                    or self.remote_decode_placement != "global_mesh"
+                ):
+                    raise ValueError(
+                        "router priority action differs from frozen global lane"
+                    )
+                self.global_priority_service_lane_enabled = True
 
         self._request_source_cached_tokens = {}
         self._request_decoder_cache_parsers = {}
@@ -544,6 +662,30 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             CassiniPressureSampler()
             if self.pressure_mode != PRESSURE_DISABLED_MODE else None
         )
+        # This is observe-only evidence for the allocation-scoped global
+        # controller.  It is intentionally independent of the legacy scalar
+        # pressure path above; missing sysfs counters remain explicit support
+        # state and never become zero pressure.
+        self._cross_layer_sequence = 0
+        self._cross_layer_cassini = None
+        self._cross_layer_cassini_error = None
+        try:
+            self._cross_layer_cassini = CassiniEndpointSampler(
+                PDEndpointIdentity(
+                    endpoint_id=(
+                        f"pair-{self.local_decoder_index}"
+                        if self.local_decoder_index is not None
+                        else socket.gethostname()),
+                    role=PDEndpointRole.DECODER,
+                    pair_index=(
+                        self.local_decoder_index
+                        if self.local_decoder_index is not None else 0),
+                ),
+                root=os.environ.get("TEMPO_CASSINI_ROOT", "/sys/class/cxi"),
+                nic_count=4,
+            )
+        except (FileNotFoundError, OSError, TypeError, ValueError) as exc:
+            self._cross_layer_cassini_error = type(exc).__name__
         self.endpoint_service_profile = None
         self.endpoint_feedback = None
         self.semantic_epoch_policy = None
@@ -553,7 +695,9 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 raise ValueError(
                     "endpoint feedback forbids synchronous request-start /metrics"
                 )
-            if priority_enabled:
+            if priority_enabled and not (
+                self.global_priority_service_lane_enabled
+            ):
                 raise ValueError(
                     "endpoint feedback forbids shape-specific priority exceptions"
                 )
@@ -610,6 +754,9 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         if not isinstance(prompt_key, str) or not prompt_key:
             raise ValueError("prompt_key must be nonempty")
         with self._lock:
+            prior = self._request_prompt_keys.get(request_id)
+            if prior is not None and prior != prompt_key:
+                raise ValueError("prompt namespace key changed")
             self._request_prompt_keys[request_id] = prompt_key
 
     def prepare_prompt_tokens(self, request_id, token_ids):
@@ -672,9 +819,20 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             raise ValueError("frontend semantic-load max_num_seqs must be 8 or 16")
         if parsed["max_num_seqs"] != self.pressure_max_num_seqs:
             raise ValueError("frontend/router max_num_seqs mismatch")
+        expected_decoder_index = self.local_decoder_index
+        with self._lock:
+            global_commit = self._request_global_commits.get(request_id)
         if (
-            self.local_decoder_index is not None
-            and parsed["pair_index"] != self.local_decoder_index
+            isinstance(global_commit, dict)
+            and global_commit.get("schema") in {
+                GLOBAL_MESH_COMMIT_SCHEMA,
+                GLOBAL_MESH_JOINT_COMMIT_SCHEMA,
+            }
+        ):
+            expected_decoder_index = global_commit.get("decoder_index")
+        if (
+            expected_decoder_index is not None
+            and parsed["pair_index"] != expected_decoder_index
         ):
             raise ValueError("frontend semantic-load pair/router mismatch")
         evidence = {
@@ -691,6 +849,867 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 raise ValueError("frontend semantic-load evidence recorded twice")
             self._request_frontend_semantic_loads[request_id] = evidence
         return dict(evidence)
+
+    def prepare_global_commit(
+        self, *, request_id, schema, pair_index, route,
+        profile_sha256, decision_sha256, telemetry_sequence,
+        actuation_plan=None, queue_lease=None, prefill_index=None,
+        decoder_index=None, edge_id=None, priority_service_lane=None,
+    ):
+        """Bind one frontend global decision before tokenization/upstream work."""
+
+        if not isinstance(request_id, str) or not request_id:
+            raise ValueError("request_id must be nonempty")
+        parsed_queue_lease = False
+        if queue_lease is not None:
+            if queue_lease not in {"0", "1"}:
+                raise ValueError("TEMPO-GO queue lease flag is invalid")
+            parsed_queue_lease = queue_lease == "1"
+        parsed_priority_service_lane = False
+        if priority_service_lane is not None:
+            if priority_service_lane not in {"0", "1"}:
+                raise ValueError(
+                    "TEMPO-GO priority service-lane flag is invalid")
+            parsed_priority_service_lane = priority_service_lane == "1"
+        raw = {
+            "schema": schema,
+            "pair_index": pair_index,
+            "route": route,
+            "profile_sha256": profile_sha256,
+            "decision_sha256": decision_sha256,
+            "telemetry_sequence": telemetry_sequence,
+        }
+        present = {name: value is not None for name, value in raw.items()}
+        if not any(present.values()):
+            return None
+        if not all(present.values()):
+            raise ValueError("TEMPO-GO route-commit headers are incomplete")
+        if schema not in {
+            GLOBAL_COMMIT_SCHEMA,
+            GLOBAL_JOINT_COMMIT_SCHEMA,
+            GLOBAL_MESH_COMMIT_SCHEMA,
+            GLOBAL_MESH_JOINT_COMMIT_SCHEMA,
+        }:
+            raise ValueError("TEMPO-GO route-commit schema mismatch")
+        if self.global_profile_sha256 is None:
+            raise ValueError("TEMPO-GO route commit is disabled on this router")
+        if profile_sha256 != self.global_profile_sha256:
+            raise ValueError("TEMPO-GO profile SHA differs from router contract")
+        for name, value in (
+            ("profile_sha256", profile_sha256),
+            ("decision_sha256", decision_sha256),
+        ):
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(
+                    character not in "0123456789abcdef" for character in value
+                )
+            ):
+                raise ValueError(f"TEMPO-GO {name} must be lowercase SHA-256")
+        parsed_pair = self._parse_frontend_nonnegative_int(
+            "global pair_index", pair_index)
+        try:
+            selected = ElasticRoute(route)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("TEMPO-GO committed route is invalid") from exc
+        if selected not in {ElasticRoute.LOCAL, ElasticRoute.REMOTE}:
+            raise ValueError("TEMPO-GO cannot commit the queue route")
+        mesh_schema = schema in {
+            GLOBAL_MESH_COMMIT_SCHEMA,
+            GLOBAL_MESH_JOINT_COMMIT_SCHEMA,
+        }
+        mesh_values = (prefill_index, decoder_index, edge_id)
+        if mesh_schema and any(value is None for value in mesh_values):
+            raise ValueError("TEMPO-GO mesh edge identity is incomplete")
+        if not mesh_schema and any(value is not None for value in mesh_values):
+            if any(value is None for value in mesh_values):
+                raise ValueError("TEMPO-GO optional edge identity is incomplete")
+        parsed_prefill = (
+            self._parse_frontend_nonnegative_int(
+                "global prefill_index", prefill_index)
+            if prefill_index is not None else parsed_pair
+        )
+        parsed_decoder = (
+            self._parse_frontend_nonnegative_int(
+                "global decoder_index", decoder_index)
+            if decoder_index is not None else parsed_pair
+        )
+        if (
+            parsed_pair not in (0, 1)
+            or parsed_prefill not in (0, 1)
+            or parsed_decoder not in (0, 1)
+            or parsed_pair != parsed_decoder
+            or self.local_decoder_index is None
+        ):
+            raise ValueError("TEMPO-GO P/D identity is invalid")
+        if selected is ElasticRoute.LOCAL and parsed_prefill != parsed_decoder:
+            raise ValueError("TEMPO-GO local route cannot cross P/D endpoints")
+        expected_router_index = (
+            parsed_prefill
+            if selected is ElasticRoute.REMOTE else parsed_decoder
+        )
+        if expected_router_index != self.local_decoder_index:
+            raise ValueError("TEMPO-GO pair/router edge identity mismatch")
+        canonical_edge_id = (
+            f"local:d{parsed_decoder}"
+            if selected is ElasticRoute.LOCAL
+            else f"remote:p{parsed_prefill}->d{parsed_decoder}"
+        )
+        if edge_id is not None and edge_id != canonical_edge_id:
+            raise ValueError("TEMPO-GO edge_id is not canonical")
+        if not mesh_schema and parsed_prefill != parsed_decoder:
+            raise ValueError("legacy TEMPO-GO commit cannot cross P/D endpoints")
+        if parsed_priority_service_lane and (
+            not self.global_priority_service_lane_enabled
+            or not parsed_queue_lease
+            or selected is not ElasticRoute.REMOTE
+            or explicit_cache_contract(request_id) != "p_only"
+        ):
+            raise ValueError(
+                "TEMPO-GO priority lane lacks global/remote/P_ONLY authority")
+        sequence = self._parse_frontend_nonnegative_int(
+            "global telemetry_sequence", telemetry_sequence)
+        if sequence <= 0:
+            raise ValueError("TEMPO-GO telemetry sequence must be positive")
+        parsed_actuation = None
+        if schema in {
+            GLOBAL_JOINT_COMMIT_SCHEMA,
+            GLOBAL_MESH_JOINT_COMMIT_SCHEMA,
+        }:
+            if not isinstance(actuation_plan, str) or not actuation_plan:
+                raise ValueError(
+                    "TEMPO-GO joint commit actuation plan is incomplete")
+            try:
+                parsed_actuation = json.loads(actuation_plan)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "TEMPO-GO joint actuation plan is invalid JSON") from exc
+            actuation_schema = (
+                parsed_actuation.get("schema")
+                if isinstance(parsed_actuation, dict) else None
+            )
+            expected_keys = {
+                "schema", "pair_index", "route",
+                "local_prefill_token_ms_limit",
+                "remote_prefill_token_ms_limit",
+                "remote_kv_bytes_limit", "remote_semantic_ops_limit",
+                "dispatch_stagger_us", "telemetry_sequence", "confidence",
+                "signal_contributions",
+            }
+            if actuation_schema == JOINT_ACTUATION_SCHEMA_V2:
+                expected_keys |= {
+                    "action_mode", "critical_guard",
+                    "enforced_local_prefill_token_ms_limit",
+                    "enforced_remote_prefill_token_ms_limit",
+                    "enforced_remote_kv_bytes_limit",
+                    "enforced_remote_semantic_ops_limit",
+                    "overage_fraction", "overage_penalty_ms",
+                    "soft_overage_resources",
+                }
+            if actuation_schema == JOINT_ACTUATION_SCHEMA_V3:
+                expected_keys |= {
+                    "action_mode", "critical_guard",
+                    "enforced_local_prefill_token_ms_limit",
+                    "enforced_remote_prefill_token_ms_limit",
+                    "enforced_remote_kv_bytes_limit",
+                    "enforced_remote_semantic_ops_limit",
+                    "overage_fraction", "overage_penalty_ms",
+                    "soft_overage_resources",
+                    "shared_fabric_group",
+                    "shared_remote_requests_limit",
+                    "shared_remote_kv_bytes_limit",
+                    "shared_remote_semantic_ops_limit",
+                    "shared_remote_requests_used_before",
+                    "shared_remote_kv_bytes_used_before",
+                    "shared_remote_semantic_ops_used_before",
+                    "shared_budget_action",
+                    "shared_budget_contributions",
+                }
+            if (
+                not isinstance(parsed_actuation, dict)
+                or set(parsed_actuation) != expected_keys
+            ):
+                raise ValueError("TEMPO-GO joint actuation inventory changed")
+            if actuation_schema not in {
+                JOINT_ACTUATION_SCHEMA,
+                JOINT_ACTUATION_SCHEMA_V2,
+                JOINT_ACTUATION_SCHEMA_V3,
+            }:
+                raise ValueError("TEMPO-GO joint actuation schema mismatch")
+            if parsed_actuation["pair_index"] != parsed_decoder:
+                raise ValueError("TEMPO-GO joint actuation pair differs")
+            if parsed_actuation["route"] != selected.value:
+                raise ValueError("TEMPO-GO joint actuation route differs")
+            if parsed_actuation["telemetry_sequence"] != sequence:
+                raise ValueError(
+                    "TEMPO-GO joint actuation sequence differs")
+            for field in (
+                "local_prefill_token_ms_limit",
+                "remote_prefill_token_ms_limit",
+                "remote_kv_bytes_limit", "remote_semantic_ops_limit",
+                "telemetry_sequence",
+            ):
+                value = parsed_actuation[field]
+                if type(value) is not int or value <= 0:
+                    raise ValueError(
+                        f"TEMPO-GO joint actuation {field} is invalid")
+            stagger = parsed_actuation["dispatch_stagger_us"]
+            if type(stagger) is not int or stagger < 0 or stagger > 10_000:
+                raise ValueError(
+                    "TEMPO-GO joint actuation stagger is invalid")
+            confidence = parsed_actuation["confidence"]
+            if (
+                isinstance(confidence, bool)
+                or not isinstance(confidence, (int, float))
+                or not math.isfinite(float(confidence))
+                or not 0.0 <= float(confidence) <= 1.0
+            ):
+                raise ValueError(
+                    "TEMPO-GO joint actuation confidence is invalid")
+            contributions = parsed_actuation["signal_contributions"]
+            if not isinstance(contributions, list):
+                raise ValueError(
+                    "TEMPO-GO joint actuation contributions are invalid")
+            names = []
+            for contribution in contributions:
+                if (
+                    not isinstance(contribution, dict)
+                    or set(contribution) != {"name", "pressure"}
+                    or not isinstance(contribution["name"], str)
+                    or not contribution["name"].strip()
+                ):
+                    raise ValueError(
+                        "TEMPO-GO joint actuation contribution is invalid")
+                pressure = contribution["pressure"]
+                if (
+                    isinstance(pressure, bool)
+                    or not isinstance(pressure, (int, float))
+                    or not math.isfinite(float(pressure))
+                    or not 0.0 <= float(pressure) <= 1.0
+                ):
+                    raise ValueError(
+                        "TEMPO-GO joint actuation pressure is invalid")
+                names.append(contribution["name"])
+            if len(names) != len(set(names)):
+                raise ValueError(
+                    "TEMPO-GO joint actuation contributions duplicate")
+            if actuation_schema in {
+                JOINT_ACTUATION_SCHEMA_V2,
+                JOINT_ACTUATION_SCHEMA_V3,
+            }:
+                expected_action_mode = (
+                    "shared_budget_v3"
+                    if actuation_schema == JOINT_ACTUATION_SCHEMA_V3
+                    else "soft_shadow_price_v2"
+                )
+                if parsed_actuation["action_mode"] != expected_action_mode:
+                    raise ValueError(
+                        "TEMPO-GO joint actuation mode is invalid")
+                if type(parsed_actuation["critical_guard"]) is not bool:
+                    raise ValueError(
+                        "TEMPO-GO v2 critical guard is invalid")
+                for field in (
+                    "enforced_local_prefill_token_ms_limit",
+                    "enforced_remote_prefill_token_ms_limit",
+                    "enforced_remote_kv_bytes_limit",
+                    "enforced_remote_semantic_ops_limit",
+                ):
+                    value = parsed_actuation[field]
+                    if type(value) is not int or value <= 0:
+                        raise ValueError(
+                            f"TEMPO-GO v2 enforced {field} is invalid")
+                for field in ("overage_fraction", "overage_penalty_ms"):
+                    value = parsed_actuation[field]
+                    if (
+                        isinstance(value, bool)
+                        or not isinstance(value, (int, float))
+                        or not math.isfinite(float(value))
+                        or value < 0.0
+                    ):
+                        raise ValueError(
+                            f"TEMPO-GO v2 {field} is invalid")
+                if parsed_actuation["overage_fraction"] > 1.0:
+                    raise ValueError(
+                        "TEMPO-GO v2 overage fraction exceeds one")
+                resources = parsed_actuation["soft_overage_resources"]
+                allowed_resources = {
+                    "local_prefill_token_ms",
+                    "remote_prefill_token_ms",
+                    "remote_kv_bytes",
+                    "remote_semantic_ops",
+                }
+                if (
+                    not isinstance(resources, list)
+                    or any(item not in allowed_resources for item in resources)
+                    or len(resources) != len(set(resources))
+                ):
+                    raise ValueError(
+                        "TEMPO-GO v2 soft overage resources are invalid")
+            if actuation_schema == JOINT_ACTUATION_SCHEMA_V3:
+                group = parsed_actuation["shared_fabric_group"]
+                if not isinstance(group, str) or not group.strip():
+                    raise ValueError(
+                        "TEMPO-GO v3 shared fabric group is invalid")
+                for field in (
+                    "shared_remote_requests_limit",
+                    "shared_remote_kv_bytes_limit",
+                    "shared_remote_semantic_ops_limit",
+                ):
+                    value = parsed_actuation[field]
+                    if type(value) is not int or value <= 0:
+                        raise ValueError(
+                            f"TEMPO-GO v3 {field} is invalid")
+                for field in (
+                    "shared_remote_requests_used_before",
+                    "shared_remote_kv_bytes_used_before",
+                    "shared_remote_semantic_ops_used_before",
+                ):
+                    value = parsed_actuation[field]
+                    if type(value) is not int or value < 0:
+                        raise ValueError(
+                            f"TEMPO-GO v3 {field} is invalid")
+                if parsed_actuation["shared_budget_action"] not in {
+                    "none", "global_remote_budget", "global_remote_stagger",
+                }:
+                    raise ValueError(
+                        "TEMPO-GO v3 shared budget action is invalid")
+                contributions = parsed_actuation[
+                    "shared_budget_contributions"]
+                if not isinstance(contributions, list):
+                    raise ValueError(
+                        "TEMPO-GO v3 shared contributions are invalid")
+                shared_names = []
+                for contribution in contributions:
+                    if (
+                        not isinstance(contribution, dict)
+                        or set(contribution) != {"name", "pressure"}
+                        or not isinstance(contribution["name"], str)
+                        or not contribution["name"].strip()
+                    ):
+                        raise ValueError(
+                            "TEMPO-GO v3 shared contribution is invalid")
+                    pressure = contribution["pressure"]
+                    if (
+                        isinstance(pressure, bool)
+                        or not isinstance(pressure, (int, float))
+                        or not math.isfinite(float(pressure))
+                        or not 0.0 <= float(pressure) <= 1.0
+                    ):
+                        raise ValueError(
+                            "TEMPO-GO v3 shared pressure is invalid")
+                    shared_names.append(contribution["name"])
+                if len(shared_names) != len(set(shared_names)):
+                    raise ValueError(
+                        "TEMPO-GO v3 shared contributions duplicate")
+        elif actuation_plan is not None:
+            raise ValueError(
+                "legacy TEMPO-GO route commit cannot carry actuation")
+        evidence = {
+            "schema": schema,
+            "source": "allocation_scoped_global_frontend",
+            "pair_index": parsed_decoder,
+            "prefill_index": parsed_prefill,
+            "decoder_index": parsed_decoder,
+            "edge_id": canonical_edge_id,
+            "route": selected.value,
+            "profile_sha256": profile_sha256,
+            "decision_sha256": decision_sha256,
+            "telemetry_sequence": sequence,
+            "actuation_plan": parsed_actuation,
+            "queue_lease": parsed_queue_lease,
+            "priority_service_lane": parsed_priority_service_lane,
+            "phase_label_policy_input": False,
+            "physical_switch_label_policy_input": False,
+            "future_arrivals_policy_input": False,
+            "received_ns": time.perf_counter_ns(),
+        }
+        with self._lock:
+            existing = self._request_global_commits.get(request_id)
+            if existing is not None:
+                comparable = dict(existing)
+                comparable.pop("received_ns", None)
+                expected = dict(evidence)
+                expected.pop("received_ns", None)
+                if comparable != expected:
+                    raise ValueError(
+                        "TEMPO-GO route commit changed after preflight")
+                return dict(existing)
+            self._request_global_commits[request_id] = evidence
+        return dict(evidence)
+
+    def preflight_global_service_lane(
+        self, *, request_id, prompt_key, prompt_tokens, output_tokens,
+        remaining_deadline_ms, commit,
+    ):
+        """Reserve endpoint credit before finalizing a global route commit.
+
+        The frontend first selects a candidate with the global controller, but
+        the router owns the only physical endpoint service window.  This
+        method makes that boundary explicit: endpoint admission is attempted
+        against the immutable candidate header, and only a non-queued
+        reservation (or an explicitly global-owned queue lease) is committed
+        to ``_request_global_commits``.  A direct route that would fall into
+        the endpoint queue is rejected before upstream execution instead of
+        becoming a later HTTP 503 after consuming the business deadline.
+        """
+
+        if not isinstance(commit, dict):
+            raise TypeError("global commit preflight must be an object")
+        required = {
+            "schema", "pair_index", "prefill_index", "decoder_index",
+            "edge_id", "route", "profile_sha256", "decision_sha256",
+            "telemetry_sequence", "actuation_plan", "queue_lease",
+        }
+        optional = {"priority_service_lane"}
+        if not required <= set(commit) or set(commit) - required - optional:
+            raise ValueError("global commit preflight inventory is not exact")
+        if isinstance(commit["actuation_plan"], dict):
+            parsed_actuation = dict(commit["actuation_plan"])
+        elif commit["actuation_plan"] is None:
+            parsed_actuation = None
+        elif isinstance(commit["actuation_plan"], str):
+            try:
+                parsed_actuation = json.loads(commit["actuation_plan"])
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise ValueError(
+                    "global commit preflight actuation plan is invalid"
+                ) from exc
+            if not isinstance(parsed_actuation, dict):
+                raise ValueError(
+                    "global commit preflight actuation plan is not an object")
+        else:
+            raise ValueError(
+                "global commit preflight actuation plan is invalid")
+        queue_lease = commit["queue_lease"]
+        if isinstance(queue_lease, bool):
+            queue_lease = "1" if queue_lease else "0"
+        if type(queue_lease) is not str:
+            raise ValueError("global commit preflight queue lease is invalid")
+        provisional = dict(commit)
+        provisional["actuation_plan"] = parsed_actuation
+        provisional["queue_lease"] = queue_lease
+        priority_service_lane = provisional.get(
+            "priority_service_lane", "0")
+        if isinstance(priority_service_lane, bool):
+            priority_service_lane = "1" if priority_service_lane else "0"
+        if priority_service_lane not in {"0", "1"}:
+            raise ValueError(
+                "global commit preflight priority service lane is invalid")
+        provisional["priority_service_lane"] = priority_service_lane
+        # These values are copied directly from the immutable HTTP headers.
+        # Keep their canonical string representation: prepare_global_commit
+        # intentionally rejects JSON-number aliases (the v23 frontend used
+        # ints here, causing a 409 after endpoint credit had been acquired).
+        for field in (
+            "pair_index", "prefill_index", "decoder_index",
+            "telemetry_sequence",
+        ):
+            self._parse_frontend_nonnegative_int(
+                f"global {field}", provisional[field])
+        if (
+            not isinstance(prompt_key, str)
+            or len(prompt_key) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in prompt_key
+            )
+        ):
+            raise ValueError("global preflight prompt key is invalid")
+        self.prepare_prompt_namespace(request_id, prompt_key)
+        self._prepare_request_cache_namespace(
+            request_id=request_id,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
+        )
+
+        def endpoint_decision_for_request():
+            with self._lock:
+                decisions = self._request_endpoint_decisions.get(
+                    request_id, ())
+                return dict(decisions[-1]) if decisions else None
+
+        def commit_record(record):
+            try:
+                self.prepare_global_commit(
+                    request_id=request_id,
+                    schema=provisional["schema"],
+                    pair_index=provisional["pair_index"],
+                    prefill_index=provisional["prefill_index"],
+                    decoder_index=provisional["decoder_index"],
+                    edge_id=provisional["edge_id"],
+                    route=provisional["route"],
+                    profile_sha256=provisional["profile_sha256"],
+                    decision_sha256=provisional["decision_sha256"],
+                    telemetry_sequence=provisional["telemetry_sequence"],
+                    actuation_plan=(
+                        json.dumps(
+                            provisional["actuation_plan"],
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        )
+                        if isinstance(provisional["actuation_plan"], dict)
+                        else provisional["actuation_plan"]
+                    ),
+                    queue_lease=provisional["queue_lease"],
+                    priority_service_lane=provisional[
+                        "priority_service_lane"],
+                )
+                return self._record_service_lane_reservation(
+                    request_id, record)
+            except BaseException:
+                # Never leak endpoint-controller ownership when the second
+                # half of commit validation fails.  A queued record holds no
+                # physical credit, but terminalizing it still closes the
+                # request ID and its queue-offer state deterministically.
+                try:
+                    self.fail(
+                        request_id,
+                        "endpoint_service_lane_commit_validation_failed",
+                    )
+                except (TypeError, ValueError, RuntimeError):
+                    pass
+                with self._lock:
+                    self._request_service_lane_queue_offers.pop(
+                        request_id, None)
+                raise
+
+        with self._lock:
+            existing_offer = self._request_service_lane_queue_offers.get(
+                request_id)
+            existing_record = self._records.get(request_id)
+            existing_reservation = (
+                request_id in self._request_service_lane_reservations)
+
+        if existing_offer is not None:
+            if provisional["queue_lease"] != "1":
+                raise ValueError(
+                    "endpoint queue offer requires a promoted global lease")
+            if (
+                existing_record is None
+                or existing_record.route is not ElasticRoute.QUEUE
+                or existing_reservation
+            ):
+                raise ValueError("endpoint queue offer state is inconsistent")
+            immutable_fields = {
+                "schema", "pair_index", "prefill_index", "decoder_index",
+                "edge_id", "route", "profile_sha256",
+                "telemetry_sequence", "actuation_plan",
+            }
+            if any(
+                provisional[field] != existing_offer[field]
+                for field in immutable_fields
+            ):
+                raise ValueError(
+                    "promoted endpoint queue lease changed route identity")
+            if (
+                existing_offer.get("priority_service_lane") == "1"
+                and provisional["priority_service_lane"] != "1"
+            ):
+                raise ValueError(
+                    "promoted endpoint queue lease dropped priority authority")
+            if provisional["decision_sha256"] == existing_offer[
+                "decision_sha256"
+            ]:
+                raise ValueError(
+                    "promoted endpoint queue lease kept the old decision SHA")
+            receipt = commit_record(existing_record)
+            with self._lock:
+                self._request_service_lane_queue_offers.pop(request_id, None)
+            endpoint_decision = endpoint_decision_for_request()
+            return {
+                "schema": "tempo-go-service-lane-preflight-v1",
+                "status": "accepted",
+                "reason": receipt["reason"] if receipt else None,
+                "endpoint_route": existing_record.route.value,
+                "endpoint_decision": endpoint_decision,
+                "reservation": receipt,
+            }
+
+        with self._lock:
+            if request_id in self._request_global_commits:
+                raise ValueError("global service-lane preflight is too late")
+            if request_id in self._request_pending_global_commits:
+                raise ValueError("global service-lane preflight repeated")
+            if existing_record is not None:
+                raise ValueError("global service-lane request_id already exists")
+            self._request_pending_global_commits[request_id] = provisional
+        try:
+            record = self._decide_endpoint_feedback(
+                request_id=request_id,
+                prompt_tokens=prompt_tokens,
+                output_tokens=output_tokens,
+                remaining_deadline_ms=remaining_deadline_ms,
+            )
+            record = self._remember_decision_cache_residency(record)
+        finally:
+            with self._lock:
+                self._request_pending_global_commits.pop(request_id, None)
+
+        committed_route = ElasticRoute(provisional["route"])
+        endpoint_decision = endpoint_decision_for_request()
+        if record.route is ElasticRoute.QUEUE and (
+            provisional["queue_lease"] != "1"
+        ):
+            reason = (
+                endpoint_decision.get("reason")
+                if endpoint_decision else
+                "endpoint_service_lane_queue_required"
+            )
+            with self._lock:
+                if request_id in self._request_service_lane_queue_offers:
+                    raise RuntimeError("endpoint queue offer recorded twice")
+                self._request_service_lane_queue_offers[request_id] = dict(
+                    provisional)
+            return {
+                "schema": "tempo-go-service-lane-preflight-v1",
+                "status": "queue_required",
+                "reason": reason,
+                "endpoint_route": record.route.value,
+                "endpoint_decision": endpoint_decision,
+            }
+        if record.route not in {ElasticRoute.QUEUE, committed_route}:
+            self.fail(request_id, "endpoint_service_lane_route_mismatch")
+            raise RuntimeError(
+                "endpoint service-lane preflight changed global route")
+
+        receipt = commit_record(record)
+        return {
+            "schema": "tempo-go-service-lane-preflight-v1",
+            "status": "accepted",
+            "reason": receipt["reason"] if receipt else None,
+            "endpoint_route": record.route.value,
+            "endpoint_decision": endpoint_decision,
+            "reservation": receipt,
+        }
+
+    def global_queue_wait_ms(
+        self, request_id, *, default_queue_wait_ms, remaining_deadline_ms,
+    ):
+        """Return a bounded endpoint wait that preserves service budget.
+
+        A global route commit may arrive while the endpoint controller still
+        has no physical service credit.  Waiting for the whole remaining
+        business deadline is unsafe: it leaves no time for the committed
+        local/remote route to execute, and the endpoint then fails after an
+        apparently successful global admission.  When the endpoint is
+        currently queued, reserve its live committed-route score first and
+        let only the residual budget be spent in the endpoint queue.  The
+        score is produced by the endpoint feedback controller for this exact
+        request; no fixed timeout or synthetic fabric threshold is introduced.
+        """
+
+        if not isinstance(request_id, str) or not request_id:
+            raise ValueError("request_id must be nonempty")
+        if (
+            isinstance(default_queue_wait_ms, bool)
+            or not isinstance(default_queue_wait_ms, (int, float))
+            or not math.isfinite(float(default_queue_wait_ms))
+            or float(default_queue_wait_ms) < 0.0
+        ):
+            raise ValueError("default queue wait must be finite and nonnegative")
+        with self._lock:
+            commit = self._request_global_commits.get(request_id)
+            endpoint_decisions = self._request_endpoint_decisions.get(
+                request_id, ())
+        wait_ms = float(default_queue_wait_ms)
+        if isinstance(commit, dict):
+            if remaining_deadline_ms is not None:
+                if (
+                    isinstance(remaining_deadline_ms, bool)
+                    or not isinstance(remaining_deadline_ms, (int, float))
+                    or not math.isfinite(float(remaining_deadline_ms))
+                    or float(remaining_deadline_ms) < 0.0
+                ):
+                    raise ValueError(
+                        "remaining deadline must be finite and nonnegative")
+                # The frontend supplies the business/SLO deadline remaining
+                # at the service-lane boundary. Every TEMPO-owned global
+                # route may wait in the native endpoint queue inside that
+                # same budget; an explicit queue lease additionally records
+                # that the request crossed the global admission window.
+                # Neither path creates an unbounded wait or a negative
+                # budget.
+                wait_ms = min(float(remaining_deadline_ms), 30_000.0)
+                if endpoint_decisions:
+                    endpoint_decision = endpoint_decisions[-1]
+                    if endpoint_decision.get("route") == (
+                        ElasticRoute.QUEUE.value
+                    ):
+                        actuation_plan = commit.get("actuation_plan")
+                        soft_overage_lease = bool(
+                            commit.get("queue_lease")
+                            and isinstance(actuation_plan, dict)
+                            and isinstance(
+                                actuation_plan.get("soft_overage_resources"),
+                                list,
+                            )
+                            and actuation_plan.get("soft_overage_resources")
+                        )
+                        committed_route = commit.get("route")
+                        score_key = {
+                            ElasticRoute.LOCAL.value: "local_score_ms",
+                            ElasticRoute.REMOTE.value: "remote_score_ms",
+                        }.get(committed_route)
+                        service_score_ms = (
+                            endpoint_decision.get(score_key)
+                            if score_key is not None else None
+                        )
+                        if (
+                            not soft_overage_lease
+                            and isinstance(service_score_ms, (int, float))
+                            and not isinstance(service_score_ms, bool)
+                            and math.isfinite(float(service_score_ms))
+                            and float(service_score_ms) >= 0.0
+                        ):
+                            # The endpoint queue may consume only the budget
+                            # left after the current committed-route service
+                            # estimate.  A non-positive residual intentionally
+                            # becomes an immediate bounded timeout; the
+                            # service-lane receipt remains the evidence that
+                            # global admission could not preserve an
+                            # executable endpoint window.
+                            wait_ms = min(
+                                wait_ms,
+                                max(
+                                    0.0,
+                                    float(remaining_deadline_ms)
+                                    - float(service_score_ms),
+                                ),
+                            )
+        with self._lock:
+            self._request_global_queue_wait_ms[request_id] = wait_ms
+        return wait_ms
+
+    def _record_service_lane_reservation(
+        self, request_id: str, record,
+    ) -> dict[str, object] | None:
+        """Close the endpoint half of a global route decision.
+
+        ``EndpointFeedbackController.submit`` is the physical service-lane
+        admission point.  A global decision that reaches its bounded queue
+        has not acquired endpoint credit and must not be converted into an
+        untracked downstream wait.  The receipt is immutable evidence for
+        the frontend handshake and for the decision analyzer.
+        """
+
+        with self._lock:
+            global_commit = self._request_global_commits.get(request_id)
+            endpoint_decisions = self._request_endpoint_decisions.get(
+                request_id, ())
+            generation = self._endpoint_controller_generation
+        if global_commit is None:
+            return None
+        if record.route is ElasticRoute.QUEUE:
+            if global_commit.get("queue_lease", False):
+                # A queue lease is an explicit global decision to keep the
+                # request TEMPO-owned while it waits for physical endpoint
+                # credit.  The v448 wire loop applies the frozen, remaining
+                # deadline as a bounded retry budget.  It is therefore not a
+                # failed reservation and must not be converted to an HTTP
+                # 503 before that bounded wait is attempted.
+                status = "accepted"
+                reason = "endpoint_bounded_queue_lease_accepted"
+            else:
+                # The global controller already owns the reservation for the
+                # committed local/remote route.  Endpoint queueing is a
+                # bounded physical service-lane wait, not a reservation
+                # failure.  Failing it here converted transient endpoint
+                # contention into an immediate 503 before vLLM could retry.
+                status = "accepted"
+                reason = "endpoint_bounded_global_route_accepted"
+            endpoint_route = ElasticRoute.QUEUE.value
+        else:
+            committed_route = global_commit.get("route")
+            if record.route.value != committed_route:
+                raise RuntimeError(
+                    "endpoint service-lane reservation changed global route")
+            status = "accepted"
+            reason = "endpoint_service_lane_reserved"
+            endpoint_route = record.route.value
+        endpoint_decision = (
+            dict(endpoint_decisions[-1]) if endpoint_decisions else None)
+        receipt = {
+            "schema": "tempo-go-service-lane-reservation-v1",
+            "request_id": request_id,
+            "status": status,
+            "reason": reason,
+            "global_route": global_commit.get("route"),
+            "endpoint_route": endpoint_route,
+            "queue_lease": bool(global_commit.get("queue_lease", False)),
+            "controller_generation": generation,
+            "endpoint_decision": endpoint_decision,
+            "received_ns": time.perf_counter_ns(),
+        }
+        with self._lock:
+            if request_id in self._request_service_lane_reservations:
+                raise ValueError(
+                    "service-lane reservation recorded twice")
+            self._request_service_lane_reservations[request_id] = receipt
+        return dict(receipt)
+
+    def service_lane_reservation(self, request_id: str):
+        """Return the endpoint reservation receipt for a global request."""
+
+        if not isinstance(request_id, str) or not request_id:
+            raise ValueError("request_id must be nonempty")
+        with self._lock:
+            receipt = self._request_service_lane_reservations.get(request_id)
+        return dict(receipt) if receipt is not None else None
+
+    @staticmethod
+    def _global_commit_resource_limits(
+        global_commit, *, endpoint_config=None,
+    ):
+        """Return endpoint limits from a validated joint commit.
+
+        A global endpoint queue lease may deliberately carry more work than
+        one endpoint window.  That excess remains owned by the global
+        controller, but it must not be forwarded as an endpoint-controller
+        limit: the endpoint controller treats a limit above its physical
+        window as an invalid contract.  Clamping at this boundary preserves
+        the global debt while letting the downstream queue absorb the work.
+        """
+
+        if not isinstance(global_commit, dict):
+            return None
+        plan = global_commit.get("actuation_plan")
+        if plan is None:
+            return None
+        if plan.get("schema") in {
+            JOINT_ACTUATION_SCHEMA_V2,
+            JOINT_ACTUATION_SCHEMA_V3,
+        }:
+            limits = {
+                "local_token_ms": plan[
+                    "enforced_local_prefill_token_ms_limit"],
+                "remote_prefill_token_ms": plan[
+                    "enforced_remote_prefill_token_ms_limit"],
+                "remote_kv_bytes": plan["enforced_remote_kv_bytes_limit"],
+                "remote_semantic_ops": plan[
+                    "enforced_remote_semantic_ops_limit"],
+            }
+        else:
+            limits = {
+                "local_token_ms": plan["local_prefill_token_ms_limit"],
+                "remote_prefill_token_ms": plan[
+                    "remote_prefill_token_ms_limit"],
+                "remote_kv_bytes": plan["remote_kv_bytes_limit"],
+                "remote_semantic_ops": plan["remote_semantic_ops_limit"],
+            }
+        if endpoint_config is None:
+            return limits
+        defaults = {
+            "local_token_ms": endpoint_config.local_token_ms_window,
+            "remote_prefill_token_ms": (
+                endpoint_config.remote_prefill_token_ms_window),
+            "remote_kv_bytes": endpoint_config.remote_kv_bytes_window,
+            "remote_semantic_ops": endpoint_config.remote_semantic_ops_window,
+        }
+        return {
+            name: min(value, defaults[name])
+            for name, value in limits.items()
+        }
 
     async def prepare_vllm_load_snapshot(self, request_id, local_client):
         if not isinstance(request_id, str) or not request_id:
@@ -1030,6 +2049,180 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             self._rows[request_id] = row
         return record
 
+    def _decide_queue_gpu_only(
+        self, *, request_id, prompt_tokens, output_tokens,
+    ):
+        """Route from request-start vLLM scheduler gauges only.
+
+        This is an intentionally weak ablation: it observes the local
+        decoder's running/waiting/ KV gauges and never reads endpoint
+        completion feedback, fabric telemetry, or TEMPO-GO state.
+        """
+
+        try:
+            snapshot = self.vllm_load_snapshot(request_id)
+        except KeyError:
+            snapshot = None
+        running = snapshot.get("num_requests_running") if snapshot else None
+        waiting = snapshot.get("num_requests_waiting") if snapshot else None
+        mode = snapshot.get("decision_mode") if snapshot else None
+        _, kv_bytes = self.classify(
+            prompt_tokens=prompt_tokens, output_tokens=output_tokens)
+        residency = self._cache_residency(request_id)
+        if not isinstance(residency, CacheResidency):
+            raise TypeError("cache residency resolver must return CacheResidency")
+        remote_allowed = residency not in {
+            CacheResidency.D_ONLY, CacheResidency.BOTH,
+        }
+        if mode != VLLM_LOAD_DECISION_MODE or not (
+            isinstance(running, int) and running >= 0
+            and isinstance(waiting, int) and waiting >= 0
+        ):
+            route = ElasticRoute.LOCAL
+            reason = "queue_gpu_missing_load_local"
+        elif waiting > 0:
+            route = ElasticRoute.REMOTE if remote_allowed else ElasticRoute.LOCAL
+            reason = (
+                "queue_gpu_waiting_remote" if remote_allowed
+                else "queue_gpu_waiting_local_residency")
+        elif running >= self.pressure_max_num_seqs:
+            route = ElasticRoute.REMOTE if remote_allowed else ElasticRoute.LOCAL
+            reason = (
+                "queue_gpu_decoder_full_remote" if remote_allowed
+                else "queue_gpu_decoder_full_local_residency")
+        else:
+            route = ElasticRoute.LOCAL
+            reason = "queue_gpu_decoder_available_local"
+        now_ns = time.perf_counter_ns()
+        with self._lock:
+            base._require(request_id not in self._records,
+                          "duplicate request_id")
+            base._require(
+                len(self._records) < self.config.decision_capacity,
+                "decision capacity exhausted")
+        record = self._record(
+            request_id=request_id,
+            arm=ElasticExperimentArm.QUEUE_GPU_ONLY,
+            route=route,
+            reason=reason,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
+            kv_bytes=kv_bytes,
+            residency=residency,
+            now_ns=now_ns,
+            decision=None,
+        )
+        with self._lock:
+            self._records[request_id] = record
+        return record
+
+    @staticmethod
+    def _network_request_penalty(envelope: Mapping[str, Any]) -> tuple[float, dict[str, Any]]:
+        """Convert only observed network/fabric signals into a route penalty.
+
+        This is the explicit NETWORK_REQUEST_ONLY ablation.  It has no
+        endpoint-controller resources, vLLM scheduler gauges, tenant debt,
+        global admission, or pair scaling input.  Unsupported signals remain
+        missing and never become zero.
+        """
+        if not isinstance(envelope, Mapping):
+            raise TypeError("network envelope must be a mapping")
+        allowed = {
+            "nccl_collective_p99_ms": 0.25,
+            "lmcache_transfer_p99_ms": 0.50,
+            "cassini_rx_pause_fraction_max": 100.0,
+            "cassini_tx_pause_fraction_max": 100.0,
+            "cassini_ecn_fraction_max": 50.0,
+            "cassini_host_posted_cycles_per_packet_max": 0.01,
+            "cassini_retries": 0.50,
+            "cassini_timeouts": 5.0,
+        }
+        observed: dict[str, Any] = {}
+        penalty_ms = 0.0
+        for item in envelope.get("signals", ()):
+            if not isinstance(item, Mapping):
+                continue
+            name = item.get("name")
+            support = item.get("support")
+            value = item.get("value")
+            if name not in allowed or support != "supported":
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            if not math.isfinite(float(value)) or float(value) < 0.0:
+                continue
+            observed[str(name)] = float(value)
+            penalty_ms += float(value) * allowed[name]
+        if not math.isfinite(penalty_ms) or penalty_ms < 0.0:
+            raise ValueError("network request penalty is invalid")
+        return penalty_ms, {
+            "schema": "tempo-go-network-request-only-v1",
+            "source": "nccl-cassini-lmcache-observed-signals",
+            "sequence": envelope.get("sequence"),
+            "communicator_id": envelope.get("communicator_id"),
+            "topology_fingerprint_sha256": envelope.get(
+                "topology_fingerprint_sha256"),
+            "observed_signals": observed,
+            "remote_network_penalty_ms": penalty_ms,
+        }
+
+    def _decide_network_request_only(
+        self, *, request_id, prompt_tokens, output_tokens,
+        remaining_deadline_ms,
+    ):
+        row = self.profile.exact_row(prompt_tokens, output_tokens)
+        if row is None:
+            raise ValueError("no exact elastic profile row")
+        _, kv_bytes = self.classify(
+            prompt_tokens=prompt_tokens, output_tokens=output_tokens)
+        if row.remote_kv_bytes != kv_bytes:
+            raise ValueError("profile/router KV geometry mismatch")
+        residency = self._cache_residency(request_id)
+        if not isinstance(residency, CacheResidency):
+            raise TypeError("cache residency resolver must return CacheResidency")
+        estimate = self._estimate(row, remaining_deadline_ms)
+        envelope = self.cross_layer_telemetry()
+        penalty_ms, evidence = self._network_request_penalty(envelope)
+        remote_score = estimate.remote_upper_bound_ms + estimate.uncertainty_ms + penalty_ms
+        local_score = estimate.local_upper_bound_ms + estimate.uncertainty_ms
+        if residency in {CacheResidency.D_ONLY, CacheResidency.BOTH}:
+            route, reason = ElasticRoute.LOCAL, "network_request_only_decoder_residency_local"
+        elif remote_score <= local_score and remote_score <= estimate.remaining_deadline_ms:
+            route, reason = ElasticRoute.REMOTE, "network_request_only_observed_network_remote"
+        else:
+            route, reason = ElasticRoute.LOCAL, "network_request_only_observed_network_local"
+        evidence.update({
+            "route": route.value,
+            "static_local_score_ms": local_score,
+            "static_remote_score_ms": estimate.remote_upper_bound_ms + estimate.uncertainty_ms,
+            "deadline_ms": estimate.remaining_deadline_ms,
+            "cache_residency": residency.value,
+        })
+        now_ns = time.perf_counter_ns()
+        with self._lock:
+            base._require(request_id not in self._records, "duplicate request_id")
+            base._require(
+                len(self._records) < self.config.decision_capacity,
+                "decision capacity exhausted",
+            )
+        record = self._record(
+            request_id=request_id,
+            arm=ElasticExperimentArm.NETWORK_REQUEST_ONLY,
+            route=route,
+            reason=reason,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
+            kv_bytes=kv_bytes,
+            residency=residency,
+            now_ns=now_ns,
+            decision=None,
+        )
+        with self._lock:
+            self._records[request_id] = record
+            self._rows[request_id] = row
+            self._request_network_route_evidence[request_id] = evidence
+        return record
+
     @staticmethod
     def _endpoint_decision_dict(decision):
         return {
@@ -1054,6 +2247,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         if profile is None or controller is None:
             return {
                 "schema": ROUTER_SCHEMA,
+                "pair_index": self.local_decoder_index,
                 "endpoint_feedback_mode": self.endpoint_feedback_mode,
                 "endpoint_passive_feedback": self.endpoint_passive_feedback,
                 "endpoint_service_profile": None,
@@ -1073,8 +2267,65 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 if record.request_id in self._endpoint_requests
             )
             passive_registered = len(self._passive_endpoint_requests)
+            records = dict(self._records)
+            endpoint_requests = dict(self._endpoint_requests)
+            passive_requests = dict(self._passive_endpoint_requests)
+            remote_decoder_indices = dict(self._request_remote_decoder_indices)
+        mesh_remote_by_decoder = {
+            str(index): {
+                "remote_prefill_token_ms": 0,
+                "remote_kv_bytes": 0,
+                "remote_semantic_ops": 0,
+            }
+            for index in (0, 1)
+        }
+        # The endpoint controller lives on P_i, while a global-mesh remote
+        # request may terminate on D_j.  Export the active edge ownership so
+        # the frontend can aggregate receiver credit by destination instead
+        # of mistaking P_i's outbound remote work for D_i's inbound load.
+        for request_id, record in records.items():
+            if (
+                record.route is not ElasticRoute.REMOTE
+                or record.phase in {
+                    ElasticPhase.COMPLETE.value,
+                    ElasticPhase.FAILED.value,
+                }
+            ):
+                continue
+            decoder_index = remote_decoder_indices.get(request_id)
+            if decoder_index not in (0, 1):
+                continue
+            request = endpoint_requests.get(request_id)
+            work = request.work if request is not None else None
+            if work is None and request_id in passive_requests:
+                passive = passive_requests[request_id]
+                try:
+                    proxy = self.endpoint_service_profile.external_credit_proxy(
+                        record.prompt_tokens,
+                        record.output_tokens,
+                        record.cache_residency,
+                        route=EndpointRoute.REMOTE,
+                        cold_unknown_as_miss=self.cold_measured,
+                    )
+                    service = proxy.row
+                    work = EndpointWork(
+                        local_token_ms=service.local_token_ms,
+                        remote_prefill_token_ms=(
+                            service.remote_prefill_token_ms),
+                        remote_kv_bytes=record.potential_kv_bytes,
+                        remote_semantic_ops=1,
+                    )
+                except (AttributeError, TypeError, ValueError):
+                    work = None
+            if work is None:
+                continue
+            target = mesh_remote_by_decoder[str(decoder_index)]
+            target["remote_prefill_token_ms"] += work.remote_prefill_token_ms
+            target["remote_kv_bytes"] += work.remote_kv_bytes
+            target["remote_semantic_ops"] += work.remote_semantic_ops
         return {
             "schema": ROUTER_SCHEMA,
+            "pair_index": self.local_decoder_index,
             "endpoint_feedback_mode": self.endpoint_feedback_mode,
             "endpoint_routing_policy": self.endpoint_routing_policy,
             "endpoint_passive_feedback": self.endpoint_passive_feedback,
@@ -1099,6 +2350,203 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             "controller_generation": self._endpoint_controller_generation,
             "queued_requests": queued_requests,
             "passive_registered_requests": passive_registered,
+            "mesh_remote_by_decoder": mesh_remote_by_decoder,
+        }
+
+    def cross_layer_telemetry(self, controller_snapshot=None):
+        """Build one endpoint-local cross-layer evidence envelope.
+
+        The method is called by the existing bounded runtime telemetry RPC;
+        it creates no watcher and performs no control-plane write.  NCCL
+        profiler/observer data can be supplied by an opt-in co-job through a
+        single JSON snapshot path, while the native fallback remains explicit
+        ``not_collected`` until that observer is installed.
+        """
+        self._cross_layer_sequence += 1
+        sampled_ns = time.perf_counter_ns()
+        signals = []
+        cassini = None
+        if self._cross_layer_cassini is not None:
+            cassini = self._cross_layer_cassini.sample(force=True)
+        cassini_signal_map = {
+            "rx_pause_fraction_max": (
+                "cassini_rx_pause_fraction_max", "fraction", "rx_pause_fraction"),
+            "tx_pause_fraction_max": (
+                "cassini_tx_pause_fraction_max", "fraction", "tx_pause_fraction"),
+            "host_posted_cycles_per_packet_max": (
+                "cassini_host_posted_cycles_per_packet_max",
+                "cycles_per_packet", "host_posted_cycles_per_packet"),
+            "tx_packets_per_s": (
+                "cassini_tx_packets_per_s", "packets_per_second",
+                "packet_counts"),
+            "rx_packets_per_s": (
+                "cassini_rx_packets_per_s", "packets_per_second",
+                "packet_counts"),
+            "oxe_channel_active_fraction_max": (
+                "cassini_oxe_channel_active_fraction_max", "fraction",
+                "oxe_channel_idle_fraction"),
+            "oxe_channel_active_fraction_mean": (
+                "cassini_oxe_channel_active_fraction_mean", "fraction",
+                "oxe_channel_idle_fraction"),
+            "ecn_fraction_max": (
+                "cassini_ecn_fraction_max", "fraction", "ecn_fraction"),
+            "retries": ("cassini_retries", "events", "transport_fault_counts"),
+            "timeouts": ("cassini_timeouts", "events", "transport_fault_counts"),
+        }
+        for source_name, (name, unit, support_group) in cassini_signal_map.items():
+            value = cassini.get("signals", {}).get(source_name) if cassini else None
+            support = (
+                "supported"
+                if cassini and cassini.get("valid") and value is not None
+                else "not_collected"
+                if cassini is None or not cassini.get("valid")
+                else str(cassini.get("support", {}).get(support_group, "ambiguous"))
+            )
+            signals.append({
+                "name": name,
+                "value": value if support == "supported" else None,
+                "unit": unit,
+                "support": support,
+                "source": "cassini_sysfs_endpoint_delta",
+                "uncertainty": 0.0,
+                "scope": "endpoint",
+            })
+
+        controller = controller_snapshot
+        if controller is None and self.endpoint_feedback is not None:
+            controller = self.endpoint_feedback.snapshot(
+                now_ns=sampled_ns)
+        resources = controller.get("resources", {}) if isinstance(controller, dict) else {}
+        for name, unit in (
+            ("remote_semantic_ops", "operations"),
+            ("remote_kv_bytes", "bytes"),
+        ):
+            value = resources.get(name)
+            signals.append({
+                "name": f"lmcache_{name}_inflight",
+                "value": value if type(value) is int and value >= 0 else None,
+                "unit": unit,
+                "support": "supported" if type(value) is int and value >= 0 else "not_collected",
+                "source": "tempo_endpoint_controller",
+                "uncertainty": 0.0,
+                "scope": "endpoint",
+            })
+
+        # The opt-in co-job/observer publishes one atomic, producer-window
+        # snapshot.  Do not infer NCCL state from topology or subtract
+        # monotonic timestamps across hosts.  A stale, completed, malformed,
+        # or mixed-epoch snapshot is explicit not_collected state.
+        nccl_path = os.environ.get("TEMPO_GO_NCCL_TELEMETRY_PATH")
+        nccl: NCCLObserverSnapshot | None = None
+        nccl_age_ms: float | None = None
+        if nccl_path:
+            try:
+                candidate = read_observer_snapshot(nccl_path)
+                expected_epoch = os.environ.get("TEMPO_GO_CROSS_LAYER_EPOCH")
+                if expected_epoch is not None and (
+                    candidate.source_epoch != expected_epoch
+                ):
+                    raise ValueError("NCCL observer source epoch mismatch")
+                max_age_ms = float(os.environ.get(
+                    NCCL_OBSERVER_MAX_AGE_MS_ENV, "5000"))
+                if not math.isfinite(max_age_ms) or max_age_ms <= 0.0:
+                    raise ValueError("NCCL observer max age is invalid")
+                age_ms = snapshot_age_ms(candidate)
+                if age_ms > max_age_ms:
+                    raise ValueError("NCCL observer snapshot is stale")
+                if candidate.producer_state != "active":
+                    raise ValueError("NCCL observer producer is not active")
+                if not candidate.correctness_met:
+                    raise ValueError("NCCL observer correctness is not met")
+                nccl = candidate
+                nccl_age_ms = age_ms
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                nccl = None
+        for name, unit, value in (
+            ("nccl_collective_p99_ms", "milliseconds",
+             nccl.nccl_collective_p99_ms if nccl is not None else None),
+            ("nccl_arrival_spread_ms", "milliseconds",
+             nccl.nccl_arrival_spread_ms if nccl is not None else None),
+            ("lmcache_transfer_p99_ms", "milliseconds",
+             nccl.lmcache_transfer_p99_ms if nccl is not None else None),
+        ):
+            signals.append({
+                "name": name,
+                "value": value,
+                "unit": unit,
+                "support": "supported" if value is not None else "not_collected",
+                "source": (
+                    "cuda_collective_observer_cojob"
+                    if nccl is not None
+                    else "cuda_collective_observer_unavailable"
+                ),
+                "uncertainty": nccl.uncertainty_ms if nccl is not None else 0.0,
+                "scope": "communicator",
+            })
+        if nccl is not None:
+            for name, unit, value in (
+                ("nccl_observer_sequence", "sequence", nccl.sequence),
+                ("nccl_observer_rank_count", "ranks", nccl.rank_count),
+                ("nccl_observer_age_ms", "milliseconds", nccl_age_ms),
+            ):
+                signals.append({
+                    "name": name,
+                    "value": value,
+                    "unit": unit,
+                    "support": "supported",
+                    "source": "tempo-nccl-observer-v1",
+                    "uncertainty": nccl.uncertainty_ms,
+                    "scope": "communicator",
+                })
+        window_ms = (
+            float(cassini.get("window_ms"))
+            if cassini and isinstance(cassini.get("window_ms"), (int, float))
+            and cassini.get("window_ms") > 0 else 1.0
+        )
+        topology_fingerprint = hashlib.sha256(
+            f"perlmutter-cassini-v4:nic4:tc8:{self.local_decoder_index}".encode()
+        ).hexdigest()
+        if nccl is not None:
+            topology_fingerprint = nccl.topology_fingerprint_sha256
+        return {
+            "schema": "tempo-go-cross-layer-envelope-v1",
+            "pair_index": (
+                self.local_decoder_index
+                if self.local_decoder_index is not None else 0),
+            "node_id": socket.gethostname(),
+            "endpoint_id": (
+                f"pair-{self.local_decoder_index}"
+                if self.local_decoder_index is not None else socket.gethostname()),
+            "communicator_id": (
+                nccl.communicator_id
+                if nccl is not None
+                else os.environ.get(
+                    "TEMPO_GO_NCCL_COMMUNICATOR_ID", "nccl-unobserved")
+            ),
+            "source_epoch": os.environ.get(
+                "TEMPO_GO_CROSS_LAYER_EPOCH",
+                nccl.source_epoch
+                if nccl is not None
+                else f"slurm-{os.environ.get('SLURM_JOB_ID', 'local')}",
+            ),
+            "topology_fingerprint_sha256": topology_fingerprint,
+            "sequence": self._cross_layer_sequence,
+            "sampled_ns": sampled_ns,
+            "window_ms": window_ms,
+            "cassini_by_nic": (
+                [
+                    [
+                        {
+                            "traffic_class": item["traffic_class"],
+                            "rx_pause_fraction": item["rx_pause_fraction"],
+                            "tx_pause_fraction": item["tx_pause_fraction"],
+                        }
+                        for item in nic["traffic_classes"]
+                    ]
+                    for nic in (cassini.get("by_nic", []) if cassini else [])
+                ]
+            ),
+            "signals": signals,
         }
 
     def reset_endpoint_controller(self):
@@ -1383,12 +2831,14 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         residency = self._cache_residency(request_id)
         if not isinstance(residency, CacheResidency):
             raise TypeError("cache residency resolver must return CacheResidency")
-        service = self.endpoint_service_profile.exact_row(
+        service_proxy = self.endpoint_service_profile.external_credit_proxy(
             prompt_tokens,
             output_tokens,
             residency,
+            route=EndpointRoute.LOCAL,
             cold_unknown_as_miss=self.cold_measured,
         )
+        service = service_proxy.row
         estimate = self._estimate(row, remaining_deadline_ms)
         deadline = estimate.remaining_deadline_ms
         if remaining_deadline_ms is None:
@@ -1415,9 +2865,39 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             local_allowed=local_allowed,
             remote_allowed=remote_allowed,
         )
+        service_lookup = {
+            "lookup_mode": service_proxy.lookup_mode,
+            "requested_prompt_tokens": prompt_tokens,
+            "requested_output_tokens": output_tokens,
+            "requested_cache_residency": residency.value,
+            "effective_cache_residency": (
+                service_proxy.requested_cache_residency.value),
+            "source_prompt_tokens": service.prompt_tokens,
+            "source_output_tokens": service.output_tokens,
+            "source_cache_residency": service.cache_residency.value,
+        }
+        with self._lock:
+            if request_id in self._request_endpoint_service_lookups:
+                raise ValueError("endpoint service lookup recorded twice")
+            self._request_endpoint_service_lookups[request_id] = service_lookup
         now_ns = time.perf_counter_ns()
         semantic_epoch = None
-        if self.endpoint_routing_policy == ENDPOINT_SEMANTIC_EPOCH_POLICY:
+        with self._lock:
+            global_commit = self._request_global_commits.get(request_id)
+            if global_commit is None:
+                global_commit = self._request_pending_global_commits.get(
+                    request_id)
+        if global_commit is not None:
+            committed = EndpointRoute(global_commit["route"])
+            if committed is EndpointRoute.REMOTE and not remote_allowed:
+                raise ValueError(
+                    "TEMPO-GO remote commit violates decoder cache residency")
+            request = replace(
+                request,
+                local_allowed=committed is EndpointRoute.LOCAL,
+                remote_allowed=committed is EndpointRoute.REMOTE,
+            )
+        elif self.endpoint_routing_policy == ENDPOINT_SEMANTIC_EPOCH_POLICY:
             request, semantic_epoch = self._semantic_epoch_request(
                 request, now_ns=now_ns)
         with self._lock:
@@ -1426,7 +2906,19 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 len(self._records) < self.config.decision_capacity,
                 "decision capacity exhausted",
             )
-        decision = self.endpoint_feedback.submit(request, now_ns=now_ns)
+        decision = self.endpoint_feedback.submit(
+            request,
+            now_ns=now_ns,
+            resource_limits=self._global_commit_resource_limits(
+                global_commit,
+                endpoint_config=self.endpoint_feedback.config,
+            ),
+        )
+        if global_commit is not None and decision.route not in {
+            EndpointRoute.QUEUE,
+            EndpointRoute(global_commit["route"]),
+        }:
+            raise RuntimeError("endpoint controller changed TEMPO-GO route")
         record = self._endpoint_record(
             request=request,
             decision=decision,
@@ -1441,6 +2933,16 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 reason=str(semantic_epoch["reason"]),
                 regime=ENDPOINT_SEMANTIC_EPOCH_POLICY,
             )
+        elif global_commit is not None:
+            record = replace(
+                record,
+                reason=(
+                    "tempo_go_waiting_pair_credit"
+                    if decision.route is EndpointRoute.QUEUE
+                    else "tempo_go_global_route_committed"
+                ),
+                regime="tempo_go_global_commit_v1",
+            )
         with self._lock:
             base._require(request_id not in self._records, "duplicate request_id")
             self._records[request_id] = record
@@ -1451,16 +2953,44 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             ]
         return record
 
-    def decide(self, *, request_id, prompt_tokens, output_tokens,
-               remaining_deadline_ms=None):
+    def _prepare_request_cache_namespace(
+        self, *, request_id, prompt_tokens, output_tokens,
+    ):
+        """Install cache identity before either preflight or direct decide."""
+
         experiment_arm = self.arm(request_id)
         arm = experiment_arm.value
         with self._lock:
             prompt_key = self._request_prompt_keys.get(request_id, request_id)
             namespace = self.cache_catalog.namespace(
-                arm=arm, prompt_tokens=prompt_tokens,
-                output_tokens=output_tokens, item=prompt_key)
+                arm=arm,
+                prompt_tokens=prompt_tokens,
+                output_tokens=output_tokens,
+                item=prompt_key,
+            )
+            existing = self._request_cache_namespaces.get(request_id)
+            if existing is not None and existing != namespace:
+                raise ValueError("request cache namespace changed")
             self._request_cache_namespaces[request_id] = namespace
+        return experiment_arm
+
+    def decide(self, *, request_id, prompt_tokens, output_tokens,
+               remaining_deadline_ms=None):
+        experiment_arm = self._prepare_request_cache_namespace(
+            request_id=request_id,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
+        )
+        with self._lock:
+            preflight_record = self._records.get(request_id)
+            preflight_reservation = (
+                request_id in self._request_service_lane_reservations)
+        if preflight_record is not None and preflight_reservation:
+            # The endpoint service lane was already reserved by the explicit
+            # frontend preflight.  Re-running submit here would double-own the
+            # physical endpoint credit and would recreate the v17 race.
+            return preflight_record
+        arm = experiment_arm.value
         if (
             "-warm-" in request_id
             or D_CACHE_SEED_MARKER in request_id
@@ -1485,8 +3015,24 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 output_tokens=output_tokens,
                 remaining_deadline_ms=remaining_deadline_ms,
             )
+        elif experiment_arm is ElasticExperimentArm.QUEUE_GPU_ONLY:
+            record = self._decide_queue_gpu_only(
+                request_id=request_id,
+                prompt_tokens=prompt_tokens,
+                output_tokens=output_tokens,
+            )
+        elif experiment_arm is ElasticExperimentArm.NETWORK_REQUEST_ONLY:
+            record = self._decide_network_request_only(
+                request_id=request_id,
+                prompt_tokens=prompt_tokens,
+                output_tokens=output_tokens,
+                remaining_deadline_ms=remaining_deadline_ms,
+            )
         elif (
-            experiment_arm is ElasticExperimentArm.TEMPO
+            experiment_arm in {
+                ElasticExperimentArm.APP_GLOBAL_ONLY,
+                ElasticExperimentArm.TEMPO,
+            }
             and self.endpoint_feedback_mode == ENDPOINT_FEEDBACK_ADAPTIVE_MODE
         ):
             record = self._decide_endpoint_feedback(
@@ -1496,14 +3042,19 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 remaining_deadline_ms=remaining_deadline_ms,
             )
         else:
-            if experiment_arm is ElasticExperimentArm.TEMPO:
+            if experiment_arm in {
+                ElasticExperimentArm.APP_GLOBAL_ONLY,
+                ElasticExperimentArm.TEMPO,
+            }:
                 self.elastic.register_request_geometry(
                     request_id, prompt_tokens, output_tokens)
             record = super().decide(
                 request_id=request_id, prompt_tokens=prompt_tokens,
                 output_tokens=output_tokens,
                 remaining_deadline_ms=remaining_deadline_ms)
-        return self._remember_decision_cache_residency(record)
+        record = self._remember_decision_cache_residency(record)
+        self._record_service_lane_reservation(request_id, record)
+        return record
 
     def retry(self, request_id, remaining_deadline_ms):
         with self._lock:
@@ -1511,6 +3062,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             current = self._records.get(request_id)
             semantic_epoch = self._request_semantic_epoch_decisions.get(
                 request_id)
+            global_commit = self._request_global_commits.get(request_id)
         if endpoint_request is None:
             return super().retry(request_id, remaining_deadline_ms)
         if current is None or current.route is not ElasticRoute.QUEUE:
@@ -1526,7 +3078,13 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         deadline = min(deadline, endpoint_request.e2e_deadline_ms)
         request = replace(endpoint_request, e2e_deadline_ms=deadline)
         decision = self.endpoint_feedback.submit(
-            request, now_ns=time.perf_counter_ns())
+            request,
+            now_ns=time.perf_counter_ns(),
+            resource_limits=self._global_commit_resource_limits(
+                global_commit,
+                endpoint_config=self.endpoint_feedback.config,
+            ),
+        )
         record = self._endpoint_record(
             request=request,
             decision=decision,
@@ -1548,6 +3106,21 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 record,
                 reason=str(semantic_epoch["reason"]),
                 regime=ENDPOINT_SEMANTIC_EPOCH_POLICY,
+            )
+        elif global_commit is not None:
+            if record.route not in {
+                ElasticRoute.QUEUE,
+                ElasticRoute(global_commit["route"]),
+            }:
+                raise RuntimeError("endpoint retry changed TEMPO-GO route")
+            record = replace(
+                record,
+                reason=(
+                    "tempo_go_waiting_pair_credit"
+                    if record.route is ElasticRoute.QUEUE
+                    else "tempo_go_global_route_committed"
+                ),
+                regime="tempo_go_global_commit_v1",
             )
         with self._lock:
             self._records[request_id] = record
@@ -1747,6 +3320,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
     def fail(self, request_id, error):
         base._require(bool(error), "error must be nonempty")
         with self._lock:
+            self._request_service_lane_queue_offers.pop(request_id, None)
             endpoint_request = self._endpoint_requests.get(request_id)
             released = request_id in self._admission_released_ns
             record = self._records.get(request_id)
@@ -1880,6 +3454,13 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         with self._lock:
             pressure = self._request_pressure_snapshots.get(
                 record.request_id)
+            global_commit = self._request_global_commits.get(
+                record.request_id)
+        priority_lane_committed = bool(
+            self.global_priority_service_lane_enabled
+            and isinstance(global_commit, dict)
+            and global_commit.get("priority_service_lane") is True
+        )
         fabric_congested = bool(
             pressure
             and pressure.get("fabric_congested") is True
@@ -1900,10 +3481,16 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             and tempo_measured
             and record.route is ElasticRoute.REMOTE
             and (
-                getattr(record, "prompt_tokens", 0) > 2048
+                priority_lane_committed
                 or (
-                    getattr(record, "prompt_tokens", 0) <= 512
-                    and record.output_tokens >= 128
+                    not self.global_priority_service_lane_enabled
+                    and (
+                        getattr(record, "prompt_tokens", 0) > 2048
+                        or (
+                            getattr(record, "prompt_tokens", 0) <= 512
+                            and record.output_tokens >= 128
+                        )
+                    )
                 )
             )
         )
@@ -2051,6 +3638,8 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 "median_guard_eligible": median_guard_eligible,
                 "median_guard_applied": priority_class == "median_guard",
                 "priority_class": priority_class,
+                "global_priority_service_lane_committed": (
+                    priority_lane_committed),
                 "fabric_congested": fabric_congested,
                 "fabric_congestion_suppressed": (
                     suppress_remote_priority
@@ -2066,18 +3655,82 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
     def prepare_upstream_headers(self, record, headers):
         prepared = dict(headers)
         if (
-            self.remote_decode_placement == "long_decode_cross"
+            self.remote_decode_placement in {
+                "long_decode_cross", "global_mesh",
+            }
             and record.route is ElasticRoute.REMOTE
         ):
             base._require(
                 self.local_decoder_index in (0, 1),
                 "local decoder index is unavailable",
             )
-            decoder_index = (
-                1 - self.local_decoder_index
-                if record.output_tokens >= 256
-                else self.local_decoder_index
-            )
+            if self.remote_decode_placement == "global_mesh":
+                with self._lock:
+                    global_commit = self._request_global_commits.get(
+                        record.request_id)
+                if (
+                    not isinstance(global_commit, dict)
+                    or global_commit.get("schema") not in {
+                        GLOBAL_MESH_COMMIT_SCHEMA,
+                        GLOBAL_MESH_JOINT_COMMIT_SCHEMA,
+                    }
+                ):
+                    # C7's offered population contains an exogenous,
+                    # route-pinned official-LMCache tenant beside requests
+                    # controlled by the P-by-D mesh.  It must load the paired
+                    # P_i->D_i edge without itself consuming a global commit;
+                    # otherwise the controller would be allowed to move its
+                    # own aggressor and manufacture an easy workload.  Keep
+                    # this exception marker-exact and remote-arm-only.  Every
+                    # ordinary global-mesh request still fails closed without
+                    # an immutable edge commitment.
+                    exogenous_decoder = exogenous_fixed_remote_decoder(
+                        record.request_id)
+                    experiment_arm = self.arm(record.request_id)
+                    if (
+                        exogenous_decoder in (0, 1)
+                        and experiment_arm
+                        is ElasticExperimentArm.OFFICIAL_LMCACHE_REMOTE
+                    ):
+                        decoder_index = exogenous_decoder
+                    elif (
+                        C4_PHYSICAL_WARM_PREFIX in record.request_id
+                        and C4_PHYSICAL_MARKER in record.request_id
+                        and record.reason in {
+                            "unmeasured_p_only_seed_remote",
+                            "unmeasured_p_only_hit_probe_remote",
+                        }
+                    ):
+                        # C4/C8 physical P_ONLY preparation is deliberately
+                        # outside the measured population.  Each campaign arm
+                        # seeds its own cache namespace; replication sends one
+                        # shadow through each producer's paired decoder so
+                        # affinity is backed by completed native LMCache I/O.
+                        # It must not consume (or fabricate) a measured global
+                        # edge commitment; every non-preparation mesh request
+                        # remains fail-closed below.
+                        decoder_index = self.local_decoder_index
+                    elif experiment_arm in GLOBAL_MESH_PAIRED_BASELINE_ARMS:
+                        # C7 keeps one immutable multi-decoder server topology
+                        # for every arm.  Non-global request-level baselines
+                        # retain their original paired semantics inside that
+                        # topology; only full/app-global requests may consume
+                        # a global edge commitment.
+                        decoder_index = self.local_decoder_index
+                    else:
+                        raise ValueError(
+                            "remote mesh request lacks a global edge commitment")
+                else:
+                    decoder_index = global_commit.get("decoder_index")
+                    if decoder_index not in (0, 1):
+                        raise ValueError(
+                            "remote mesh decoder commitment is invalid")
+            else:
+                decoder_index = (
+                    1 - self.local_decoder_index
+                    if record.output_tokens >= 256
+                    else self.local_decoder_index
+                )
             prepared[DECODER_INDEX_HEADER] = str(decoder_index)
             with self._lock:
                 self._request_remote_decoder_indices[
@@ -2248,7 +3901,9 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         decoder_evidence = self._finish_decoder_cache_evidence(
             request_id, record)
         if route == "official_lmcache_remote_prefill":
-            if self.remote_decode_placement == "long_decode_cross":
+            if self.remote_decode_placement in {
+                "long_decode_cross", "global_mesh",
+            }:
                 with self._lock:
                     expected_decoder_index = (
                         self._request_remote_decoder_indices.get(request_id))
@@ -2304,8 +3959,8 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             # vLLM intentionally recomputes the final source token on a full
             # external-cache hit. LMCache therefore reports exactly L-1
             # reusable KV tokens for the proxy's L-token source prompt.
-            full_cacheable_tokens = prompt_tokens - 1
-            if not 0 <= cached_tokens <= full_cacheable_tokens:
+            full_cacheable_tokens = _source_full_hit_tokens(prompt_tokens)
+            if not 0 <= cached_tokens <= prompt_tokens:
                 raise ValueError("LMCache cached-token evidence outside prompt")
             with self._lock:
                 self._request_source_cached_tokens[request_id] = cached_tokens
@@ -2320,10 +3975,18 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 raise ValueError(
                     "P-side preparation was contaminated by decoder APC")
             if "-warm-seed-" in request_id:
-                if cached_tokens != 0:
-                    raise ValueError(
-                        "P-only seed was contaminated by a prior source hit")
-                return None
+                # A seed is an idempotent preparation event.  With concurrent
+                # replicated warmup, another seed may already have populated
+                # a complete LMCache chunk, so a nonzero read is not evidence
+                # that this seed failed.  The request still completes through
+                # the official remote path and records P_ONLY ownership; a
+                # later probe must provide the exact source-hit observation.
+                return self.observe_cache_completion(
+                    request_id,
+                    prefill_resident=True,
+                    decode_resident=False,
+                    actual_kv_bytes=actual_kv_bytes,
+                )
 
             prior_event = self.cache_catalog.event(namespace)
             cache_contract = explicit_cache_contract(request_id)
@@ -2593,6 +4256,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         rows = super().records()
         with self._lock:
             namespaces = dict(self._request_cache_namespaces)
+            global_queue_wait_ms = dict(self._request_global_queue_wait_ms)
             source_cached_tokens = dict(self._request_source_cached_tokens)
             decoder_cache_evidence = dict(
                 self._request_decoder_cache_evidence)
@@ -2605,10 +4269,20 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 self._request_vllm_load_snapshots)
             pressure_snapshots = dict(
                 self._request_pressure_snapshots)
+            network_route_evidence = {
+                request_id: dict(value)
+                for request_id, value
+                in self._request_network_route_evidence.items()
+            }
             endpoint_decisions = {
                 request_id: [dict(value) for value in values]
                 for request_id, values
                 in self._request_endpoint_decisions.items()
+            }
+            endpoint_service_lookups = {
+                request_id: dict(value)
+                for request_id, value
+                in self._request_endpoint_service_lookups.items()
             }
             endpoint_feedback = dict(self._request_endpoint_feedback)
             semantic_epoch_decisions = {
@@ -2621,6 +4295,14 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             frontend_semantic_loads = {
                 request_id: dict(value) for request_id, value
                 in self._request_frontend_semantic_loads.items()
+            }
+            global_commits = {
+                request_id: dict(value) for request_id, value
+                in self._request_global_commits.items()
+            }
+            service_lane_reservations = {
+                request_id: dict(value) for request_id, value
+                in self._request_service_lane_reservations.items()
             }
         endpoint_profile = self.endpoint_service_profile
         reuse_items = (
@@ -2635,6 +4317,22 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             priority = upstream_priorities.get(request_id)
             decoder_index = remote_decoder_indices.get(
                 request_id)
+            decoder_index_source = (
+                "immutable_decoder_header"
+                if decoder_index is not None else None
+            )
+            # In ``cross`` mode the official single-decoder proxy is launched
+            # with the opposite decoder host, so no per-request selector
+            # header is needed.  Preserve that immutable physical topology in
+            # the terminal receipt instead of reporting an unknown decoder.
+            if (
+                decoder_index is None
+                and self.remote_decode_placement == "cross"
+                and self.local_decoder_index in (0, 1)
+                and row.get("route") == ElasticRoute.REMOTE.value
+            ):
+                decoder_index = 1 - self.local_decoder_index
+                decoder_index_source = "fixed_cross_proxy_topology"
             request_credit = self.elastic.request_credit_evidence(
                 request_id)
             load_snapshot = vllm_load_snapshots.get(request_id)
@@ -2648,6 +4346,8 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             passive_endpoint_request = passive_endpoint_requests.get(
                 request_id)
             semantic_load = frontend_semantic_loads.get(request_id)
+            global_commit = global_commits.get(request_id)
+            service_lane_reservation = service_lane_reservations.get(request_id)
             endpoint_snapshot = (
                 endpoint_event.get("controller")
                 if endpoint_event is not None else None
@@ -2745,6 +4445,11 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                     pressure.get(field) if pressure else None)
             row["endpoint_feedback_mode"] = self.endpoint_feedback_mode
             row["endpoint_routing_policy"] = self.endpoint_routing_policy
+            network_evidence = network_route_evidence.get(request_id)
+            row["network_request_only_evidence"] = network_evidence
+            row["network_request_only_penalty_ms"] = (
+                network_evidence.get("remote_network_penalty_ms")
+                if network_evidence else None)
             row["frontend_semantic_load_schema"] = (
                 semantic_load.get("schema") if semantic_load else None)
             row["frontend_semantic_load_source"] = (
@@ -2757,6 +4462,30 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 row[f"frontend_semantic_{field}"] = (
                     semantic_load.get(field) if semantic_load else None)
             row["endpoint_policy_applied"] = endpoint_request is not None
+            row["tempo_go_global_commit_applied"] = global_commit is not None
+            for field in (
+                "schema", "source", "pair_index", "prefill_index",
+                "decoder_index", "edge_id", "route",
+                "profile_sha256", "decision_sha256", "telemetry_sequence",
+                "queue_lease", "priority_service_lane",
+                "phase_label_policy_input",
+                "physical_switch_label_policy_input",
+                "future_arrivals_policy_input", "received_ns",
+            ):
+                row[f"tempo_go_global_commit_{field}"] = (
+                    global_commit.get(field) if global_commit else None)
+            row["tempo_go_global_commit_actuation_plan"] = (
+                global_commit.get("actuation_plan") if global_commit else None)
+            row["tempo_go_global_queue_wait_ms"] = global_queue_wait_ms.get(
+                request_id)
+            row["tempo_go_service_lane_reservation"] = (
+                service_lane_reservation)
+            row["tempo_go_service_lane_reservation_status"] = (
+                service_lane_reservation.get("status")
+                if service_lane_reservation else None)
+            row["tempo_go_service_lane_reservation_reason"] = (
+                service_lane_reservation.get("reason")
+                if service_lane_reservation else None)
             row["semantic_epoch_applied"] = semantic_epoch is not None
             for field in (
                 "schema", "policy", "route_before", "route_after", "reason",
@@ -2794,6 +4523,31 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 if endpoint_profile else None)
             row["endpoint_service_profile_deployment_scope"] = (
                 endpoint_profile.deployment_scope if endpoint_profile else None)
+            service_lookup = endpoint_service_lookups.get(request_id)
+            row["endpoint_service_lookup_mode"] = (
+                service_lookup.get("lookup_mode")
+                if service_lookup else None)
+            row["endpoint_service_requested_prompt_tokens"] = (
+                service_lookup.get("requested_prompt_tokens")
+                if service_lookup else None)
+            row["endpoint_service_requested_output_tokens"] = (
+                service_lookup.get("requested_output_tokens")
+                if service_lookup else None)
+            row["endpoint_service_requested_cache_residency"] = (
+                service_lookup.get("requested_cache_residency")
+                if service_lookup else None)
+            row["endpoint_service_effective_cache_residency"] = (
+                service_lookup.get("effective_cache_residency")
+                if service_lookup else None)
+            row["endpoint_service_source_prompt_tokens"] = (
+                service_lookup.get("source_prompt_tokens")
+                if service_lookup else None)
+            row["endpoint_service_source_output_tokens"] = (
+                service_lookup.get("source_output_tokens")
+                if service_lookup else None)
+            row["endpoint_service_source_cache_residency"] = (
+                service_lookup.get("source_cache_residency")
+                if service_lookup else None)
             row["endpoint_default_e2e_deadline_ms"] = (
                 endpoint_profile.default_e2e_deadline_ms
                 if endpoint_profile else None)
@@ -3002,6 +4756,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 self.proxy_kv_control_overlap)
             row["local_decoder_index"] = self.local_decoder_index
             row["remote_decoder_index"] = decoder_index
+            row["remote_decoder_index_source"] = decoder_index_source
             row["remote_decoder_crossed"] = (
                 decoder_index is not None
                 and self.local_decoder_index is not None
@@ -3092,6 +4847,9 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 priority["median_guard_applied"] if priority is not None else None)
             row["upstream_priority_class"] = (
                 priority["priority_class"] if priority is not None else None)
+            row["global_priority_service_lane_committed"] = (
+                priority["global_priority_service_lane_committed"]
+                if priority is not None else None)
             row["remote_priority_fabric_congested"] = (
                 priority["fabric_congested"]
                 if priority is not None else None)
@@ -3102,8 +4860,13 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 priority["token_ids_forwarded"]
                 if priority is not None else None)
             row["lmcache_source_cached_tokens"] = cached_tokens
+            row["lmcache_source_full_hit_expected_tokens"] = (
+                _source_full_hit_tokens(int(row["prompt_tokens"]) + 1)
+                if cached_tokens is not None
+                else None
+            )
             row["lmcache_source_full_hit_observed"] = (
-                cached_tokens == row["prompt_tokens"]
+                cached_tokens == row["lmcache_source_full_hit_expected_tokens"]
                 if cached_tokens is not None
                 else None)
             row["cache_namespace"] = namespace
@@ -3126,6 +4889,80 @@ def _headers(record):
     }
 
 
+class _GlobalCommitMiddleware:
+    """Record a complete global route contract before request execution."""
+
+    _HEADERS = {
+        "schema": "x-tempo-go-schema",
+        "pair_index": "x-tempo-go-pair-index",
+        "prefill_index": "x-tempo-go-prefill-index",
+        "decoder_index": "x-tempo-go-decoder-index",
+        "edge_id": "x-tempo-go-edge-id",
+        "route": "x-tempo-go-route",
+        "profile_sha256": "x-tempo-go-profile-sha256",
+        "decision_sha256": "x-tempo-go-decision-sha256",
+        "telemetry_sequence": "x-tempo-go-telemetry-sequence",
+        "actuation_plan": "x-tempo-go-actuation-plan",
+        "queue_lease": "x-tempo-go-queue-lease",
+        "priority_service_lane": "x-tempo-go-priority-service-lane",
+    }
+
+    def __init__(self, app, *, core):
+        self.app = app
+        self.core = core
+
+    @staticmethod
+    async def _reject(send, detail):
+        body = json.dumps({
+            "schema": ROUTER_SCHEMA,
+            "detail": detail,
+        }, separators=(",", ":")).encode()
+        await send({
+            "type": "http.response.start",
+            "status": 400,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode()),
+                (b"x-tempo-pd-schema", ROUTER_SCHEMA.encode()),
+            ],
+        })
+        await send({
+            "type": "http.response.body",
+            "body": body,
+            "more_body": False,
+        })
+
+    async def __call__(self, scope, receive, send):
+        if (
+            scope.get("type") != "http"
+            or scope.get("method") != "POST"
+            or scope.get("path") != "/v1/completions"
+        ):
+            await self.app(scope, receive, send)
+            return
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in scope.get("headers", ())
+        }
+        values = {
+            name: headers.get(header)
+            for name, header in self._HEADERS.items()
+        }
+        if not any(value is not None for value in values.values()):
+            await self.app(scope, receive, send)
+            return
+        request_id = headers.get(base.REQUEST_ID_HEADER)
+        try:
+            self.core.prepare_global_commit(
+                request_id=request_id,
+                **values,
+            )
+        except (TypeError, ValueError) as exc:
+            await self._reject(send, str(exc))
+            return
+        await self.app(scope, receive, send)
+
+
 class _CanonicalWireMiddleware:
     """Keep canonical wire identity app-local while runtime globals are restored."""
 
@@ -3133,7 +4970,10 @@ class _CanonicalWireMiddleware:
         "/health",
         "/tempo/decisions",
         "/tempo/endpoint_controller",
+        "/tempo/runtime_telemetry",
         "/tempo/reset_endpoint_controller",
+        "/tempo/service_lane_preflight",
+        "/tempo/service_lane_abort",
     ))
 
     def __init__(self, app):
@@ -3215,11 +5055,140 @@ def build_app(config, profile, *, allow_screen_profile=False,
         app = runtime.build_app(config, profile,
                                 allow_screen_profile=allow_screen_profile,
                                 queue_wait_ms=queue_wait_ms)
+        app.state.runtime_telemetry_scheduler_lock = asyncio.Lock()
+        app.state.runtime_telemetry_scheduler_cache = None
         app.add_middleware(_CanonicalWireMiddleware)
+        app.add_middleware(
+            _GlobalCommitMiddleware, core=app.state.tempo_core)
 
         @app.get("/tempo/endpoint_controller")
         async def endpoint_controller():
             return app.state.tempo_core.endpoint_controller_state()
+
+        @app.get("/tempo/runtime_telemetry")
+        async def runtime_telemetry():
+            """Return a bounded, sample-timestamped local vLLM gauge.
+
+            A single-flight short cache is part of the control-plane
+            contract.  It prevents every admission request from synchronously
+            contending with the loaded vLLM Prometheus handler while retaining
+            the timestamp and cache age needed for provenance analysis.
+            """
+            now_ns = time.perf_counter_ns()
+            cache_hit = False
+            async with app.state.runtime_telemetry_scheduler_lock:
+                cache = app.state.runtime_telemetry_scheduler_cache
+                if (
+                    isinstance(cache, dict)
+                    and isinstance(cache.get("sampled_ns"), int)
+                    and now_ns >= cache["sampled_ns"]
+                    and now_ns - cache["sampled_ns"]
+                    <= RUNTIME_TELEMETRY_SCHEDULER_CACHE_NS
+                ):
+                    scheduler = dict(cache["scheduler"])
+                    scheduler_sampled_ns = int(cache["sampled_ns"])
+                    fetch_started_ns = scheduler_sampled_ns
+                    fetch_finished_ns = scheduler_sampled_ns
+                    cache_hit = True
+                else:
+                    fetch_started_ns = time.perf_counter_ns()
+                    response = await app.state.local.get("/metrics")
+                    response.raise_for_status()
+                    scheduler = parse_vllm_load_metrics(
+                        response.text,
+                        served_model_name=app.state.tempo_core._served_model_name,
+                    )
+                    scheduler_sampled_ns = time.perf_counter_ns()
+                    fetch_finished_ns = scheduler_sampled_ns
+                    app.state.runtime_telemetry_scheduler_cache = {
+                        "scheduler": dict(scheduler),
+                        "sampled_ns": scheduler_sampled_ns,
+                    }
+            sampled_ns = time.perf_counter_ns()
+            state = app.state.tempo_core.endpoint_controller_state()
+            state["vllm_scheduler"] = {
+                "schema": GLOBAL_SCHEDULER_SCHEMA,
+                "source": "router_local_vllm_prometheus_observe_only",
+                "decision_mode": "observe_only",
+                "model_name": scheduler["model_name"],
+                "engine_indices": scheduler["engine_indices"],
+                "num_requests_running": scheduler["num_requests_running"],
+                "num_requests_waiting": scheduler["num_requests_waiting"],
+                "kv_cache_usage_fraction": scheduler["kv_cache_usage_perc"],
+            }
+            state["vllm_scheduler_fetch"] = {
+                "started_ns": fetch_started_ns,
+                "sampled_ns": scheduler_sampled_ns,
+                "fetch_ms": (
+                    fetch_finished_ns - fetch_started_ns
+                ) / 1_000_000,
+                "cache_hit": cache_hit,
+                "cache_age_ms": (
+                    max(0, sampled_ns - scheduler_sampled_ns)
+                    / 1_000_000
+                ),
+            }
+            state["cross_layer"] = app.state.tempo_core.cross_layer_telemetry(
+                state.get("controller"))
+            return state
+
+        @app.post("/tempo/service_lane_preflight")
+        async def service_lane_preflight(request: Request):
+            """Acquire endpoint credit before a TEMPO route commit.
+
+            This is a bounded request-scoped handshake, not a background
+            watcher.  The global frontend sends the same immutable route
+            header it will use for ``/v1/completions`` together with the
+            already-tokenized geometry.  A direct route that would only fit
+            the endpoint's bounded queue is returned as ``unavailable``;
+            global-owned queue leases remain explicitly accepted.
+            """
+            try:
+                payload = await request.json()
+                if not isinstance(payload, dict):
+                    raise ValueError("service-lane preflight body is not an object")
+                required = {
+                    "request_id", "prompt_key", "prompt_tokens", "output_tokens",
+                    "remaining_deadline_ms", "commit",
+                }
+                if set(payload) != required:
+                    raise ValueError(
+                        "service-lane preflight body inventory is not exact")
+                return app.state.tempo_core.preflight_global_service_lane(
+                    request_id=payload["request_id"],
+                    prompt_key=payload["prompt_key"],
+                    prompt_tokens=payload["prompt_tokens"],
+                    output_tokens=payload["output_tokens"],
+                    remaining_deadline_ms=payload["remaining_deadline_ms"],
+                    commit=payload["commit"],
+                )
+            except (TypeError, ValueError, RuntimeError) as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        @app.post("/tempo/service_lane_abort")
+        async def service_lane_abort(request: Request):
+            """Release a preflighted endpoint reservation on upstream abort."""
+            try:
+                payload = await request.json()
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != {"request_id", "error"}
+                ):
+                    raise ValueError("service-lane abort body inventory is not exact")
+                request_id = payload["request_id"]
+                error = payload["error"]
+                if not isinstance(request_id, str) or not request_id:
+                    raise ValueError("service-lane abort request_id is invalid")
+                if not isinstance(error, str) or not error:
+                    raise ValueError("service-lane abort error is invalid")
+                app.state.tempo_core.fail(request_id, error)
+                return {
+                    "schema": "tempo-go-service-lane-abort-v1",
+                    "status": "released",
+                    "request_id": request_id,
+                }
+            except (TypeError, ValueError, RuntimeError) as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
 
         @app.post("/tempo/reset_endpoint_controller")
         async def reset_endpoint_controller():

@@ -1,0 +1,108 @@
+{
+  "schema": "tempo-go-c10-paper-sota-extension-v1",
+  "frozen_utc": "2026-08-25T15:14:03Z",
+  "claim_boundary": {
+    "post_hoc_extension": true,
+    "actual_vllm_lmcache_performance_measurement_allowed": true,
+    "independent_validation_claim_allowed": false,
+    "reason": "The parent held-out workload was preregistered, but these paper-policy adapters were frozen after allocation 57586612 started. A fresh unchanged rerun is required before an independent SOTA claim."
+  },
+  "parent_independent_validation": {
+    "path": "eval/sota_4node/tempo_go_c8_independent_validation_contract_v3.json",
+    "sha256": "e2d07e8c50316620cee29a82ae06bbb4e3efd5e8c18c07347a34a4f532f07a76",
+    "analysis": "results/tempo_go_c8_independent_validation_job_57586612_v3/analysis.json",
+    "analysis_sha256": "844d7b317c0c4839f62feb9a748785a328f9b86b05b52949d81486de09719c47",
+    "tempo_result": "results/tempo_go_c8_independent_validation_job_57586612_v3/full_c7_managed_background/result.json",
+    "tempo_result_sha256": "0e2069313073001dac277726cfe01dc607defd2eea69e48d3f414d0a7d68de64"
+  },
+  "execution_order": [
+    "kairos_x512",
+    "netkv"
+  ],
+  "wire_arm": "app_global_only",
+  "same_population_contract": {
+    "request_seed": 20260825,
+    "same_parent_block_order": true,
+    "same_arrival_jitter": true,
+    "same_prompt_namespace_transform": true,
+    "same_model_and_tensor_parallelism": true,
+    "same_background_and_victim_offered_population": true,
+    "fresh_server_epoch_per_policy": true,
+    "one_execution_per_policy_no_retry": true
+  },
+  "common_carrier": {
+    "nodes": 4,
+    "gpus": 16,
+    "topology": "2P2D full P-by-D mesh; one TP4 Qwen2.5-7B-Instruct engine per node",
+    "vllm": "0.26.0+cu129",
+    "lmcache": "LMCacheConnectorV1 common pinned carrier with Perlmutter compatibility fixes",
+    "nixl": "1.4.0 UCX/CXI",
+    "fabric": "HPE Slingshot 11 / four 25 GB/s Cassini NICs per GPU node",
+    "tempo_business_priority_fairness_pair_scaling_shared_fabric_actuation": false
+  },
+  "policies": {
+    "kairos_x512": {
+      "identity": "Kairos paper-policy reproduction with candidate chunk set X={512}",
+      "paper": "https://arxiv.org/html/2607.02043",
+      "reported_code_url": "https://github.com/sudokara/Kairos",
+      "reported_code_url_status_at_freeze": "repository_not_found",
+      "alpha": 1.3,
+      "tbt_safety_factor": 0.9,
+      "decoder_max_num_batched_tokens": 512,
+      "allowed_runtime_inputs": [
+        "prompt geometry",
+        "prefill and decoder calibrated latency priors",
+        "vLLM decoder running requests",
+        "vLLM decoder waiting requests",
+        "vLLM decoder KV occupancy",
+        "tenant TTFT and TBT SLO"
+      ],
+      "forbidden_tempo_inputs_and_actions": [
+        "Cassini or NCCL fabric telemetry",
+        "LMCache semantic inflight",
+        "business priority lane",
+        "tenant fairness reservation",
+        "pair scaling",
+        "shared fabric admission budget",
+        "TEMPO dispatch stagger"
+      ],
+      "limitation": "Stock vLLM lacks Kairos per-request dynamic chunk schedules; X={512} is an explicit safe subset executed with a real 512-token decoder batching ceiling."
+    },
+    "netkv": {
+      "identity": "NetKV Algorithm-1 paper-policy reproduction on the Perlmutter Slingshot tier",
+      "paper": "https://arxiv.org/html/2606.03910",
+      "static_nic_bytes_per_second": 25000000000,
+      "tensor_parallel_shards": 4,
+      "oracle_refresh": "request-triggered atomic all-pair telemetry batch",
+      "score": "KV_bytes / (25GBps * TP4 * (1-c) / (1+self_inflight)) + T_queue + T_first_decode_step",
+      "allowed_runtime_inputs": [
+        "P-to-D candidate topology",
+        "KV transfer bytes",
+        "supported Cassini pause/ECN/OXE fractions",
+        "LMCache remote semantic operations inflight",
+        "vLLM decoder running requests",
+        "vLLM decoder waiting requests",
+        "vLLM decoder KV occupancy"
+      ],
+      "forbidden_tempo_inputs_and_actions": [
+        "decoder-local prefill deflection",
+        "business priority lane",
+        "tenant fairness reservation",
+        "pair scaling",
+        "shared fabric admission budget",
+        "TEMPO cross-layer shadow price or stagger"
+      ],
+      "topology_scope": "All physical P/D candidates in this four-node allocation traverse Slingshot; live source and destination congestion and self-contention distinguish edges while the static tier bandwidth is uniform."
+    }
+  },
+  "source_inventory": {
+    "tempo/pd_paper_baselines.py": "7d78ab4f2fa868e56831bbc4f9dbc4a875facf04dde5a1d5e2781688f5b783e3",
+    "eval/sota_4node/tempo_pd_paper_baseline_frontend.py": "c0e9a4e1f1b4a7215481a92853c228ade0906eccda15c3746ed5876763dbf00d",
+    "eval/sota_4node/run_tempo_go_c10_paper_sota_client.py": "f84bca443e4034a1b1431ff19fb94442bd0968cb07acb2b177aa841f28bb2644",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c10_paper_sota_node.py": "383b77b9ebbe7fa74201ff7a1d7d92de9da1582c2723b50cea0fb22fb39824b8",
+    "eval/sota_4node/c10_paper_sota_node_entry.sh": "8617272ee6ed5ee9f6bab4721b3b04e2cd5fcdd47c23f3a588b082acddf58560",
+    "eval/sota_4node/analyze_tempo_go_c10_paper_sota.py": "ca1c2ac10dd7f670ba4378ac53a2d80581cae5560ccdf7fbfc936c067e79bb5e",
+    "eval/sota_4node/run_tempo_go_c10_paper_sota_in_allocation.sh": "b5899447670bdee858375ab8ef9f84aad2ef1e86f2117d7c011f218302f7db98",
+    "eval/sota_4node/test_tempo_go_c10_paper_baselines.py": "2bb044022a4c7b94209df9d19ccc1acc504bc97b6cee6c064889221bd5a8eb18"
+  }
+}
