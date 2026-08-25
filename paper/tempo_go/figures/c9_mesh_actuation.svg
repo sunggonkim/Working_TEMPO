@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1350" height="760" viewBox="0 0 1350 760" role="img" aria-labelledby="figure-title figure-description">
+  <title id="figure-title">TEMPO mesh actuation</title>
+  <desc id="figure-description">Observed local and remote edge use in the C9 independent run.</desc>
+  <rect x="0.00" y="0.00" width="1350.00" height="760.00" fill="#FFFFFF" />
+  <text x="48.00" y="43.00" fill="#172033" font-size="26" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">실제 mesh actuation: local/remote를 미리 고정하지 않고 여섯 physical edge를 모두 사용</text>
+  <text x="48.00" y="72.00" fill="#5F6B7A" font-size="14" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Edge labels are completed foreground requests in the 210-request C9 run</text>
+  <rect x="40.00" y="100.00" width="1270.00" height="585.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <path d="M 310 245 Q 640.0 175.0 970 245" stroke="#1457D9" stroke-width="4.75" fill="none" opacity="0.72" stroke-linecap="round" />
+  <rect x="605.00" y="157.00" width="70.00" height="30.00" fill="#FFFFFF" stroke="#78A7FF" stroke-width="1" rx="12" />
+  <text x="640.00" y="178.00" fill="#1457D9" font-size="14" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">9</text>
+  <path d="M 310 245 Q 640.0 355.0 970 515" stroke="#1457D9" stroke-width="4.0" fill="none" opacity="0.72" stroke-linecap="round" />
+  <rect x="605.00" y="337.00" width="70.00" height="30.00" fill="#FFFFFF" stroke="#78A7FF" stroke-width="1" rx="12" />
+  <text x="640.00" y="358.00" fill="#1457D9" font-size="14" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">6</text>
+  <path d="M 310 515 Q 640.0 405.0 970 245" stroke="#1457D9" stroke-width="4.5" fill="none" opacity="0.72" stroke-linecap="round" />
+  <rect x="605.00" y="387.00" width="70.00" height="30.00" fill="#FFFFFF" stroke="#78A7FF" stroke-width="1" rx="12" />
+  <text x="640.00" y="408.00" fill="#1457D9" font-size="14" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">8</text>
+  <path d="M 310 515 Q 640.0 585.0 970 515" stroke="#1457D9" stroke-width="4.0" fill="none" opacity="0.72" stroke-linecap="round" />
+  <rect x="605.00" y="567.00" width="70.00" height="30.00" fill="#FFFFFF" stroke="#78A7FF" stroke-width="1" rx="12" />
+  <text x="640.00" y="588.00" fill="#1457D9" font-size="14" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">6</text>
+  <path d="M 1030 190 C 890 150 1210 150 1070 190" stroke="#94A3B8" stroke-width="4.944444444444445" fill="none" opacity="0.9" stroke-linecap="round" />
+  <rect x="840.00" y="137.00" width="100.00" height="32.00" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1" rx="12" />
+  <text x="890.00" y="159.00" fill="#172033" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">local 35</text>
+  <path d="M 1030 570 C 890 610 1210 610 1070 570" stroke="#94A3B8" stroke-width="11" fill="none" opacity="0.9" stroke-linecap="round" />
+  <rect x="840.00" y="587.00" width="100.00" height="32.00" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1" rx="12" />
+  <text x="890.00" y="609.00" fill="#172033" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">local 146</text>
+  <rect x="148.00" y="190.00" width="164.00" height="110.00" fill="#E8F0FF" stroke="#1457D9" stroke-width="2" rx="16" />
+  <text x="230.00" y="238.00" fill="#172033" font-size="17" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Prefill P0</text>
+  <text x="230.00" y="268.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">TP4 / A100 node</text>
+  <rect x="148.00" y="460.00" width="164.00" height="110.00" fill="#E8F0FF" stroke="#1457D9" stroke-width="2" rx="16" />
+  <text x="230.00" y="508.00" fill="#172033" font-size="17" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Prefill P1</text>
+  <text x="230.00" y="538.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">TP4 / A100 node</text>
+  <rect x="968.00" y="190.00" width="164.00" height="110.00" fill="#ECFDF5" stroke="#059669" stroke-width="2" rx="16" />
+  <text x="1050.00" y="238.00" fill="#172033" font-size="17" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Decoder D0</text>
+  <text x="1050.00" y="268.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">TP4 / A100 node</text>
+  <rect x="968.00" y="460.00" width="164.00" height="110.00" fill="#ECFDF5" stroke="#059669" stroke-width="2" rx="16" />
+  <text x="1050.00" y="508.00" fill="#172033" font-size="17" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Decoder D1</text>
+  <text x="1050.00" y="538.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">TP4 / A100 node</text>
+  <rect x="115.00" y="625.00" width="1120.00" height="42.00" fill="#EEF4FF" stroke="#BDD2FF" stroke-width="1" rx="12" />
+  <text x="675.00" y="651.00" fill="#172033" font-size="15" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">local 181 · official LMCache remote 29 · remote-favorable에서 remote 29/30 · failures 0</text>
+</svg>

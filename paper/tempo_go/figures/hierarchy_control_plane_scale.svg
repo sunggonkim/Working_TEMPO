@@ -1,0 +1,102 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1450" height="720" viewBox="0 0 1450 720" role="img" aria-labelledby="figure-title figure-description">
+  <title id="figure-title">Hierarchy control-plane scaling</title>
+  <desc id="figure-description">Payload and CPU control-path latency from 2 through 1024 logical pairs.</desc>
+  <rect x="0.00" y="0.00" width="1450.00" height="720.00" fill="#FFFFFF" />
+  <text x="48.00" y="43.00" fill="#172033" font-size="26" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">계층형 fan-in: global 후보 payload는 256개에서 bounded, CPU 경로 비용은 별도 공개</text>
+  <text x="48.00" y="72.00" fill="#5F6B7A" font-size="14" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">15 repeats · same candidate population · CPU control-plane only (not native 1,024-pair inference)</text>
+  <rect x="35.00" y="95.00" width="680.00" height="565.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <rect x="735.00" y="95.00" width="680.00" height="565.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <text x="70.00" y="133.00" fill="#172033" font-size="18" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Global payload bytes (log scale)</text>
+  <text x="770.00" y="133.00" fill="#172033" font-size="18" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Control-path p50 latency (ms)</text>
+  <line x1="100.00" y1="530.00" x2="660.00" y2="530.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="90.00" y="535.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">1K</text>
+  <line x1="100.00" y1="413.33" x2="660.00" y2="413.33" stroke="#DCE3EC" stroke-width="1" />
+  <text x="90.00" y="418.33" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">10K</text>
+  <line x1="100.00" y1="296.67" x2="660.00" y2="296.67" stroke="#DCE3EC" stroke-width="1" />
+  <text x="90.00" y="301.67" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">100K</text>
+  <line x1="100.00" y1="180.00" x2="660.00" y2="180.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="90.00" y="185.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">1M</text>
+  <circle cx="100.00" cy="516.86" r="5.00" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="224.44" cy="446.65" r="5.00" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="348.89" cy="376.32" r="5.00" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="473.33" cy="306.01" r="5.00" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="597.78" cy="235.67" r="5.00" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="660.00" cy="200.53" r="5.00" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <polyline points="100.00,516.86 224.44,446.65 348.89,376.32 473.33,306.01 597.78,235.67 660.00,200.53" stroke="#94A3B8" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+  <circle cx="100.00" cy="516.86" r="5.00" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="224.44" cy="446.65" r="5.00" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="348.89" cy="376.32" r="5.00" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="473.33" cy="306.01" r="5.00" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="597.78" cy="305.91" r="5.00" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="660.00" cy="305.89" r="5.00" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <polyline points="100.00,516.86 224.44,446.65 348.89,376.32 473.33,306.01 597.78,305.91 660.00,305.89" stroke="#1457D9" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+  <text x="100.00" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">2</text>
+  <text x="224.44" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">8</text>
+  <text x="348.89" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">32</text>
+  <text x="473.33" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">128</text>
+  <text x="597.78" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">512</text>
+  <text x="660.00" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">1024</text>
+  <rect x="360.00" y="121.00" width="18.00" height="12.00" fill="#94A3B8" rx="2" />
+  <text x="385.00" y="132.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">full scan</text>
+  <rect x="490.00" y="121.00" width="18.00" height="12.00" fill="#1457D9" rx="2" />
+  <text x="515.00" y="132.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">bounded global</text>
+  <text x="655.00" y="289.89" fill="#1457D9" font-size="12" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">83,358 B</text>
+  <text x="380.00" y="600.00" fill="#1457D9" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">1,024 pairs: 666,815 B → 83,358 B (−87.499%)</text>
+  <line x1="800.00" y1="530.00" x2="1360.00" y2="530.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="790.00" y="535.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">0</text>
+  <line x1="800.00" y1="460.00" x2="1360.00" y2="460.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="790.00" y="465.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">20</text>
+  <line x1="800.00" y1="390.00" x2="1360.00" y2="390.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="790.00" y="395.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">40</text>
+  <line x1="800.00" y1="320.00" x2="1360.00" y2="320.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="790.00" y="325.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">60</text>
+  <line x1="800.00" y1="250.00" x2="1360.00" y2="250.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="790.00" y="255.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">80</text>
+  <line x1="800.00" y1="180.00" x2="1360.00" y2="180.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="790.00" y="185.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">100</text>
+  <circle cx="800.00" cy="529.36" r="4.50" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="924.44" cy="528.34" r="4.50" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1048.89" cy="524.37" r="4.50" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1173.33" cy="508.32" r="4.50" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1297.78" cy="443.11" r="4.50" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1360.00" cy="355.90" r="4.50" fill="#94A3B8" stroke="#FFFFFF" stroke-width="2" />
+  <polyline points="800.00,529.36 924.44,528.34 1048.89,524.37 1173.33,508.32 1297.78,443.11 1360.00,355.90" stroke="#94A3B8" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+  <circle cx="800.00" cy="529.75" r="4.50" fill="#D97706" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="924.44" cy="529.11" r="4.50" fill="#D97706" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1048.89" cy="526.62" r="4.50" fill="#D97706" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1173.33" cy="516.93" r="4.50" fill="#D97706" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1297.78" cy="478.27" r="4.50" fill="#D97706" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1360.00" cy="426.24" r="4.50" fill="#D97706" stroke="#FFFFFF" stroke-width="2" />
+  <polyline points="800.00,529.75 924.44,529.11 1048.89,526.62 1173.33,516.93 1297.78,478.27 1360.00,426.24" stroke="#D97706" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+  <circle cx="800.00" cy="523.94" r="4.50" fill="#78A7FF" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="924.44" cy="522.62" r="4.50" fill="#78A7FF" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1048.89" cy="517.53" r="4.50" fill="#78A7FF" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1173.33" cy="497.12" r="4.50" fill="#78A7FF" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1297.78" cy="427.97" r="4.50" fill="#78A7FF" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1360.00" cy="336.00" r="4.50" fill="#78A7FF" stroke="#FFFFFF" stroke-width="2" />
+  <polyline points="800.00,523.94 924.44,522.62 1048.89,517.53 1173.33,497.12 1297.78,427.97 1360.00,336.00" stroke="#78A7FF" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+  <circle cx="800.00" cy="523.68" r="4.50" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="924.44" cy="521.72" r="4.50" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1048.89" cy="514.15" r="4.50" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1173.33" cy="484.00" r="4.50" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1297.78" cy="376.13" r="4.50" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <circle cx="1360.00" cy="231.35" r="4.50" fill="#1457D9" stroke="#FFFFFF" stroke-width="2" />
+  <polyline points="800.00,523.68 924.44,521.72 1048.89,514.15 1173.33,484.00 1297.78,376.13 1360.00,231.35" stroke="#1457D9" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+  <text x="800.00" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">2</text>
+  <text x="924.44" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">8</text>
+  <text x="1048.89" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">32</text>
+  <text x="1173.33" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">128</text>
+  <text x="1297.78" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">512</text>
+  <text x="1360.00" y="558.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">1024</text>
+  <rect x="820.00" y="579.00" width="18.00" height="12.00" fill="#94A3B8" rx="2" />
+  <text x="845.00" y="590.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">full scan</text>
+  <rect x="958.00" y="579.00" width="18.00" height="12.00" fill="#D97706" rx="2" />
+  <text x="983.00" y="590.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">pair agent</text>
+  <rect x="1096.00" y="579.00" width="18.00" height="12.00" fill="#78A7FF" rx="2" />
+  <text x="1121.00" y="590.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">bounded global</text>
+  <rect x="1234.00" y="579.00" width="18.00" height="12.00" fill="#1457D9" rx="2" />
+  <text x="1259.00" y="590.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">bounded total</text>
+  <text x="1080.00" y="623.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">1,024 p50: full 49.74 · pair 29.65 · global 55.43 · total 85.33 ms</text>
+  <text x="1080.00" y="645.00" fill="#DC2626" font-size="12" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">p99: full 152.84 ms · bounded total 158.24 ms</text>
+</svg>

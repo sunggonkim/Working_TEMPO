@@ -1,0 +1,26 @@
+{
+  "claim_boundary": "C9 is independent four-node evidence; C10 is post-hoc; hierarchy scale is CPU control-plane only.",
+  "figures": {
+    "paper/tempo_go/figures/c10_paper_policy_comparison.svg": "bf055064327867d96a191a1f060d53b6da39c7d7034b4da6c826398f771f86c6",
+    "paper/tempo_go/figures/c9_fairness_telemetry.svg": "5c8759163718a2fab5df16049afdcbfc44821c46a04020a57541b7fa76aade84",
+    "paper/tempo_go/figures/c9_independent_performance.svg": "2a10fb630ebaf8f87bc844681c270ceb4ff120b00ee547704c15cc3fb519b6aa",
+    "paper/tempo_go/figures/c9_mesh_actuation.svg": "1d43d79a4a63a8065ad0bfecf63ae472829fcaf12ec03c573c555a75777dd8de",
+    "paper/tempo_go/figures/hierarchy_control_plane_scale.svg": "8935d6dacff0e4a90ffe6020ebf2179e1052dea104dbde9c15b203b7c3cce098"
+  },
+  "renderer": "paper/tempo_go/render_readme_figures.py",
+  "schema": "tempo-go-readme-figure-manifest-v1",
+  "sources": {
+    "paper/tempo_go/artifact_manifest.json": "dcdaa27ed68d24a4a392f04efdd0b3b408cdb80acc5804398cd74a1af9416fb5",
+    "results/tempo_go_c10_paper_sota_job_57586612_v2/kairos_x512/result.json": "49c5f7ec0831c86b6a03401aa4af44188dbf074e90a6efdf5235d9362509c3c8",
+    "results/tempo_go_c10_paper_sota_job_57586612_v3/netkv/result.json": "2cbeffd87337961806e448af43e111fc4ef1a202aa8a72acc3f51bee82940759",
+    "results/tempo_go_c8_independent_validation_job_57586612_v3/analysis.json": "844d7b317c0c4839f62feb9a748785a328f9b86b05b52949d81486de09719c47",
+    "results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d0/result.json": "f7c6310896a597c22903a074efa2c721a988e1f913bb324ba7898c050bb5d53c",
+    "results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/result.json": "f3a84e793db84ddefd99d1a3273bfaf40ee785c714162e65a21ed0c98ea708df",
+    "results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_remote_p0d1/result.json": "23a03a9bb237301238366d64b5d178b14d14c28d63b9988b9e6b55b70844c133",
+    "results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_remote_p1d0/result.json": "3936e2f02dc138765745bd3d5738083599577cfea556e4921b29896159534387",
+    "results/tempo_go_c8_independent_validation_job_57586612_v3/full_c7_managed_background/result.json": "0e2069313073001dac277726cfe01dc607defd2eea69e48d3f414d0a7d68de64",
+    "results/tempo_go_c8_independent_validation_job_57586612_v3/predictor/result.json": "f7db052fd0a77fbcd020237247ba71ac578401c4c2815dd6a033cc0402e5e6ce",
+    "results/tempo_go_c8_independent_validation_job_57586612_v3/queue_gpu/result.json": "00128b06e99833e1c24839a2223b5a8dec31a9bd5bd62a54eddca73b3ffaed03",
+    "results/tempo_go_hierarchy_scale_20260825_c9_c10_r15.json": "90f4e2ab3b3645e7c4ee62c3c95a11f1debb0cb2eb400bb189ac85b36e047088"
+  }
+}

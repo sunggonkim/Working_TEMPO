@@ -1,0 +1,110 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1450" height="770" viewBox="0 0 1450 770" role="img" aria-labelledby="figure-title figure-description">
+  <title id="figure-title">C9 independent validation</title>
+  <desc id="figure-description">Seven matched policies under miss-hot and remote-favorable contention.</desc>
+  <rect x="0.00" y="0.00" width="1450.00" height="770.00" fill="#FFFFFF" />
+  <text x="48.00" y="43.00" fill="#172033" font-size="26" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">C9 독립 검증: 부분 정책은 병목 이동에서 무너지고 TEMPO만 두 구간을 함께 방어</text>
+  <text x="48.00" y="72.00" fill="#5F6B7A" font-size="14" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Fresh 4-node allocation · same offered population · lower p99 and higher SLO are better</text>
+  <rect x="35.00" y="95.00" width="880.00" height="620.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <rect x="935.00" y="95.00" width="480.00" height="620.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <text x="70.00" y="132.00" fill="#172033" font-size="18" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Foreground E2E p99 (seconds)</text>
+  <text x="970.00" y="132.00" fill="#172033" font-size="18" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">SLO attainment (% of offered)</text>
+  <rect x="520.00" y="119.00" width="18.00" height="12.00" fill="#F59E0B" rx="2" />
+  <text x="545.00" y="130.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">miss-hot</text>
+  <rect x="695.00" y="119.00" width="18.00" height="12.00" fill="#7C3AED" rx="2" />
+  <text x="720.00" y="130.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">remote-favorable</text>
+  <line x1="85.00" y1="605.00" x2="875.00" y2="605.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="73.00" y="610.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">0</text>
+  <line x1="85.00" y1="533.33" x2="875.00" y2="533.33" stroke="#DCE3EC" stroke-width="1" />
+  <text x="73.00" y="538.33" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">10</text>
+  <line x1="85.00" y1="461.67" x2="875.00" y2="461.67" stroke="#DCE3EC" stroke-width="1" />
+  <text x="73.00" y="466.67" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">20</text>
+  <line x1="85.00" y1="390.00" x2="875.00" y2="390.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="73.00" y="395.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">30</text>
+  <line x1="85.00" y1="318.33" x2="875.00" y2="318.33" stroke="#DCE3EC" stroke-width="1" />
+  <text x="73.00" y="323.33" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">40</text>
+  <line x1="85.00" y1="246.67" x2="875.00" y2="246.67" stroke="#DCE3EC" stroke-width="1" />
+  <text x="73.00" y="251.67" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">50</text>
+  <line x1="85.00" y1="175.00" x2="875.00" y2="175.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="73.00" y="180.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">60</text>
+  <rect x="112.43" y="532.96" width="29.00" height="72.04" fill="#F59E0B" rx="3" />
+  <text x="126.93" y="525.96" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">10.1</text>
+  <rect x="141.43" y="347.40" width="29.00" height="257.60" fill="#7C3AED" rx="3" />
+  <text x="155.93" y="340.40" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">35.9</text>
+  <text x="159.43" y="633.00" fill="#172033" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-28 159.43 633.00)">Local D0</text>
+  <rect x="225.29" y="534.41" width="29.00" height="70.59" fill="#F59E0B" rx="3" />
+  <text x="239.79" y="527.41" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">9.8</text>
+  <rect x="254.29" y="321.49" width="29.00" height="283.51" fill="#7C3AED" rx="3" />
+  <text x="268.79" y="314.49" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">39.6</text>
+  <text x="272.29" y="633.00" fill="#172033" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-28 272.29 633.00)">Local D1</text>
+  <rect x="338.14" y="446.42" width="29.00" height="158.58" fill="#F59E0B" rx="3" />
+  <text x="352.64" y="439.42" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">22.1</text>
+  <rect x="367.14" y="345.94" width="29.00" height="259.06" fill="#7C3AED" rx="3" />
+  <text x="381.64" y="338.94" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">36.1</text>
+  <text x="385.14" y="633.00" fill="#172033" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-28 385.14 633.00)">Remote 0→1</text>
+  <rect x="451.00" y="432.79" width="29.00" height="172.21" fill="#F59E0B" rx="3" />
+  <text x="465.50" y="425.79" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">24.0</text>
+  <rect x="480.00" y="350.53" width="29.00" height="254.47" fill="#7C3AED" rx="3" />
+  <text x="494.50" y="343.53" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">35.5</text>
+  <text x="498.00" y="633.00" fill="#172033" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-28 498.00 633.00)">Remote 1→0</text>
+  <rect x="563.86" y="542.58" width="29.00" height="62.42" fill="#F59E0B" rx="3" />
+  <text x="578.36" y="535.58" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">8.7</text>
+  <rect x="592.86" y="242.67" width="29.00" height="362.33" fill="#7C3AED" rx="3" />
+  <text x="607.36" y="235.67" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">50.6</text>
+  <text x="610.86" y="633.00" fill="#172033" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-28 610.86 633.00)">Predictor</text>
+  <rect x="676.71" y="547.41" width="29.00" height="57.59" fill="#F59E0B" rx="3" />
+  <text x="691.21" y="540.41" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">8.0</text>
+  <rect x="705.71" y="232.53" width="29.00" height="372.47" fill="#7C3AED" rx="3" />
+  <text x="720.21" y="225.53" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">52.0</text>
+  <text x="723.71" y="633.00" fill="#172033" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-28 723.71 633.00)">Queue-GPU</text>
+  <rect x="789.57" y="581.09" width="29.00" height="23.91" fill="#F59E0B" rx="3" />
+  <text x="804.07" y="574.09" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">3.3</text>
+  <rect x="818.57" y="580.94" width="29.00" height="24.06" fill="#7C3AED" rx="3" />
+  <text x="833.07" y="573.94" fill="#172033" font-size="11" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">3.4</text>
+  <text x="836.57" y="633.00" fill="#172033" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-28 836.57 633.00)">TEMPO</text>
+  <text x="56.00" y="390.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle" transform="rotate(-90 56 390.0)">seconds</text>
+  <line x1="980.00" y1="605.00" x2="1370.00" y2="605.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="970.00" y="610.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">0</text>
+  <line x1="980.00" y1="519.00" x2="1370.00" y2="519.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="970.00" y="524.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">20</text>
+  <line x1="980.00" y1="433.00" x2="1370.00" y2="433.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="970.00" y="438.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">40</text>
+  <line x1="980.00" y1="347.00" x2="1370.00" y2="347.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="970.00" y="352.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">60</text>
+  <line x1="980.00" y1="261.00" x2="1370.00" y2="261.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="970.00" y="266.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">80</text>
+  <line x1="980.00" y1="175.00" x2="1370.00" y2="175.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="970.00" y="180.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">100</text>
+  <rect x="989.86" y="257.42" width="14.00" height="347.58" fill="#F59E0B" rx="2" />
+  <text x="996.86" y="251.42" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">81</text>
+  <rect x="1011.86" y="605.00" width="14.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="1021.86" y="630.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1021.86 630.00)">Local D0</text>
+  <rect x="1045.57" y="257.42" width="14.00" height="347.58" fill="#F59E0B" rx="2" />
+  <text x="1052.57" y="251.42" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">81</text>
+  <rect x="1067.57" y="605.00" width="14.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="1077.57" y="630.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1077.57 630.00)">Local D1</text>
+  <rect x="1101.29" y="293.25" width="14.00" height="311.75" fill="#F59E0B" rx="2" />
+  <text x="1108.29" y="287.25" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">72</text>
+  <rect x="1123.29" y="605.00" width="14.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="1133.29" y="630.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1133.29 630.00)">Remote 0→1</text>
+  <rect x="1157.00" y="468.83" width="14.00" height="136.17" fill="#F59E0B" rx="2" />
+  <text x="1164.00" y="462.83" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">32</text>
+  <rect x="1179.00" y="605.00" width="14.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="1189.00" y="630.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1189.00 630.00)">Remote 1→0</text>
+  <rect x="1212.71" y="246.67" width="14.00" height="358.33" fill="#F59E0B" rx="2" />
+  <text x="1219.71" y="240.67" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">83</text>
+  <rect x="1234.71" y="418.67" width="14.00" height="186.33" fill="#7C3AED" rx="2" />
+  <text x="1241.71" y="412.67" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">43</text>
+  <text x="1244.71" y="630.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1244.71 630.00)">Predictor</text>
+  <rect x="1268.43" y="189.33" width="14.00" height="415.67" fill="#F59E0B" rx="2" />
+  <text x="1275.43" y="183.33" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">97</text>
+  <rect x="1290.43" y="418.67" width="14.00" height="186.33" fill="#7C3AED" rx="2" />
+  <text x="1297.43" y="412.67" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">43</text>
+  <text x="1300.43" y="630.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1300.43 630.00)">Queue-GPU</text>
+  <rect x="1324.14" y="175.00" width="14.00" height="430.00" fill="#F59E0B" rx="2" />
+  <text x="1331.14" y="169.00" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">100</text>
+  <rect x="1346.14" y="175.00" width="14.00" height="430.00" fill="#7C3AED" rx="2" />
+  <text x="1353.14" y="169.00" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">100</text>
+  <text x="1356.14" y="630.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1356.14 630.00)">TEMPO</text>
+  <text x="1210.00" y="686.00" fill="#1457D9" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">TEMPO: 120/120 miss-hot, 30/30 remote-favorable</text>
+</svg>
