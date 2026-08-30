@@ -342,7 +342,7 @@ def build_payload() -> dict[str, Any]:
             "clean_base_apply_check": "passed",
         },
         "verification": {
-            "focused_tests": 104,
+            "focused_tests": 109,
             "focused_test_result": "passed",
             "python_compile": "passed",
             "posthoc_reproduction": "byte-identical",

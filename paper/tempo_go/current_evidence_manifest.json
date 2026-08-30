@@ -418,7 +418,7 @@
   "schema": "tempo-go-current-evidence-manifest-v2",
   "verification": {
     "focused_test_result": "passed",
-    "focused_tests": 104,
+    "focused_tests": 109,
     "posthoc_reproduction": "byte-identical",
     "python_compile": "passed"
   }

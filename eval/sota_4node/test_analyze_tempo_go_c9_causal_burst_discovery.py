@@ -3,6 +3,48 @@ from __future__ import annotations
 from eval.sota_4node import analyze_tempo_go_c9_causal_burst_discovery as analyzer
 
 
+def test_valid_failure_receipt_is_not_a_completed_request() -> None:
+    terminal = {
+        "http_status": 503,
+        "terminal_kind": "service_lane_failure",
+        "terminal_error_kind": "endpoint_service_lane_preflight_unavailable",
+        "valid": True,
+        "done_seen": False,
+        "output_token_values": [],
+    }
+
+    assert analyzer._business_terminal_outcome(
+        terminal, expected_output_tokens=128) == "failure"
+
+
+def test_completion_requires_done_and_exact_output_tokens() -> None:
+    terminal = {
+        "http_status": 200,
+        "terminal_kind": None,
+        "valid": True,
+        "done_seen": True,
+        "output_token_values": ["x", "y"],
+    }
+
+    assert analyzer._business_terminal_outcome(
+        terminal, expected_output_tokens=2) == "completed"
+    assert analyzer._business_terminal_outcome(
+        terminal, expected_output_tokens=3) == "failure"
+
+
+def test_global_reject_remains_distinct_from_failure() -> None:
+    terminal = {
+        "http_status": 503,
+        "terminal_kind": "global_reject",
+        "valid": True,
+        "done_seen": False,
+        "output_token_values": [],
+    }
+
+    assert analyzer._business_terminal_outcome(
+        terminal, expected_output_tokens=2) == "global_reject"
+
+
 def test_empty_offered_regime_preserves_null_latency_metrics() -> None:
     analysis = {
         "remote_favorable": {

@@ -13,7 +13,7 @@
   "schema": "tempo-go-readme-figure-manifest-v1",
   "sources": {
     "paper/tempo_go/artifact_manifest.json": "dcdaa27ed68d24a4a392f04efdd0b3b408cdb80acc5804398cd74a1af9416fb5",
-    "paper/tempo_go/current_evidence_manifest.json": "7b7344843e26c6b989a533ebc8c5f1cf5f996833e5e2b142381cb61ca14d4bdd",
+    "paper/tempo_go/current_evidence_manifest.json": "afc5cdd82b8d5152c42980668fb17b5741e90447c2dccfd440163f0271ac469d",
     "results/tempo_go_c10_paper_sota_job_57586612_v2/kairos_x512/result.json": "49c5f7ec0831c86b6a03401aa4af44188dbf074e90a6efdf5235d9362509c3c8",
     "results/tempo_go_c10_paper_sota_job_57586612_v3/netkv/result.json": "2cbeffd87337961806e448af43e111fc4ef1a202aa8a72acc3f51bee82940759",
     "results/tempo_go_c8_independent_validation_job_57586612_v3/analysis.json": "844d7b317c0c4839f62feb9a748785a328f9b86b05b52949d81486de09719c47",

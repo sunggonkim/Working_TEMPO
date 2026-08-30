@@ -1,9 +1,24 @@
 # TEMPO 전체 연구 상태·증거·글로벌 오케스트레이터 다음 목표
 
-문서 버전: `master-v5`, 2026-08-22
+문서 버전: `master-v6`, 2026-08-30
 대상 환경: Perlmutter native 4노드 / 16 A100 / 실제 vLLM P/D / official `LMCacheConnectorV1:UCX`
 
 이 문서는 지금까지의 TEMPO 연구를 다음 에이전트에게 넘기기 위한 하나의 기준 문서다. 원래 목표를 축소하거나 다른 목표로 바꾸지 않는다. 과거 버전의 코드는 삭제하지 않고 증거로 보존하며, 이 문서에는 각 세대에서 무엇을 배웠는지, 무엇이 실패했는지, 현재 결론이 무엇인지, 앞으로 어떤 global orchestrator를 어떤 workload와 gate로 검증해야 하는지를 적는다.
+
+> **현재성 주의:** 이 문서 아래의 C5 및 2026-08-26 실행 절은 historical
+> chronology다. 최신 authoritative state는
+> `TEMPO_GO_UNIFIED_GOAL_STATE_AND_EXECUTION_PLAN.ko.md` §74.58이다. 새
+> allocation `57736076`에서 Candidate O 7-arm actual vLLM/LMCache/NCCL campaign이
+> 완주됐고 O bundle은 remote-favorable 30/30과 background completion 72.93%를
+> 기록했다. 그러나 M과는 allocation이 달라 비인과 context이며, O가 바꾼
+> route-scoped quarantine은 1,614개 decision에서 한 번도 발동하지 않았다.
+> 또한 normal/miss-hot strongest-fixed tail,
+> observer 37/210, foreground 3 failure와 background 40 failure/704 queue reject로
+> 최종 gate는 실패했다. 다음 목표는 threshold 후보가 아니라 fresh observer,
+> decoder lane, P×D edge/receiver/fabric credit와 business debt를 하나의 atomic
+> global service frontier로 예약하는 전체 orchestrator다. `valid=true` failure
+> receipt를 completion으로 세던 분석 오류는 fail-closed business reanalysis에서 교정했고
+> 원본 native raw/analysis/completed receipt는 변경하지 않았다.
 
 ## 0. 먼저 읽어야 할 결론
 
