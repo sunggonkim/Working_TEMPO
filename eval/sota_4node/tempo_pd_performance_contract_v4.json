@@ -1,0 +1,45 @@
+{
+  "schema": "tempo-pd-performance-contract-4",
+  "claim_scope": "screen_only_actual_vllm_pd_loaded",
+  "model": "models/Qwen2.5-7B-Instruct",
+  "model_max_length": 8192,
+  "topology": {
+    "nodes": 4,
+    "gpus_per_node": 4,
+    "replicas": 2,
+    "prefill_tensor_parallel": 4,
+    "decode_tensor_parallel": 4,
+    "total_gpu_budget": 16
+  },
+  "remote_path": {
+    "connector": "LMCacheConnectorV1",
+    "transfer_channel": "nixl",
+    "backend": "UCX",
+    "gpu_connector_v3": true,
+    "chunk_size_tokens": 64
+  },
+  "workload": {
+    "prompt_repetitions": [64, 192, 384],
+    "expected_prompt_tokens_for_frozen_model": [1220, 3652, 7300],
+    "output_tokens": 32,
+    "samples_per_bucket": 3,
+    "request_rate_per_second": 4.0,
+    "max_workers": 8,
+    "single_factor_from_contract_v3": "increase offered load from 2 rps/4 workers to 4 rps/8 workers"
+  },
+  "lifecycles": [
+    "calibration_local",
+    "calibration_remote",
+    "validation_local",
+    "validation_remote",
+    "validation_tempo"
+  ],
+  "slo_ms": {"ttft": 2000.0, "tpot": 150.0, "e2e": 5000.0},
+  "policy": {
+    "classifier": "exact_closed_key",
+    "minimum_samples_per_route": 3,
+    "remote_advantage_margin_ms": 5.0,
+    "manifest_scope": "screen_only",
+    "manifest_frozen_before_validation": true
+  }
+}

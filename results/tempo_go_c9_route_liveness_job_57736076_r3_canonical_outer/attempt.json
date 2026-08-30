@@ -1,0 +1,17 @@
+{
+  "schema": "tempo-go-c9-causal-burst-attempt-v1",
+  "status": "running",
+  "slurm_job_id": 57736076,
+  "contract": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c9_candidate_o_route_liveness_population_contract.json",
+  "contract_sha256": "9936a4a980d23250ce6604494d9fa545da189de8508b931d8ffb1952c35a8cc5",
+  "base_contract": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c8_candidate_o_route_liveness_contract.json",
+  "base_contract_sha256": "3b7f82f29a8870157cb6d5bb6264edca550b88cc1027e430f8eeb1020315e585",
+  "hosts": [
+    "nid001145",
+    "nid001148",
+    "nid001149",
+    "nid001152"
+  ],
+  "one_campaign_no_retry": true,
+  "discovery_only": true
+}

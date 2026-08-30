@@ -1,0 +1,34 @@
+"""Short requests whose first token chunk has a unique cold-cache identity."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from eval.sota_4node import tempo_pd_short_workload_v14 as short
+from eval.sota_4node import vllm_lmcache_tempo_pd_perf_node_v1 as base
+
+
+def _rewrite(path: Path) -> None:
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    base._require(len(rows) == 9, "unique-head workload requires nine rows")
+    with path.open("w", encoding="utf-8") as stream:
+        for index, row in enumerate(rows):
+            row["prompt"] = f"Cold-cache request nonce {index:02d}.\n" + row["prompt"]
+            stream.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+    prompts = {row["prompt"] for row in (
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()
+    )}
+    base._require(len(prompts) == 9, "head nonces must make every prompt unique")
+
+
+def prepare(args, model: Path, python: Path) -> tuple[Path, Path]:
+    calibration, validation = short.prepare(args, model, python)
+    marker = args.result_dir / "workloads" / "unique-head-v23-ready"
+    if args.node_index == 0:
+        _rewrite(calibration)
+        _rewrite(validation)
+        marker.write_text("ready\n", encoding="utf-8")
+    else:
+        base.common._wait_file(marker, [])
+    return calibration, validation

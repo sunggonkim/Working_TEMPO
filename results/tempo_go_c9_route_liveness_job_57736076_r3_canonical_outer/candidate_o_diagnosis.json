@@ -1,0 +1,311 @@
+{
+  "candidate": "Candidate O route-scoped telemetry failure quarantine",
+  "candidate_o": {
+    "business": {
+      "background": {
+        "completed": 2004,
+        "completed_output_tokens": 4008,
+        "completion_fraction": 0.7292576419213974,
+        "failures": 40,
+        "global_rejects": 704,
+        "offered": 2748,
+        "offered_output_tokens": 5496,
+        "output_token_completion_fraction": 0.7292576419213974
+      },
+      "foreground": {
+        "completed": 207,
+        "completed_output_tokens": 26496,
+        "completion_fraction": 0.9857142857142858,
+        "failures": 3,
+        "global_rejects": 0,
+        "offered": 210,
+        "offered_output_tokens": 26880,
+        "output_token_completion_fraction": 0.9857142857142858
+      },
+      "observer_supported_decisions": 37,
+      "observer_supported_fraction": 0.1761904761904762,
+      "observer_total_decisions": 210
+    },
+    "causal_discovery_positive": false,
+    "gates": {
+      "baseline_cross_layer_blind": true,
+      "correctness": true,
+      "fixed_baseline_present": true,
+      "full_cross_layer_actuation": true,
+      "full_observer_supported": false,
+      "native_transport": true,
+      "normal_p50_regression_bounded": true,
+      "predictor_baseline_present": true,
+      "same_population": true,
+      "stressed_p99_reduction_vs_best_fixed": false,
+      "stressed_p99_reduction_vs_predictor": true,
+      "stressed_slo_not_lower_vs_best_fixed": false,
+      "stressed_slo_not_lower_vs_predictor": true
+    },
+    "observer_by_block": {
+      "00_control_a": {
+        "observer_actuated_decisions": 13,
+        "observer_supported_decisions": 13,
+        "victim_global_decisions": 30
+      },
+      "01_remote_cool_hot_d0": {
+        "observer_actuated_decisions": 24,
+        "observer_supported_decisions": 24,
+        "victim_global_decisions": 30
+      },
+      "02_combined_hot_d0": {
+        "observer_actuated_decisions": 0,
+        "observer_supported_decisions": 0,
+        "victim_global_decisions": 30
+      },
+      "03_remote_cool_hot_d1": {
+        "observer_actuated_decisions": 0,
+        "observer_supported_decisions": 0,
+        "victim_global_decisions": 30
+      },
+      "04_combined_hot_d1": {
+        "observer_actuated_decisions": 0,
+        "observer_supported_decisions": 0,
+        "victim_global_decisions": 30
+      },
+      "05_p_only_dual_decoder_hot": {
+        "observer_actuated_decisions": 0,
+        "observer_supported_decisions": 0,
+        "victim_global_decisions": 30
+      },
+      "06_control_b": {
+        "observer_actuated_decisions": 0,
+        "observer_supported_decisions": 0,
+        "victim_global_decisions": 30
+      }
+    },
+    "performance_claim_allowed": false,
+    "regimes": {
+      "miss_hot": {
+        "completed": 117,
+        "mean_e2e_p50_ms": 3243.6714,
+        "mean_e2e_p99_ms": 35577.777032,
+        "mean_tpot_p99_ms": 272.3993532992126,
+        "mean_ttft_p99_ms": 3075.161893,
+        "offered": 120,
+        "runs": 1,
+        "slo_good": 65,
+        "slo_good_fraction": 0.5416666666666666
+      },
+      "normal": {
+        "completed": 60,
+        "mean_e2e_p50_ms": 2977.106116,
+        "mean_e2e_p99_ms": 26365.409223,
+        "mean_tpot_p99_ms": 203.55621914960628,
+        "mean_ttft_p99_ms": 1137.99418,
+        "offered": 60,
+        "runs": 1,
+        "slo_good": 35,
+        "slo_good_fraction": 0.5833333333333334
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "mean_e2e_p50_ms": 3054.401607,
+        "mean_e2e_p99_ms": 3170.273648,
+        "mean_tpot_p99_ms": 22.431910692913387,
+        "mean_ttft_p99_ms": 360.964098,
+        "offered": 30,
+        "runs": 1,
+        "slo_good": 30,
+        "slo_good_fraction": 1.0
+      }
+    },
+    "route_counts": {
+      "local": 160,
+      "remote": 47
+    }
+  },
+  "candidate_specific_mechanism": {
+    "activated": false,
+    "causal_mechanism_positive": false,
+    "changed_input": "telemetry_failure_quarantine_scope: pair -> route",
+    "interpretation": "No telemetry route-failure counter or route-failure quarantine rejection was observed, so O-vs-M differences cannot be attributed to the changed mechanism.",
+    "route_failure_evidence_by_block": {
+      "00_control_a": {
+        "all_decisions_with_nonzero_route_failure_counter": 0,
+        "all_global_decisions": 30,
+        "all_route_failure_quarantine_rejections": 0,
+        "victim_decisions_with_nonzero_route_failure_counter": 0,
+        "victim_global_decisions": 30,
+        "victim_route_failure_quarantine_rejections": 0
+      },
+      "01_remote_cool_hot_d0": {
+        "all_decisions_with_nonzero_route_failure_counter": 0,
+        "all_global_decisions": 264,
+        "all_route_failure_quarantine_rejections": 0,
+        "victim_decisions_with_nonzero_route_failure_counter": 0,
+        "victim_global_decisions": 30,
+        "victim_route_failure_quarantine_rejections": 0
+      },
+      "02_combined_hot_d0": {
+        "all_decisions_with_nonzero_route_failure_counter": 0,
+        "all_global_decisions": 498,
+        "all_route_failure_quarantine_rejections": 0,
+        "victim_decisions_with_nonzero_route_failure_counter": 0,
+        "victim_global_decisions": 30,
+        "victim_route_failure_quarantine_rejections": 0
+      },
+      "03_remote_cool_hot_d1": {
+        "all_decisions_with_nonzero_route_failure_counter": 0,
+        "all_global_decisions": 264,
+        "all_route_failure_quarantine_rejections": 0,
+        "victim_decisions_with_nonzero_route_failure_counter": 0,
+        "victim_global_decisions": 30,
+        "victim_route_failure_quarantine_rejections": 0
+      },
+      "04_combined_hot_d1": {
+        "all_decisions_with_nonzero_route_failure_counter": 0,
+        "all_global_decisions": 498,
+        "all_route_failure_quarantine_rejections": 0,
+        "victim_decisions_with_nonzero_route_failure_counter": 0,
+        "victim_global_decisions": 30,
+        "victim_route_failure_quarantine_rejections": 0
+      },
+      "05_p_only_dual_decoder_hot": {
+        "all_decisions_with_nonzero_route_failure_counter": 0,
+        "all_global_decisions": 30,
+        "all_route_failure_quarantine_rejections": 0,
+        "victim_decisions_with_nonzero_route_failure_counter": 0,
+        "victim_global_decisions": 30,
+        "victim_route_failure_quarantine_rejections": 0
+      },
+      "06_control_b": {
+        "all_decisions_with_nonzero_route_failure_counter": 0,
+        "all_global_decisions": 30,
+        "all_route_failure_quarantine_rejections": 0,
+        "victim_decisions_with_nonzero_route_failure_counter": 0,
+        "victim_global_decisions": 30,
+        "victim_route_failure_quarantine_rejections": 0
+      }
+    },
+    "route_failure_evidence_total": {
+      "all_decisions_with_nonzero_route_failure_counter": 0,
+      "all_global_decisions": 1614,
+      "all_route_failure_quarantine_rejections": 0,
+      "victim_decisions_with_nonzero_route_failure_counter": 0,
+      "victim_global_decisions": 210,
+      "victim_route_failure_quarantine_rejections": 0
+    }
+  },
+  "cross_allocation_context_noncausal": {
+    "candidate_m": {
+      "allocation": 57732862,
+      "analysis": "results/tempo_go_c9_causal_burst_job_57732862/analysis_failclosed_business_v3.json",
+      "analysis_sha256": "d7b95ed124dce4549f51d75555aeb1db6740cf9db3401a64371e2fbdb028d5fe",
+      "business": {
+        "background": {
+          "completed": 1478,
+          "completed_output_tokens": 2956,
+          "completion_fraction": 0.5378457059679768,
+          "failures": 73,
+          "global_rejects": 1197,
+          "offered": 2748,
+          "offered_output_tokens": 5496,
+          "output_token_completion_fraction": 0.5378457059679768
+        },
+        "foreground": {
+          "completed": 203,
+          "completed_output_tokens": 25984,
+          "completion_fraction": 0.9666666666666667,
+          "failures": 3,
+          "global_rejects": 4,
+          "offered": 210,
+          "offered_output_tokens": 26880,
+          "output_token_completion_fraction": 0.9666666666666667
+        },
+        "observer_supported_decisions": 95,
+        "observer_supported_fraction": 0.4523809523809524,
+        "observer_total_decisions": 210
+      }
+    },
+    "candidate_n": {
+      "allocation": 57732862,
+      "analysis": "results/tempo_go_c9_global_frontier_job_57732862/analysis_failclosed_business_v3.json",
+      "analysis_sha256": "577fb39f3438ebd54adfb67a1f90c46a1b25e8551c34876c50f382cf25ad57af",
+      "business": {
+        "background": {
+          "completed": 1363,
+          "completed_output_tokens": 2726,
+          "completion_fraction": 0.4959970887918486,
+          "failures": 56,
+          "global_rejects": 1329,
+          "offered": 2748,
+          "offered_output_tokens": 5496,
+          "output_token_completion_fraction": 0.4959970887918486
+        },
+        "foreground": {
+          "completed": 57,
+          "completed_output_tokens": 7296,
+          "completion_fraction": 0.2714285714285714,
+          "failures": 3,
+          "global_rejects": 150,
+          "offered": 210,
+          "offered_output_tokens": 26880,
+          "output_token_completion_fraction": 0.2714285714285714
+        },
+        "observer_supported_decisions": 22,
+        "observer_supported_fraction": 0.10476190476190476,
+        "observer_total_decisions": 210
+      }
+    },
+    "candidate_o": {
+      "allocation": 57736076,
+      "business": {
+        "background": {
+          "completed": 2004,
+          "completed_output_tokens": 4008,
+          "completion_fraction": 0.7292576419213974,
+          "failures": 40,
+          "global_rejects": 704,
+          "offered": 2748,
+          "offered_output_tokens": 5496,
+          "output_token_completion_fraction": 0.7292576419213974
+        },
+        "foreground": {
+          "completed": 207,
+          "completed_output_tokens": 26496,
+          "completion_fraction": 0.9857142857142858,
+          "failures": 3,
+          "global_rejects": 0,
+          "offered": 210,
+          "offered_output_tokens": 26880,
+          "output_token_completion_fraction": 0.9857142857142858
+        },
+        "observer_supported_decisions": 37,
+        "observer_supported_fraction": 0.1761904761904762,
+        "observer_total_decisions": 210
+      }
+    },
+    "causal_comparison_allowed": false,
+    "reason": "M/N and O used separate allocations and one sample per arm; co-job pressure and observer survival varied between campaigns."
+  },
+  "native_campaign": {
+    "allocation": 57736076,
+    "completed_receipt": "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/completed_attempt.json",
+    "completed_receipt_sha256": "a56da8013a6fdf69747c4c08ea68708d1a28ebb545f27c12e636b0fd6b4b96a9",
+    "discovery_only": true,
+    "gpus": 16,
+    "nodes": 4,
+    "one_campaign_no_retry": true,
+    "original_analysis": "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/analysis.json",
+    "original_analysis_sha256": "1d5f9c5a785ffd0b3a35c9bc2709fbb13b45af86d099d869e9fef0da9341b9a5",
+    "posthoc_business_analysis": "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/analysis_failclosed_business_v2.json",
+    "posthoc_business_analysis_sha256": "850c2858a30473235fb9bbfaa0c8940abf94405e4243607db96e2e1935cd3590"
+  },
+  "next_gate": [
+    "independent durable telemetry/failure sidecar with terminal failure lease",
+    "atomic global-to-endpoint service-lane reservation and exactly-once release",
+    "within-allocation counterbalanced paired repeats with at least three samples",
+    "unchanged strongest fixed, predictor, queue-GPU, and same offered population"
+  ],
+  "root_cause": {
+    "admission_lifecycle": "Global admission does not atomically reserve endpoint service-lane capacity through completion; HTTP 503 service-lane failures and global queue rejections remain distinct business failures.",
+    "observer_liveness": "The co-load generator and observer publisher share one co-job lifetime. Official LMCache/NIXL timeout terminates that process, leaving later decisions with stale observer state."
+  },
+  "schema": "tempo-go-c9-candidate-o-route-liveness-diagnosis-v1"
+}

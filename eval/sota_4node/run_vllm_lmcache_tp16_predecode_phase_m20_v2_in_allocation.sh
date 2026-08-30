@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ $# -le 2 ]]; B=${1:-UCX}; [[ "$B" == UCX ]]
+: "${SLURM_JOB_ID:?}"; : "${SLURM_JOB_NODELIST:?}"; [[ "${SLURM_JOB_NUM_NODES:-}" == 4 ]]; [[ "${TEMPO_VLLM_LMCACHE_TP16_APPROVED:-}" == YES ]]
+S=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd); R=$(cd -- "$S/../.." && pwd); P=${TEMPO_TP16_HYBRID_PORT_STRIDE:-0}; [[ "$P" =~ ^[0-9]+$ ]]; ((10#$P<=15))
+NODE="$S/vllm_lmcache_tp16_predecode_phase_m20_v2_node.py"; PY="$R/.vllm_venv/bin/python"; PLAN="$S/real_tp16_predecode_phase_m20.json"; [[ -f "$NODE" && -x "$PY" && -f "$PLAN" && -f "$R/models/TinyLlama-1.1B-Chat-v1.0/config.json" ]]
+OUT=${2:-"$R/results/vllm_lmcache_tp16_predecode_phase_M20v2_job_${SLURM_JOB_ID}"}; [[ "$OUT" == /* ]] || OUT="$R/$OUT"; OUT=$(realpath -m -- "$OUT"); case "$OUT/" in "$R/"*) ;; *) exit 2;; esac; [[ "$OUT" != "$R" && ! -e "$OUT/result.json" ]]
+module reset; module load pytorch/2.8.0; mapfile -t H < <(scontrol show hostnames "$SLURM_JOB_NODELIST"); [[ ${#H[@]} -eq 4 ]]; SLOT=$((10#$SLURM_JOB_ID%500+2700+10#$P)); ((SLOT<3300))
+export TEMPO_NIXL_BACKEND=UCX CUDA_DEVICE_ORDER=PCI_BUS_ID OMP_NUM_THREADS=1 PYTHONNOUSERSITE=1 PYTHONSAFEPATH=1 PYTHONPATH="$R" NCCL_NET=Socket NCCL_SOCKET_IFNAME=hsn NCCL_IB_DISABLE=1 NCCL_DEBUG=WARN
+unset UCX_TLS UCX_LOG_LEVEL NIXL_PLUGIN_DIR TEMPO_VLLM_QUIESCENCE_ENABLED TEMPO_VLLM_QUIESCENCE_NODE_RANK TEMPO_VLLM_QUIESCENCE_SOCKET TEMPO_VLLM_QUIESCENCE_TRACE TEMPO_VLLM_QUIESCENCE_TOKEN_INDEX TEMPO_VLLM_QUIESCENCE_TIMEOUT_S
+mkdir -p -- "$OUT"; cd -- "$R"; TAG="${SLURM_JOB_ID}-m20v2-r$P"
+timeout --foreground --signal=TERM --kill-after=20s 1800s srun --exact --nodes=4 --ntasks=4 --ntasks-per-node=1 --distribution=block:block --gpus-per-task=4 --gpu-bind=none --cpus-per-task=64 --cpu-bind=cores --kill-on-bad-exit=1 --wait=10 --time=00:29:30 --export=ALL --output="$OUT/wrapper-node-%N.stdout.log" --error="$OUT/wrapper-node-%N.stderr.log" "$PY" "$NODE" --repo-root "$R" --result-dir "$OUT" --campaign-index 0 --master-addr "${H[0]}" --vllm-master-port "$((9000+SLOT))" --sidecar-master-port "$((13000+SLOT))" --api-port "$((17000+SLOT))" --nixl-port-base "$((21000+SLOT))" --quiescence-socket "/tmp/tempo-vllm-quiescence-$TAG.sock" --quiescence-trace "/tmp/tempo-step-gate-$TAG.jsonl" --readiness-timeout-s 600 --sidecar-timeout-s 1100
+[[ -s "$OUT/result.json" && -s "$OUT/vllm-quiescence-trace-node-0.jsonl" ]]; echo "M20v2 result: $OUT/result.json"

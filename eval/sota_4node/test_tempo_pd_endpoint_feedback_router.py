@@ -299,7 +299,7 @@ def _prepare_semantic(core, request_id: str, *, active: int, decode: int = 512):
 def _prepare_global(
     core, request_id: str, *, route: str, pair: str = "0",
     profile_sha: str = "f" * 64, sequence: str = "7",
-    queue_lease: bool = False,
+    queue_lease: bool = False, service_forecast: bool = False,
 ):
     return core.prepare_global_commit(
         request_id=request_id,
@@ -310,6 +310,8 @@ def _prepare_global(
         decision_sha256="e" * 64,
         telemetry_sequence=sequence,
         queue_lease="1" if queue_lease else "0",
+        service_queue_delay_ms="12.5" if service_forecast else None,
+        service_forecast_ms="37.5" if service_forecast else None,
     )
 
 
@@ -409,7 +411,36 @@ def test_global_commit_forces_one_route_and_preserves_provenance(
     assert row["tempo_go_global_commit_profile_sha256"] == "f" * 64
     assert row["tempo_go_global_commit_decision_sha256"] == "e" * 64
     assert row["tempo_go_global_commit_telemetry_sequence"] == 7
+    assert row["tempo_go_global_commit_service_queue_delay_ms"] is None
+    assert row["tempo_go_global_commit_service_forecast_ms"] is None
     assert row["semantic_epoch_applied"] is False
+
+
+def test_global_commit_preserves_service_forecast_provenance(
+    tmp_path: Path,
+) -> None:
+    core, _, _ = _core(
+        tmp_path,
+        **{
+            "TEMPO_PD_LOCAL_DECODER_INDEX": "0",
+            router.GLOBAL_PROFILE_SHA_ENV: "f" * 64,
+        },
+    )
+    request_id = "epd-tempo-r0-measured-global-service-forecast"
+    evidence = _prepare_global(
+        core, request_id, route=router.ElasticRoute.LOCAL.value,
+        service_forecast=True)
+    assert evidence["service_queue_delay_ms"] == 12.5
+    assert evidence["service_forecast_ms"] == 37.5
+    record = core.decide(
+        request_id=request_id, prompt_tokens=10, output_tokens=64)
+    assert record.route is router.ElasticRoute.LOCAL
+    core.mark_upstream_started(request_id)
+    core.mark_first_response_chunk(request_id)
+    core.complete(request_id)
+    row = {item["request_id"]: item for item in core.records()}[request_id]
+    assert row["tempo_go_global_commit_service_queue_delay_ms"] == 12.5
+    assert row["tempo_go_global_commit_service_forecast_ms"] == 37.5
 
 
 def test_global_mesh_commit_routes_p0_to_d1_with_immutable_decoder_header(

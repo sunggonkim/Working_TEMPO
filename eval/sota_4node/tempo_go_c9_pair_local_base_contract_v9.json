@@ -1,0 +1,493 @@
+{
+  "candidate": {
+    "base_contract": "eval/sota_4node/tempo_go_c9_business_lane_base_contract_v13.json",
+    "failed_preflight_receipt": "results/tempo_go_c9_business_lane_followup_job_57622087/00_app_global_only_a/block_failure_receipt.json",
+    "failed_preflight_was_not_a_performance_result": true,
+    "id": "tempo-go-c9-pair-local-bounded-burst-v1",
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "purpose": "Repair the measured remote-only priority-lane dead end without using phase, future-arrival, or physical-switch oracle input.",
+    "supersedes_failed_preflight_contract": "eval/sota_4node/tempo_go_c9_business_lane_base_contract_v4.json"
+  },
+  "causal_business_lane_followup": {
+    "background_arrivals_unchanged": true,
+    "controller_receives_phase_or_future_arrivals": false,
+    "discovery_only": true,
+    "local_lane_requires_global_commit": true,
+    "mechanism": "vllm_priority_business_dual_route_v2",
+    "native_c8_binding_accepts_exact_contract_mode": true,
+    "post_hoc_from_job": "57622087",
+    "remote_only_mode_preserved": true,
+    "schema": "tempo-go-c9-business-lane-followup-v1"
+  },
+  "claim_boundary": {
+    "controller_performance_claim_allowed": true,
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": true,
+    "purpose": "The inner C8 lifecycle is executable as a source-bound discovery; the enclosing C9 follow-up contract forbids a paper claim."
+  },
+  "independent_validation": {
+    "arrival_jitter": {
+      "algorithm": "sha256_centered_subspacing_v1",
+      "controller_input": false,
+      "maximum_spacing_fraction": 0.25,
+      "same_count_rate_duration_in_every_arm": true
+    },
+    "claim_rule": "Only the frozen independent analyzer may set both performance and independent_validation_claim_allowed after every gate passes",
+    "controller_receives_future_arrivals": false,
+    "controller_receives_workload_seed": false,
+    "counterbalance": {
+      "discovery_arm_order": [
+        "fixed_local_d0",
+        "fixed_local_d1",
+        "fixed_remote_p0d1",
+        "fixed_remote_p1d0",
+        "predictor",
+        "queue_gpu",
+        "full_c7_managed_background"
+      ],
+      "discovery_block_order": [
+        "00_control_a",
+        "01_remote_cool_hot_d0",
+        "02_combined_hot_d0",
+        "03_remote_cool_hot_d1",
+        "04_combined_hot_d1",
+        "05_p_only_dual_decoder_hot",
+        "06_control_b"
+      ],
+      "full_temporal_position_reversed": true,
+      "remote_regime_temporal_position_reversed": true,
+      "validation_arm_order": [
+        "full_c7_managed_background",
+        "queue_gpu",
+        "predictor",
+        "fixed_remote_p1d0",
+        "fixed_remote_p0d1",
+        "fixed_local_d1",
+        "fixed_local_d0"
+      ],
+      "validation_block_order": [
+        "06_control_b",
+        "05_p_only_dual_decoder_hot",
+        "04_combined_hot_d1",
+        "03_remote_cool_hot_d1",
+        "02_combined_hot_d0",
+        "01_remote_cool_hot_d0",
+        "00_control_a"
+      ]
+    },
+    "forbidden_discovery_job_ids": [
+      "57576758",
+      "57582286",
+      "57583281",
+      "57585888",
+      "57586085"
+    ],
+    "fresh_allocation_required": true,
+    "gates": {
+      "background": {
+        "maximum_c7_service_lane_failure_fraction": 0.01,
+        "maximum_c8_background_noncomplete": 13,
+        "minimum_c7_background_completion_fraction": 0.8,
+        "minimum_c7_block_tenant_completion_fraction": 0.7,
+        "minimum_c7_tenant_jain_fairness": 0.99,
+        "minimum_c8_background_completion_fraction": 0.99
+      },
+      "telemetry": {
+        "maximum_admission_wait_p50_ms": 50.0,
+        "maximum_admission_wait_p99_ms": 250.0,
+        "maximum_collection_p50_ms": 50.0,
+        "maximum_collection_p99_ms": 250.0,
+        "minimum_complete_batch_fraction": 1.0,
+        "minimum_source_virtual_service_binding_fraction": 0.5,
+        "minimum_supported_signal_fraction": 0.9,
+        "required_explicit_status_signals": [
+          "nccl_collective_p99_ms",
+          "nccl_arrival_spread_ms",
+          "lmcache_transfer_p99_ms"
+        ],
+        "required_supported_signals": [
+          "cassini_rx_pause_fraction_max",
+          "cassini_tx_pause_fraction_max",
+          "cassini_host_posted_cycles_per_packet_max",
+          "cassini_tx_packets_per_s",
+          "cassini_rx_packets_per_s",
+          "cassini_oxe_channel_active_fraction_max",
+          "cassini_oxe_channel_active_fraction_mean",
+          "cassini_ecn_fraction_max",
+          "cassini_retries",
+          "cassini_timeouts",
+          "lmcache_remote_semantic_ops_inflight",
+          "lmcache_remote_kv_bytes_inflight"
+        ],
+        "unavailable_is_never_zero_pressure": true
+      }
+    },
+    "one_shot_no_retry": true,
+    "p_only_prompt_namespace": {
+      "algorithm": "c8_marker_offset_v1",
+      "base_marker": 240000,
+      "controller_input": false,
+      "marker_offset": 8192
+    },
+    "parent_discovery": {
+      "analysis_path": "results/tempo_go_c8_dual_regime_job_57583281_v45_campaign_analysis.json",
+      "analysis_sha256": "d835f9e3f5c4f7861da3852936adf4f6e6772ac550fe9b133781ac12f4f5b975",
+      "contract_path": "eval/sota_4node/tempo_go_c8_dual_regime_contract_v45.json",
+      "contract_sha256": "1521d855b8dbddde58afff0a92050969123c0218004288b33b756498f88ca260"
+    },
+    "preregistered_at_utc": "2026-08-25T13:27:34Z",
+    "preregistered_before_fresh_allocation": true,
+    "prior_failed_attempts": [
+      {
+        "contract_sha256": "90019478189c50f00ff0568c9f9a7486edd65f53d837a02462c3806035aa1ea3",
+        "failed_arm": "full_c7_managed_background",
+        "path": "results/tempo_go_c8_independent_validation_job_57585888_v1/execution_failure_receipt.json",
+        "performance_result": false,
+        "sha256": "dcfa5a07d4c4806fc7a46a5e3effe5aaa6843f9806de5198ffe81b2ba34bab44",
+        "slurm_job_id": "57585888"
+      },
+      {
+        "contract_sha256": "7f457f65091d738005e6e2dff8666163def2228fe3d3f2fc8539f6bf56e651d9",
+        "failed_arm": "full_c7_managed_background",
+        "path": "results/tempo_go_c8_independent_validation_job_57586085_v2/execution_failure_receipt.json",
+        "performance_result": false,
+        "sha256": "fac9759fad29339fe3f1099915235b8a3eb3c1663de31d6f3b70ae0f78ea89ba",
+        "slurm_job_id": "57586085"
+      }
+    ],
+    "remote_favorable_block": "05_p_only_dual_decoder_hot",
+    "request_seed": 20260825,
+    "runtime_port_schedule": {
+      "endpoint_probe_port_base": 30000,
+      "exclusive_upper_bound": 32768,
+      "maximum_endpoint_probe_port": 32380,
+      "maximum_port_slot": 2380,
+      "port_slot_base": 2140,
+      "port_slot_stride_per_arm": 40
+    },
+    "schema": "tempo-go-c8-independent-validation-v1"
+  },
+  "joint_control": {
+    "activation_matrix": {
+      "controller_does_not_receive_phase_label": true,
+      "local_cool_rate_per_s": 0.0,
+      "local_hot_rate_per_s": 7.8,
+      "purpose": "causally separate decoder/receiver pressure from remote source/fabric pressure before evaluating remote actuation",
+      "remote_cool_source_indices": [
+        1
+      ],
+      "remote_hot_rate_per_s": 7.8,
+      "remote_hot_source_indices": [
+        0,
+        1
+      ],
+      "remote_selective_rate_per_s": 7.8,
+      "schema": "tempo-go-c7-remote-activation-matrix-v1"
+    },
+    "aggressor": {
+      "cache_state": "miss",
+      "controller_may_move_or_throttle": false,
+      "load_fraction": 0.7,
+      "output_tokens": 2,
+      "prompt_tokens": 4094,
+      "rate_per_s": 7.8,
+      "reference_rate_per_s": 32.0,
+      "route": "official_lmcache_remote_prefill",
+      "source_assignment": "ordinal parity across P0 and P1",
+      "target_assignment": "phase-frozen D0 or D1",
+      "tenant_id": "background"
+    },
+    "arms": [
+      {
+        "kind": "managed_cross_layer",
+        "name": "full_c7_managed_background"
+      },
+      {
+        "kind": "request_baseline",
+        "name": "queue_gpu"
+      },
+      {
+        "kind": "request_baseline",
+        "name": "predictor"
+      },
+      {
+        "kind": "fixed",
+        "name": "fixed_remote_p1d0"
+      },
+      {
+        "kind": "fixed",
+        "name": "fixed_remote_p0d1"
+      },
+      {
+        "kind": "fixed",
+        "name": "fixed_local_d1"
+      },
+      {
+        "kind": "fixed",
+        "name": "fixed_local_d0"
+      }
+    ],
+    "blocks": [
+      {
+        "hot_decoder_index": null,
+        "name": "06_control_b"
+      },
+      {
+        "controller_receives_regime_label": false,
+        "hot_decoder_index": 0,
+        "hot_decoder_indices": [
+          0,
+          1
+        ],
+        "local_aggressor_decoder_indices": [
+          0,
+          1
+        ],
+        "local_aggressor_rate_per_s": 22.4,
+        "managed_background": false,
+        "name": "05_p_only_dual_decoder_hot",
+        "p_only_pool_per_owner": 8,
+        "p_only_preseed_before_measurement": true,
+        "pressure_regime": "dual_decoder_hot_p_only_remote_favorable",
+        "remote_aggressor_rate_per_s": 0.0,
+        "remote_source_indices": [
+          0,
+          1
+        ],
+        "victim_cache_state": "p_only"
+      },
+      {
+        "hot_decoder_index": 1,
+        "local_aggressor_rate_per_s": 7.8,
+        "name": "04_combined_hot_d1",
+        "pressure_regime": "decoder_hot_remote_fabric_hot",
+        "remote_aggressor_rate_per_s": 7.8,
+        "remote_source_indices": [
+          0,
+          1
+        ]
+      },
+      {
+        "hot_decoder_index": 1,
+        "local_aggressor_rate_per_s": 0.0,
+        "name": "03_remote_cool_hot_d1",
+        "pressure_regime": "decoder_hot_remote_edge_selective",
+        "remote_aggressor_rate_per_s": 7.8,
+        "remote_source_indices": [
+          1
+        ]
+      },
+      {
+        "hot_decoder_index": 0,
+        "local_aggressor_rate_per_s": 7.8,
+        "name": "02_combined_hot_d0",
+        "pressure_regime": "decoder_hot_remote_fabric_hot",
+        "remote_aggressor_rate_per_s": 7.8,
+        "remote_source_indices": [
+          0,
+          1
+        ]
+      },
+      {
+        "hot_decoder_index": 0,
+        "local_aggressor_rate_per_s": 0.0,
+        "name": "01_remote_cool_hot_d0",
+        "pressure_regime": "decoder_hot_remote_edge_selective",
+        "remote_aggressor_rate_per_s": 7.8,
+        "remote_source_indices": [
+          1
+        ]
+      },
+      {
+        "hot_decoder_index": null,
+        "name": "00_control_a"
+      }
+    ],
+    "cooldown_s": 5,
+    "elastic_profile": {
+      "path": "results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+      "sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53"
+    },
+    "endpoint_profile": {
+      "path": "results/tempo_go_c5_cross_layer_short_slice_v4_profiles/real_tempo_pd_endpoint_service_profile_short_slice_v1.json",
+      "sha256": "8776221a0bc0d932205c97e1a943a130cd206e73ce6b863fb6cce67c33f1a4cf"
+    },
+    "global_profile": {
+      "fingerprint_sha256": "1686f5baf700f45a8c253761fd936e8923589cf639c02c2cad8ed7347717e91f",
+      "path": "results/tempo_go_c9_pair_local_campaign_v9/real_tempo_go_c9_pair_local_profile_v9.json",
+      "sha256": "a5c304f3face2cd1df15ee56141a049db5f2395df5dfe13b0834cd9222613c10"
+    },
+    "headline_full_arm": "full_c7_managed_background",
+    "ingress": {
+      "background_workers": 240,
+      "controller_does_not_receive_ingress_lane": true,
+      "interactive_reserved_workers": 16,
+      "policy": "interactive_reserved",
+      "purpose": "prevent background executor backlog from delaying interactive admission while preserving the same exogenous arrivals",
+      "same_offered_population": true,
+      "same_open_loop_clock": true,
+      "schema": "tempo-go-c7-ingress-policy-v1"
+    },
+    "local_aggressor": {
+      "cache_state": "miss",
+      "controller_may_move_or_throttle": false,
+      "output_tokens": 2,
+      "prompt_tokens": 4094,
+      "rate_per_s": 7.8,
+      "route": "decoder_local_chunked_prefill",
+      "source_assignment": "hot decoder's paired prefill source",
+      "target_assignment": "phase-frozen local D0 or D1",
+      "tenant_id": "background_local_decoder"
+    },
+    "max_workers": 256,
+    "performance_gates": {
+      "hot_p99_reduction_fraction": 0.15,
+      "hot_slo_good_ratio": 1.15,
+      "incremental_hot_p99_reduction_fraction": 0.1,
+      "incremental_hot_slo_good_ratio": 1.05,
+      "normal_p50_regression_fraction": 0.03
+    },
+    "phase_duration_ms": 30000,
+    "policies": {
+      "fixed_p0d1": {
+        "decoder_index": 1,
+        "edge_id": "remote:p0->d1",
+        "prefill_index": 0
+      },
+      "fixed_p1d0": {
+        "decoder_index": 0,
+        "edge_id": "remote:p1->d0",
+        "prefill_index": 1
+      }
+    },
+    "profile": {
+      "path": "results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+      "sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53"
+    },
+    "remote_activation": {
+      "all_endpoint_fetch_failure_policy": "preserve_last_complete_batch_then_tenant_stale_grace",
+      "baseline_request_priority": 0,
+      "controller_does_not_receive_regime_label": true,
+      "decoder_background_concurrency_limits": [
+        8,
+        8
+      ],
+      "decoder_background_max_wait_ns": 60000000000,
+      "decoder_background_requests_are_delayed_not_dropped": true,
+      "decoder_business_admission_mode": "priority_drain_v1",
+      "exact_source_hit_required": true,
+      "local_decoder_indices": [
+        0,
+        1
+      ],
+      "local_rate_per_decoder": 22.4,
+      "managed_remote_priority": -2,
+      "mesh_near_tie_source_balance_is_not_a_route_quota": true,
+      "mesh_near_tie_source_balance_mode": "telemetry_uncertainty_virtual_service_v1",
+      "mesh_near_tie_source_balance_uncertainty_fraction": 1.0,
+      "p_only_pool_per_owner": 8,
+      "physical_preseed_outside_measurement": true,
+      "priority_service_lane_capacity_per_decoder": 8,
+      "priority_service_lane_min_admission_priority": 800,
+      "priority_service_lane_mode": "vllm_priority_business_dual_route_v2",
+      "purpose": "When official LMCache/NCCL fabric service is overloaded, let the global business decision lease either a cache-safe remote lane or a local vLLM priority lane while decoder background drains.",
+      "remote_background_rate_per_s": 0.0,
+      "replicated_prefill_owners": [
+        0,
+        1
+      ],
+      "same_offered_population_in_every_arm": true,
+      "schema": "tempo-go-c8-remote-activation-workload-v1",
+      "source_evidence": [
+        "C1 decoder-local-hot fixed crossover",
+        "C4 P_ONLY physical seed and exact full-source-hit probe"
+      ],
+      "telemetry_freshness_ns": 500000000,
+      "telemetry_maximum_collection_span_ns": 400000000,
+      "telemetry_per_fetch_timeout_ns": 200000000,
+      "telemetry_refresh_timeout_ns": 400000000,
+      "total_local_rate_per_s": 44.8,
+      "victim_cache_state": "p_only",
+      "victim_output_tokens": 128,
+      "victim_prompt_tokens": 4094,
+      "vllm_scheduling_policy": "priority"
+    },
+    "remote_activation_gates": {
+      "best_fixed_p99_ratio_ceiling": 1.1,
+      "best_fixed_slo_retention_fraction": 0.95,
+      "minimum_cross_pair_remote_fraction": 0.1,
+      "minimum_full_remote_fraction": 0.5
+    },
+    "source_workload": {
+      "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+      "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+    },
+    "victim": {
+      "cache_state": "miss",
+      "offered_rate_per_s": 1.0,
+      "output_tokens": 128,
+      "prompt_tokens": 4094,
+      "slo": {
+        "e2e_ms": 8000,
+        "tpot_ms": 150
+      },
+      "tenant_id": "interactive"
+    }
+  },
+  "purpose": "Observer-live C9 validation with bounded resident native incast pressure so endpoint/cache failure is measured rather than used as the only terminal outcome.",
+  "schema": "tempo-go-c8-dual-regime-contract-v1",
+  "source_inventory": {
+    "eval/sota_4node/analyze_tempo_go_c7_joint_control.py": "b090d18c5e919df89a3d421c9c76592c50e258c1de60bb3ef0aaec48f395af48",
+    "eval/sota_4node/analyze_tempo_go_c8_dual_regime.py": "ff1a4314b502765939fe219e284a55623c493981ed504bc7b9baba1ea6c4d1a9",
+    "eval/sota_4node/analyze_tempo_go_c8_independent_validation.py": "e79f4951a80507d6a1070e1530fe195cb44a654ee9b6675ce3feba47ff3d3077",
+    "eval/sota_4node/analyze_tempo_go_c9_causal_burst_discovery.py": "fe6fc1920fe9bb2ed02beddd4bdda406bfa6018c412f7c700c32674f98e65e40",
+    "eval/sota_4node/build_tempo_go_c8_dual_regime_contract.py": "92739012122b0bb10b6e2014462eb278aff24158a1eeb7d1a805f269b71a911e",
+    "eval/sota_4node/build_tempo_go_c8_independent_validation_contract.py": "e02fa15e8fe144485e9b18de7220085d89a82f65147189ebb3f3a451443e456c",
+    "eval/sota_4node/build_tempo_go_c8_priority_service_lane_profile.py": "9c96f48e8e3ed78558763d497d8b708756c9ac5fbe54a32026b143fc30faffcd",
+    "eval/sota_4node/build_tempo_go_c9_business_lane_followup_contract.py": "ec3e70c36bff19578fb434dd6cc15937c85f144372f6d4ac303d3aa5b5a6b9ca",
+    "eval/sota_4node/c7_joint_control_node_entry.sh": "e955f3df2cbaaa52f9004fa64e7a11847d072431448b335884ca39d0da996c7d",
+    "eval/sota_4node/c8_dual_regime_node_entry.sh": "737ac0c0839b7223ad1f28c66b6c9ae5ebf69d871698ab37ece75363b97d631f",
+    "eval/sota_4node/c8_independent_validation_node_entry.sh": "cc64452947e39fb453f01833e5f5f7cc21b190b5826fca5a8099b0da326ffada",
+    "eval/sota_4node/c9_gate_node_entry.sh": "f6d46d07f5e8bea93d79a407164aed961d11c3a0ab9ed4f67b4155cbaba0d1b1",
+    "eval/sota_4node/require_perlmutter_4node_4h_interactive.sh": "6b56b0a0caf04addb3f047faaa529f9d6db66555c91a575db7d797f90f90a442",
+    "eval/sota_4node/run_tempo_go_c5_stream_client.py": "f8e30657e0195c44914a71c2162a17bfdecfb5cec52e08a9392d4fcd905501d0",
+    "eval/sota_4node/run_tempo_go_c6_decoder_victim_client.py": "17942a2d4473b7fb4edfee1b2749edb648fd061f55ee57e254a5220e81a69e69",
+    "eval/sota_4node/run_tempo_go_c6_performance_client.py": "f3d77e736abeb1f9846e7f3055b7116ac79989dc2033a2017bad241057a68f9a",
+    "eval/sota_4node/run_tempo_go_c6_stream_client.py": "bde4fa1ab83ce5fd0f9f52967a08981c13bbd396443b496296cd221410b67a7a",
+    "eval/sota_4node/run_tempo_go_c7_joint_control_client.py": "9d840d00b1d33c6f4c9c56d6b10a2ad15a23ed8c16833fd4a4c56b9323ab89d1",
+    "eval/sota_4node/run_tempo_go_c7_joint_control_in_allocation.sh": "0888d0f0aa9dc59126f75272c285922afc11ea7cf49c9f66c88a94119d32788c",
+    "eval/sota_4node/run_tempo_go_c8_dual_regime_client.py": "9fa7908f9e5785d49914baaa21fa8a8b9d2c565ee0c1f90ba966a44e8534e1d3",
+    "eval/sota_4node/run_tempo_go_c8_dual_regime_in_allocation.sh": "0128ca0aae878c0393fd1222cf173d29d7a8466c140f703eaffec1261c0b1825",
+    "eval/sota_4node/run_tempo_go_c8_independent_validation_client.py": "45aa8a81aa7302b3c3a638fe3efb597e7124ba4be86e45d9b37e007417b248fa",
+    "eval/sota_4node/run_tempo_go_c8_independent_validation_in_allocation.sh": "efbb5952133d30497ec244903c332c1c9c6e65fbee78f0d2d0aaeefd45bf727e",
+    "eval/sota_4node/run_tempo_go_c9_causal_burst_discovery_in_allocation.sh": "e94d0389e86c2f7ae8ff9c8db23018e0d0f5095355e0e98818787d1de34ceba7",
+    "eval/sota_4node/run_tempo_pd_contention_fixed_client.py": "ca5afbee3f1d4082e0c0f8e730dc9cd40e05453ae576bc3a54af54b230ca71a4",
+    "eval/sota_4node/run_tempo_pd_stream_metrics_v1.py": "47baa53ce362709c443b1e6186b4f8b3cf2e3fa69bc791c7fdac4fbc891aba38",
+    "eval/sota_4node/tempo_pd_decoder_selecting_proxy.py": "b0c7f8c6cf8db8c919e4ce43f4b1c98b0989e0f4d0dbb377da14e2026ec85816",
+    "eval/sota_4node/tempo_pd_elastic_frontend.py": "1d5536a4a1f688d8033717c2ef11a188ac1647df4816bca24987efd9081efe53",
+    "eval/sota_4node/tempo_pd_elastic_router.py": "5c92060610c3e897badf29b37775ad901f7b4c95f3e8378e515c43cff3ab66ea",
+    "eval/sota_4node/vllm_lmcache_elastic_pd_node.py": "7ae7716417264f4884e4f835e544a944351bda35b68184605b88de8e6c3146a4",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c6_qualification_node.py": "63e35a8fd267df934711dad9eea8c14e2a295e833a77eabe58129013d968b720",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c7_joint_control_node.py": "902966e4f79de1183d6199181900d73247204845de82ac34494df440f0f864e0",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c8_dual_regime_node.py": "3676d6033aaf3ac542a39f745a828b11c2a03f5a2950be384c96fb73db64196d",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c8_independent_validation_node.py": "b34ec55b32986433d00a40013a56cc82aa1fb460afc0837804a6355b1ef59a61",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c9_gate_node.py": "ac0da22a419a4abd4725f47020e7d82539de5014d1d23c87600eb56b24e5bc7c",
+    "eval/sota_4node/vllm_lmcache_tempo_pd_perf_node_v1.py": "7870fb2379a5087377e85dde12421492d992a2ee77e6820504cb2de11666f28d",
+    "tempo/pd_contention_workload.py": "3473b59f1375b4f3720f52ad8716f1741468a903430289c7fd572e2203a778f0",
+    "tempo/pd_global_agent.py": "675f3ebe70b9a1e02cca15faec693a5476d4cf8195a46df5ab8d28c7b5d8476e",
+    "tempo/pd_global_candidates.py": "84526dac13f8d82a029fa64937cc7b15266d82098f1c2dce1b8cd62a95944a3a",
+    "tempo/pd_global_coordinator.py": "adb84b6ea97006537bd0a87337ec96f88528bbafbee2d3725d669e3f5aac6ca5",
+    "tempo/pd_global_hierarchy.py": "1a4fbe548ed2325c351154633d1d93ea4fa71a00da599e5a0bbb9e8b94ac75e9",
+    "tempo/pd_global_orchestrator.py": "214cc44d6cb56fcef8ecb15d1f9f226d22e299f312452f1fdbbe3b417579e45f",
+    "tempo/pd_global_profile.py": "75a48ae98b94e1340a69c5aafa050c05c1af80a1e985b76575e1fe07c377dd28",
+    "tempo/pd_global_telemetry.py": "550567d0e4b39f09bd8f2035bdd8d849d23643f0d51b10e1311336ae65e6701b"
+  },
+  "transport": {
+    "lmcache": "official checked-out LMCacheConnectorV1 NIXL UCX",
+    "nccl": "actual vLLM TP4 NCCL through NERSC AWS Libfabric",
+    "privileged_or_container_configuration_allowed": false,
+    "synthetic_network_background": false,
+    "topology": "Perlmutter P0/D0/P1/D1 TP4 with immutable P-by-D multi-decoder proxy topology in every arm"
+  }
+}

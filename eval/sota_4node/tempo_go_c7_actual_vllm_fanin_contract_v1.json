@@ -1,0 +1,93 @@
+{
+  "schema": "tempo-go-c7-actual-vllm-fanin-contract-v1",
+  "claim_boundary": {
+    "controller_performance_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "purpose": "Qualify a real independent vLLM inference victim under frozen two-prefill official-LMCache receiver incast before C7 joint-control comparison"
+  },
+  "actual_vllm_fanin": {
+    "phase_duration_ms": 30000,
+    "cooldown_s": 5,
+    "max_workers": 256,
+    "blocks": [
+      {"name": "00_control_a", "aggressor_rate_per_s": 0.0},
+      {"name": "01_knee_0p8", "aggressor_rate_per_s": 7.8},
+      {"name": "02_knee_1p0", "aggressor_rate_per_s": 9.7},
+      {"name": "03_knee_1p2", "aggressor_rate_per_s": 11.6},
+      {"name": "04_knee_1p5", "aggressor_rate_per_s": 14.6},
+      {"name": "05_control_b", "aggressor_rate_per_s": 0.0}
+    ],
+    "victim": {
+      "tenant_id": "interactive",
+      "offered_rate_per_s": 1.0,
+      "prompt_tokens": 4094,
+      "output_tokens": 128,
+      "cache_state": "miss",
+      "source_prefill_index": 0,
+      "target_decoder_index": 0,
+      "route": "official_lmcache_remote_prefill",
+      "slo": {"e2e_ms": 8000, "tpot_ms": 150}
+    },
+    "aggressor": {
+      "tenant_id": "background",
+      "prompt_tokens": 4094,
+      "output_tokens": 2,
+      "cache_state": "miss",
+      "source_assignment": "ordinal parity across P0 and P1",
+      "target_decoder_index": 0,
+      "route": "official_lmcache_remote_prefill",
+      "reference_rate_per_s": 32.0,
+      "load_fraction": 0.7,
+      "historical_receiver_service_ceiling_per_s": 9.7
+    },
+    "qualification_gates": {
+      "victim_e2e_p50_degradation_fraction": 0.25,
+      "victim_e2e_p99_ratio": 2.0,
+      "victim_slo_attainment_drop_percentage_points": 20.0,
+      "same_victim_population": "30 fixed P0-to-D0 4094/128 MISS requests in every block",
+      "actual_fanin": "both P0 and P1 complete route-pinned official-LMCache requests to D0 for at least 95 percent of each 30 second hot horizon"
+    },
+    "profile": {
+      "path": "results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+      "sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53"
+    },
+    "elastic_profile": {
+      "path": "results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+      "sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53"
+    },
+    "endpoint_profile": {
+      "path": "results/tempo_go_c5_cross_layer_short_slice_v4_profiles/real_tempo_pd_endpoint_service_profile_short_slice_v1.json",
+      "sha256": "8776221a0bc0d932205c97e1a943a130cd206e73ce6b863fb6cce67c33f1a4cf"
+    },
+    "global_profile": {
+      "path": "results/tempo_go_c6_performance_v1_contract/real_tempo_go_c6_receiver_credit_pxd_profile_v1.json",
+      "sha256": "c9984bf2d30b6e2314e59d24177600be48fdded206b4c49ce25e62e9e17c1bb7",
+      "fingerprint_sha256": "727c5800101928251b7b3ed26bd0f064337043ab267f3116a0410a321a9cb14e"
+    },
+    "source_workload": {
+      "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+      "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+    }
+  },
+  "transport": {
+    "topology": "Perlmutter P0/D0/P1/D1 TP4; P0 and P1 official LMCacheConnectorV1 NIXL/UCX transfers converge on D0",
+    "lmcache": "official checked-out LMCacheConnectorV1 with NIXL UCX",
+    "nccl": "vLLM TP4 NCCL on every P and D engine using NERSC AWS Libfabric",
+    "synthetic_network_background": false,
+    "privileged_or_container_configuration_allowed": false
+  },
+  "source_inventory": {
+  "eval/sota_4node/tempo_pd_elastic_router.py": "b67157424ed808983dcac81311c908b3b33d235d0a8021416810f5eff6d04d68",
+    "eval/sota_4node/run_tempo_go_c7_actual_vllm_fanin_client.py": "e6bdc874119d4d378666d2bce2458ebc3413c14263a8bc541d4f164371aadb22",
+    "eval/sota_4node/analyze_tempo_go_c7_actual_vllm_fanin.py": "6001939085b6f8bb73b85e9e3986eb1a1afa41a4dc9c8e516bc0b9432d766501",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c7_actual_vllm_fanin_node.py": "29bdbe67121d99762363cee9f1f08186fbd6524ba08d8fa3be3369278b7c2c44",
+    "eval/sota_4node/c7_actual_vllm_fanin_node_entry.sh": "32bde9ed87a6e5791073a10a00843774821aa560744c08cbc0927c355b168ecb",
+    "eval/sota_4node/run_tempo_go_c7_actual_vllm_fanin_in_allocation.sh": "cbf3750843ea8af92b8b58097b4dbd0522f401c36d1493ad2de3b7271a165ac0",
+    "eval/sota_4node/run_tempo_go_c6_stream_client.py": "bde4fa1ab83ce5fd0f9f52967a08981c13bbd396443b496296cd221410b67a7a",
+    "eval/sota_4node/run_tempo_go_c6_performance_client.py": "f3d77e736abeb1f9846e7f3055b7116ac79989dc2033a2017bad241057a68f9a",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c6_qualification_node.py": "117017c65b2b62b879c4b31646856901f78dcf3e7d86df47bf08e0ee032469eb",
+    "eval/sota_4node/vllm_lmcache_tempo_pd_perf_node_v1.py": "7870fb2379a5087377e85dde12421492d992a2ee77e6820504cb2de11666f28d",
+    "eval/sota_4node/vllm_lmcache_elastic_pd_node.py": "7ae7716417264f4884e4f835e544a944351bda35b68184605b88de8e6c3146a4",
+    "eval/sota_4node/tempo_pd_decoder_selecting_proxy.py": "b0c7f8c6cf8db8c919e4ce43f4b1c98b0989e0f4d0dbb377da14e2026ec85816"
+  }
+}

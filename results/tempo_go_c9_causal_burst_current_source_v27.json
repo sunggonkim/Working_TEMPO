@@ -1,0 +1,107 @@
+{
+  "burst": {
+    "block_delay_s": 0.1,
+    "cojob_time_limit": "00:29:00",
+    "cojob_timeout_s": 1740,
+    "foreground_mib": 16,
+    "interpretation": "Each block is a high-peak NCCL collective plus 2 GiB aggregate receiver-incast KV burst, followed by a 100 ms gap; the train is exogenous and identical in all four arms",
+    "kv_mib_per_request": 128,
+    "maximum_blocks": 256,
+    "minimum_active_duration_s": 1200,
+    "minimum_blocks": 1,
+    "nixl_transfer_timeout_s": 60,
+    "observer_max_age_ms": 60000,
+    "process_group_timeout_s": 120,
+    "requests_per_source": 4,
+    "start_delay_s": 180,
+    "token_iters": 4096,
+    "traffic_pattern": "incast_4to1",
+    "transport": {
+      "lmcache": "official NixlChannel with UCX",
+      "nccl": "AWS Libfabric over Slingshot/CXI",
+      "socket_fallback_forbidden": true
+    }
+  },
+  "claim_boundary": {
+    "discovery_only": true,
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "reason": "The overload geometry and timeout-as-outcome rule were selected from a prior partial pilot; this campaign is frozen before allocation but remains discovery and cannot replace the fresh C9 independent result"
+  },
+  "execution": {
+    "cojob_readiness_timeout_s": 240,
+    "cooldown_s": 5,
+    "inference_timeout_s": 1800,
+    "one_campaign_no_retry": true,
+    "order": [
+      {
+        "arm": "app_global_only",
+        "name": "00_app_global_only_a",
+        "port_slot": 2420
+      },
+      {
+        "arm": "full_c7_managed_background",
+        "name": "01_full_c9_a",
+        "port_slot": 2460
+      },
+      {
+        "arm": "full_c7_managed_background",
+        "name": "02_full_c9_b",
+        "port_slot": 2500
+      },
+      {
+        "arm": "app_global_only",
+        "name": "03_app_global_only_b",
+        "port_slot": 2540
+      }
+    ],
+    "paired_indices": [
+      [
+        0,
+        1
+      ],
+      [
+        3,
+        2
+      ]
+    ]
+  },
+  "gates": {
+    "correctness_required": true,
+    "maximum_normal_p50_regression_fraction": 0.03,
+    "minimum_full_supported_observer_fraction": 0.5,
+    "minimum_stressed_p99_reduction_fraction": 0.15,
+    "minimum_stressed_slo_good_ratio": 1.0,
+    "require_ablation_cross_layer_blind": true,
+    "require_full_cross_layer_actuation": true,
+    "require_native_transport_receipt": true
+  },
+  "provenance": {
+    "base_contract": "results/tempo_go_c8_dual_regime_contract_v54_declared_group.json",
+    "base_contract_sha256": "bb8655e9ae03d4b8d1d4661a0d90d8dcd2d70dde6a8aa1e9e5c3a1de0e1ee6b7",
+    "base_source_inventory_count": 33,
+    "c9_source_inventory_count": 5,
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "schema": "tempo-go-c9-current-source-binding-v1",
+    "source_inventory": {
+      "eval/sota_4node/analyze_tempo_go_c9_causal_burst_discovery.py": "fe6fc1920fe9bb2ed02beddd4bdda406bfa6018c412f7c700c32674f98e65e40",
+      "eval/sota_4node/c9_gate_node_entry.sh": "f6d46d07f5e8bea93d79a407164aed961d11c3a0ab9ed4f67b4155cbaba0d1b1",
+      "eval/sota_4node/run_lmcache_nixl_contention_2node_in_allocation.sh": "5e367cafe1d9569aa33ea0fc531cf3d40c6aa2f6328dc9639bf2ce65d479d8e8",
+      "eval/sota_4node/run_tempo_go_c9_causal_burst_discovery_in_allocation.sh": "7f9b010584d3eabe70fd5ae0758187cee3c875b9df7af2d54c69e7225427bed5",
+      "eval/sota_4node/vllm_lmcache_tempo_go_c9_gate_node.py": "ac0da22a419a4abd4725f47020e7d82539de5014d1d23c87600eb56b24e5bc7c"
+    },
+    "template": "results/tempo_go_c9_causal_burst_current_source_v26.json",
+    "template_sha256": "b480542edc63bb9d81f7936d7cee8d11bb81f497ff532472d84a50eacc26b43c"
+  },
+  "purpose": "Whole-system C9 versus cross-layer-blind global ablation under a co-located NCCL plus official LMCache NIXL receiver-incast burst train",
+  "schema": "tempo-go-c9-causal-burst-discovery-v1",
+  "system_under_test": {
+    "base_contract": "results/tempo_go_c8_dual_regime_contract_v54_declared_group.json",
+    "base_contract_sha256": "bb8655e9ae03d4b8d1d4661a0d90d8dcd2d70dde6a8aa1e9e5c3a1de0e1ee6b7",
+    "node_entry": "eval/sota_4node/c9_gate_node_entry.sh",
+    "observer_scope": "P0-D0 co-located 8-rank NCCL and four-source NIXL receiver incast",
+    "source_policy": "current_source_bound_c8_base_v1",
+    "topology": "P0-D0-P1-D1, Qwen2.5-7B-Instruct, TP4 per node, official LMCacheConnectorV1 NIXL-UCX"
+  }
+}

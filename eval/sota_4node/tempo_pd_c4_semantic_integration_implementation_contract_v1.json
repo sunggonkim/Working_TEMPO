@@ -1,0 +1,52 @@
+{
+  "adaptive_implementation_contract": {
+    "fingerprint_sha256": "cdfd106e28a9284f5c1390ab4766f56f9c19215789fef8ef02a0a672bb0c6fa6",
+    "path": "eval/sota_4node/tempo_pd_c4_adaptive_implementation_contract_v1.json",
+    "sha256": "15accb86ff433876e14ae8cffcd4b4537dde90147b2794bb47f3056b0bf8ca54"
+  },
+  "environment_versions": {
+    "lmcache": "0.1.dev1",
+    "python": "3.12.11",
+    "torch": "2.11.0+cu129",
+    "transformers": "5.15.0",
+    "vllm": "0.26.0+cu129"
+  },
+  "files": [
+    {
+      "path": "eval/sota_4node/analyze_tempo_pd_c4_semantic_epoch_screen.py",
+      "sha256": "2a7065b4d54db92db646c5073d9ec9376fd7cd2cc108b7f67f048bf20cff607b"
+    },
+    {
+      "path": "eval/sota_4node/analyze_tempo_pd_c4_semantic_integration_screen.py",
+      "sha256": "f57db5f646aeb04f79a64e61c08c5a5c63e58ac53524005c28f06b44aa680db8"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_c4_semantic_integration_run_contract.py",
+      "sha256": "9e660b35a738d8b8f77592e502b974690e07c95ca0bd962451cb4e95fc2f26be"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_semantic_epoch_endpoint_profile.py",
+      "sha256": "b2116b58c670093fa7171d99a61648a331f6b281812dc5ce4b773e853a620120"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_semantic_integration_campaign_in_allocation.sh",
+      "sha256": "81184e837c40e4091cef5e6d2649b0b888c20a70507290a4157939d14e53cd08"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_semantic_integration_screen_in_allocation.sh",
+      "sha256": "071c5a2c3a4080a9a7ff83be3eb526304d4939d5a4a497fcd040f1af6d3e8046"
+    },
+    {
+      "path": "eval/sota_4node/verify_tempo_pd_c4_semantic_integration_implementation.py",
+      "sha256": "d31d4bc51c7ed4ad95cd2d52968562a6c861092a068f9e924314e7f18e25918b"
+    }
+  ],
+  "fingerprint_sha256": "c7b925d3d6d4cd8fc2daea852761355877d7f5b999febe5f34016401894f303a",
+  "git_heads": {
+    "repository": "3894bd1f6c91d0498a970575dbbad988ce003c46",
+    "third_party_lmcache": "227d13f5c9fdb52ddb933641d34331f678de03a0"
+  },
+  "performance_claim_allowed": false,
+  "purpose": "post-C4 calibrated semantic-epoch integration screen",
+  "schema": "tempo-pd-c4-semantic-integration-implementation-contract-v1"
+}

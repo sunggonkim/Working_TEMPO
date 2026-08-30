@@ -197,6 +197,18 @@ def analyze(
     manifest = _load(manifest_path)
     _require(manifest.get("schema") == "tempo-go-c10-paper-sota-extension-v1",
              "paper SOTA manifest schema differs")
+    boundary = manifest.get("claim_boundary", {})
+    independent_manifest = (
+        boundary.get("post_hoc_extension") is False
+        and boundary.get("independent_validation_claim_allowed") is True
+        and boundary.get("pre_registered_before_fresh_allocation") is True
+    )
+    post_hoc_manifest = (
+        boundary.get("post_hoc_extension") is True
+        and boundary.get("independent_validation_claim_allowed") is False
+    )
+    _require(independent_manifest or post_hoc_manifest,
+             "paper SOTA manifest claim boundary differs")
     _require(set(baseline_paths) == set(manifest["policies"]),
              "baseline result population differs from manifest")
 
@@ -235,6 +247,11 @@ def analyze(
 
     _require(len(job_ids) == 1 and "None" not in job_ids,
              "C10 comparisons must use one live four-node allocation")
+    if independent_manifest:
+        forbidden = {str(item) for item in boundary.get(
+            "forbidden_allocation_job_ids", [])}
+        _require(not (job_ids & forbidden),
+                 "independent C10 comparison used a forbidden allocation")
     tempo_metrics = {
         regime: _metrics(tempo_analysis, regime) for regime in REGIMES
     }
@@ -355,11 +372,14 @@ def analyze(
             and normal_p50_regression <= 0.05
         ),
         "claim_boundary": {
-            "post_hoc_extension": True,
+            "post_hoc_extension": not independent_manifest,
             "parent_tempo_independent_validation_positive": True,
             "sota_extension_is_actual_vllm_lmcache": True,
-            "sota_extension_independent_validation_claim_allowed": False,
+            "sota_extension_independent_validation_claim_allowed": independent_manifest,
             "reason": (
+                "pre-registered unchanged C10 manifest executed on a fresh "
+                "allocation"
+                if independent_manifest else
                 "baseline policies were frozen after the parent allocation "
                 "started; rerun the unchanged C10 contract on a fresh "
                 "allocation before an independent SOTA claim"

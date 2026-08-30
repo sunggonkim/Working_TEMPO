@@ -1,0 +1,71 @@
+{
+  "artifact_schema": {
+    "crossover_gate": "tempo-pd-contention-crossover-gate-v4",
+    "fixed_block": "tempo-pd-contention-fixed-block-v4",
+    "fixed_client": "tempo-pd-contention-fixed-client-v4",
+    "workload": "tempo-pd-contention-workload-v4"
+  },
+  "block_order": [
+    "c1_decoder_hot:local:r0",
+    "c1_decoder_hot:remote:r0",
+    "c2_remote_hot:remote:r0",
+    "c2_remote_hot:local:r0",
+    "c2_remote_hot:local:r1",
+    "c2_remote_hot:remote:r1",
+    "c1_decoder_hot:remote:r1",
+    "c1_decoder_hot:local:r1"
+  ],
+  "calibration_completed_at_utc": "2026-08-21T03:12:10.078748+00:00",
+  "calibration_evidence": {
+    "aggregate_raw_sha256": "13f2baedd561400d6298a158be8673a74817c3dcdaba9ac858b4fbcb267396fc",
+    "c1_decoder_hot": {
+      "paired_median_gain": 0.17525564784852532,
+      "pooled_median_gain": 0.19213344553869693,
+      "winner": "remote"
+    },
+    "c2_remote_hot": {
+      "paired_median_gain": 0.7253674509572644,
+      "pooled_median_gain": 0.730164517523562,
+      "winner": "local"
+    },
+    "result": "results/tempo_pd_contention_fixed_v4_job_57335890_f70_ucx_pilot01/result.json",
+    "result_sha256": "31388794cc979e7523c7aeecd246bbdda0f0b68ff252ed74a4c98b43dfbb5120",
+    "slurm_job_id": "57335890"
+  },
+  "cache_state": "miss",
+  "calibration_only": true,
+  "controller_tuning_allowed": true,
+  "cooldown_s": 2.0,
+  "foreground_rate_per_s": 2.0,
+  "geometry": {
+    "output_tokens": 2,
+    "prompt_tokens": 4094,
+    "unique_first_lmcache_chunk": true
+  },
+  "load": {
+    "decoder_offered_rate_per_s": 22.4,
+    "decoder_reference_rate_per_s": 32.0,
+    "fraction": 0.7,
+    "remote_offered_rate_per_s": 4.76,
+    "remote_reference_rate_per_s": 6.8
+  },
+  "minimum_crossover_gain": 0.05,
+  "performance_claim_allowed": false,
+  "phase_duration_ms": 15000.0,
+  "profile": {
+    "path": "eval/sota_4node/real_tempo_pd_elastic_profile_v447.json",
+    "sha256": "de6ef04708a557b825bb482c62ec69069e7988db5b2fbec2cd98eed0a2938cfe"
+  },
+  "replicates": 2,
+  "routes": {
+    "local": "decoder_local_chunked_prefill",
+    "remote": "official_lmcache_remote_prefill"
+  },
+  "schema": "tempo-pd-contention-frozen-manifest-v1",
+  "source_workload": {
+    "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+    "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+  },
+  "synthetic_network_background": false,
+  "transport": "LMCacheConnectorV1:UCX"
+}

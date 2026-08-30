@@ -1,0 +1,70 @@
+{
+  "campaign": {
+    "blocks": 9,
+    "candidate_gates": {
+      "all_armed_observed_by_worker": true,
+      "all_armed_status_is_PROC": true,
+      "all_candidate_gate_bubbles_zero": true,
+      "all_candidate_observed_slack_ge_ms": 200.0,
+      "all_candidate_poll_accounting_exact": true,
+      "all_candidate_post_foreground_drain_zero": true,
+      "at_least_one_rescue_observed": true,
+      "candidate_e2e_p50_le_fg_ratio": 1.05,
+      "candidate_tpot_p99_le_lmcache_ratio": 1.1,
+      "global_rescue_collectives": 0,
+      "no_measured_candidate_hook_events": true,
+      "no_rescue_timer_threads": true,
+      "paired_service_delta_median_le_ms": -5.0,
+      "paired_service_win_max_delta_ms": -5.0,
+      "paired_service_win_min_prompts": 2,
+      "rescue_only_unfinished_sources": true,
+      "triggered_count_equals_unfinished_at_950ms": true
+    },
+    "duplicate_trace_ids_fail_closed": true,
+    "modes": [
+      "fg_only",
+      "lmcache_prelaunch_no_gate",
+      "tempo_prelaunch_local_rescue_950ms_safe"
+    ],
+    "rank_block_identity_fail_closed": true,
+    "replicates_per_mode": 3,
+    "unmeasured_fence_prewarm": true
+  },
+  "contract_id": "tp16-single-flight-local-rescue-950ms-safe-e12",
+  "local_rescue": {
+    "arm_condition": "observed_PROC_and_worker_elapsed_ge_950ms",
+    "armed_implies_worker_boost_poll": true,
+    "basis_result": "results/vllm_lmcache_tp16_deadline_C9_job_56972950/result.json",
+    "candidate_mode": "tempo_prelaunch_local_rescue_950ms_safe",
+    "completed_sources_never_boosted": true,
+    "definitive_timer_join": "not_applicable_no_timer",
+    "global_rescue_collectives": 0,
+    "measured_candidate_request_marked": false,
+    "prior_c9_min_slack_ms": 145.222977,
+    "prior_c9_service_median_delta_ms": -31.808033,
+    "scope": "per_source_same_polling_loop",
+    "timer_threads_created": 0,
+    "token31_hook_events_per_candidate": 0,
+    "trigger_ms_from_source_worker_start": 950.0,
+    "vllm_gate_events_per_candidate": 0
+  },
+  "schema_version": "tempo-tp16-single-flight-local-rescue-safe-contract-12",
+  "topology": {
+    "nodes": 4,
+    "pairing": [[0, 8], [1, 9], [2, 10], [3, 11], [4, 12], [5, 13], [6, 14], [7, 15]],
+    "receiver_ranks": [8, 9, 10, 11, 12, 13, 14, 15],
+    "source_ranks": [0, 1, 2, 3, 4, 5, 6, 7],
+    "world_size": 16
+  },
+  "transfer": {
+    "bytes_per_source": 16777216,
+    "calls_global": 8,
+    "decode_progress_sleep_ms": 1.0,
+    "global_bytes": 134217728,
+    "physical_descriptors_global": 8,
+    "prelaunch_at_request_start": true,
+    "prepared_handle_repost": true,
+    "single_flight_per_source": true,
+    "worker_entry_precedes_http_request": true
+  }
+}

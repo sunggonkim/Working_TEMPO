@@ -1,0 +1,28 @@
+{
+  "schema": "tempo-go-real-trace-business-profile-v1",
+  "profile_id": "mooncake-fast25-balanced-business-discovery-v1",
+  "assignment": {
+    "mode": "weighted_cycle_v1",
+    "tenant_cycle": [
+      "latency",
+      "interactive",
+      "batch",
+      "background"
+    ],
+    "remaining_deadline_ms": {
+      "latency": null,
+      "interactive": null,
+      "batch": null,
+      "background": null
+    },
+    "deadline_semantics": "null delegates to the frozen endpoint/global profile; scale-specific numeric SLOs require a post-capacity-sweep profile"
+  },
+  "cache_semantics": "natural prefix reuse from source-bound Mooncake hash IDs; no oracle cache state and no hidden warm copy",
+  "policy_inputs_excluded": [
+    "future_arrivals",
+    "oracle_route",
+    "future_cache_evictions",
+    "physical_switch_label"
+  ],
+  "performance_claim_allowed": false
+}

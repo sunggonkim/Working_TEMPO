@@ -1,0 +1,20 @@
+{
+  "schema": "lmcache-nixl-hotpath-ab-contract-1",
+  "model": "Qwen2.5-7B-Instruct",
+  "topology": "4 nodes, two independent TP4 prefill/decode pairs",
+  "routes": ["stock_lmcache_remote", "tempo_nixl_remote"],
+  "route_policy": "lmcache_always_remote",
+  "request_rate_per_s": 2.0,
+  "max_workers": 4,
+  "prompt_repetitions": [64, 192, 384],
+  "samples_per_bucket": 3,
+  "output_tokens": 32,
+  "hotpath": {
+    "prepared_cache_capacity": 128,
+    "initial_yield_polls": 16,
+    "subsequent_sleep_us": 100,
+    "cache_key": "receiver, local dlist identity, remote dlist identity, local addresses, remote indexes"
+  },
+  "evidence": "one same-allocation remote-only component A/B with nine paired requests",
+  "promotion_valid": false
+}

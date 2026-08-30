@@ -1,0 +1,302 @@
+{
+  "candidate": {
+    "base_contract": "eval/sota_4node/tempo_go_c7_remote_activation_matrix_contract_v28.json",
+    "id": "tempo-go-c8-dual-regime-v1",
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "purpose": "preserve v28 business-aware local protection and add a causal remote-favorable P_ONLY regime under dual decoder-local pressure"
+  },
+  "claim_boundary": {
+    "controller_performance_claim_allowed": true,
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": true,
+    "purpose": "Same-population C7 whole-system discovery after actual-vLLM two-prefill receiver-incast qualification"
+  },
+  "joint_control": {
+    "activation_matrix": {
+      "controller_does_not_receive_phase_label": true,
+      "local_cool_rate_per_s": 0.0,
+      "local_hot_rate_per_s": 7.8,
+      "purpose": "causally separate decoder/receiver pressure from remote source/fabric pressure before evaluating remote actuation",
+      "remote_cool_source_indices": [
+        1
+      ],
+      "remote_hot_rate_per_s": 7.8,
+      "remote_hot_source_indices": [
+        0,
+        1
+      ],
+      "remote_selective_rate_per_s": 7.8,
+      "schema": "tempo-go-c7-remote-activation-matrix-v1"
+    },
+    "aggressor": {
+      "cache_state": "miss",
+      "controller_may_move_or_throttle": false,
+      "load_fraction": 0.7,
+      "output_tokens": 2,
+      "prompt_tokens": 4094,
+      "rate_per_s": 7.8,
+      "reference_rate_per_s": 32.0,
+      "route": "official_lmcache_remote_prefill",
+      "source_assignment": "ordinal parity across P0 and P1",
+      "target_assignment": "phase-frozen D0 or D1",
+      "tenant_id": "background"
+    },
+    "arms": [
+      {
+        "kind": "fixed",
+        "name": "fixed_local_d0"
+      },
+      {
+        "kind": "fixed",
+        "name": "fixed_local_d1"
+      },
+      {
+        "kind": "fixed",
+        "name": "fixed_remote_p0d1"
+      },
+      {
+        "kind": "fixed",
+        "name": "fixed_remote_p1d0"
+      },
+      {
+        "kind": "request_baseline",
+        "name": "predictor"
+      },
+      {
+        "kind": "request_baseline",
+        "name": "queue_gpu"
+      },
+      {
+        "kind": "managed_cross_layer",
+        "name": "full_c7_managed_background"
+      }
+    ],
+    "blocks": [
+      {
+        "hot_decoder_index": null,
+        "name": "00_control_a"
+      },
+      {
+        "hot_decoder_index": 0,
+        "local_aggressor_rate_per_s": 0.0,
+        "name": "01_remote_cool_hot_d0",
+        "pressure_regime": "decoder_hot_remote_edge_selective",
+        "remote_aggressor_rate_per_s": 7.8,
+        "remote_source_indices": [
+          1
+        ]
+      },
+      {
+        "hot_decoder_index": 0,
+        "local_aggressor_rate_per_s": 7.8,
+        "name": "02_combined_hot_d0",
+        "pressure_regime": "decoder_hot_remote_fabric_hot",
+        "remote_aggressor_rate_per_s": 7.8,
+        "remote_source_indices": [
+          0,
+          1
+        ]
+      },
+      {
+        "hot_decoder_index": 1,
+        "local_aggressor_rate_per_s": 0.0,
+        "name": "03_remote_cool_hot_d1",
+        "pressure_regime": "decoder_hot_remote_edge_selective",
+        "remote_aggressor_rate_per_s": 7.8,
+        "remote_source_indices": [
+          1
+        ]
+      },
+      {
+        "hot_decoder_index": 1,
+        "local_aggressor_rate_per_s": 7.8,
+        "name": "04_combined_hot_d1",
+        "pressure_regime": "decoder_hot_remote_fabric_hot",
+        "remote_aggressor_rate_per_s": 7.8,
+        "remote_source_indices": [
+          0,
+          1
+        ]
+      },
+      {
+        "controller_receives_regime_label": false,
+        "hot_decoder_index": 0,
+        "hot_decoder_indices": [
+          0,
+          1
+        ],
+        "local_aggressor_decoder_indices": [
+          0,
+          1
+        ],
+        "local_aggressor_rate_per_s": 22.4,
+        "managed_background": false,
+        "name": "05_p_only_dual_decoder_hot",
+        "p_only_pool_per_owner": 8,
+        "p_only_preseed_before_measurement": true,
+        "pressure_regime": "dual_decoder_hot_p_only_remote_favorable",
+        "remote_aggressor_rate_per_s": 0.0,
+        "remote_source_indices": [
+          0,
+          1
+        ],
+        "victim_cache_state": "p_only"
+      },
+      {
+        "hot_decoder_index": null,
+        "name": "06_control_b"
+      }
+    ],
+    "cooldown_s": 5,
+    "elastic_profile": {
+      "path": "results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+      "sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53"
+    },
+    "endpoint_profile": {
+      "path": "results/tempo_go_c5_cross_layer_short_slice_v4_profiles/real_tempo_pd_endpoint_service_profile_short_slice_v1.json",
+      "sha256": "8776221a0bc0d932205c97e1a943a130cd206e73ce6b863fb6cce67c33f1a4cf"
+    },
+    "global_profile": {
+      "fingerprint_sha256": "12c6fef39c7f86291abeaf48345382c8061dfb6522c279707467dc1c8eec582e",
+      "path": "results/tempo_go_c7_tenant_pair_packing_profile_v7/real_tempo_go_c7_tenant_pair_packing_profile_v7.json",
+      "sha256": "b67a180611a45a15bcea43fca23337b9f21181e82d6189535eb54f59bfb6ff44"
+    },
+    "headline_full_arm": "full_c7_managed_background",
+    "ingress": {
+      "background_workers": 240,
+      "controller_does_not_receive_ingress_lane": true,
+      "interactive_reserved_workers": 16,
+      "policy": "interactive_reserved",
+      "purpose": "prevent background executor backlog from delaying interactive admission while preserving the same exogenous arrivals",
+      "same_offered_population": true,
+      "same_open_loop_clock": true,
+      "schema": "tempo-go-c7-ingress-policy-v1"
+    },
+    "local_aggressor": {
+      "cache_state": "miss",
+      "controller_may_move_or_throttle": false,
+      "output_tokens": 2,
+      "prompt_tokens": 4094,
+      "rate_per_s": 7.8,
+      "route": "decoder_local_chunked_prefill",
+      "source_assignment": "hot decoder's paired prefill source",
+      "target_assignment": "phase-frozen local D0 or D1",
+      "tenant_id": "background_local_decoder"
+    },
+    "max_workers": 256,
+    "performance_gates": {
+      "hot_p99_reduction_fraction": 0.15,
+      "hot_slo_good_ratio": 1.15,
+      "incremental_hot_p99_reduction_fraction": 0.1,
+      "incremental_hot_slo_good_ratio": 1.05,
+      "normal_p50_regression_fraction": 0.03
+    },
+    "phase_duration_ms": 30000,
+    "policies": {
+      "fixed_p0d1": {
+        "decoder_index": 1,
+        "edge_id": "remote:p0->d1",
+        "prefill_index": 0
+      },
+      "fixed_p1d0": {
+        "decoder_index": 0,
+        "edge_id": "remote:p1->d0",
+        "prefill_index": 1
+      }
+    },
+    "profile": {
+      "path": "results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+      "sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53"
+    },
+    "remote_activation": {
+      "controller_does_not_receive_regime_label": true,
+      "exact_source_hit_required": true,
+      "local_decoder_indices": [
+        0,
+        1
+      ],
+      "local_rate_per_decoder": 22.4,
+      "p_only_pool_per_owner": 8,
+      "physical_preseed_outside_measurement": true,
+      "purpose": "make decoder-local prefill the measured bottleneck while keeping official LMCache P_ONLY reuse physically available",
+      "remote_background_rate_per_s": 0.0,
+      "replicated_prefill_owners": [
+        0,
+        1
+      ],
+      "same_offered_population_in_every_arm": true,
+      "schema": "tempo-go-c8-remote-activation-workload-v1",
+      "source_evidence": [
+        "C1 decoder-local-hot fixed crossover",
+        "C4 P_ONLY physical seed and exact full-source-hit probe"
+      ],
+      "total_local_rate_per_s": 44.8,
+      "victim_cache_state": "p_only",
+      "victim_output_tokens": 128,
+      "victim_prompt_tokens": 4094
+    },
+    "remote_activation_gates": {
+      "best_fixed_p99_ratio_ceiling": 1.1,
+      "best_fixed_slo_retention_fraction": 0.95,
+      "minimum_full_remote_fraction": 0.5
+    },
+    "source_workload": {
+      "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+      "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+    },
+    "victim": {
+      "cache_state": "miss",
+      "offered_rate_per_s": 1.0,
+      "output_tokens": 128,
+      "prompt_tokens": 4094,
+      "slo": {
+        "e2e_ms": 8000,
+        "tpot_ms": 150
+      },
+      "tenant_id": "interactive"
+    }
+  },
+  "purpose": "C8 same-population actual-vLLM dual-regime discovery: managed local protection plus official-LMCache remote activation",
+  "schema": "tempo-go-c8-dual-regime-contract-v1",
+  "source_inventory": {
+    "eval/sota_4node/analyze_tempo_go_c7_joint_control.py": "973fe5522fdda49effba6164b935c57cbc45b3227cb3f087ef0a8d58524163a1",
+    "eval/sota_4node/analyze_tempo_go_c8_dual_regime.py": "0b084b52bca01a19dc396150ace320e542632b29bd3b8dee71d06f13f9105e9d",
+    "eval/sota_4node/build_tempo_go_c8_dual_regime_contract.py": "4b22805527b9438a9117d057e6fbeedda919710bb46dc9c05b5cec0a517ee40c",
+    "eval/sota_4node/c7_joint_control_node_entry.sh": "e955f3df2cbaaa52f9004fa64e7a11847d072431448b335884ca39d0da996c7d",
+    "eval/sota_4node/c8_dual_regime_node_entry.sh": "737ac0c0839b7223ad1f28c66b6c9ae5ebf69d871698ab37ece75363b97d631f",
+    "eval/sota_4node/run_tempo_go_c5_stream_client.py": "f8e30657e0195c44914a71c2162a17bfdecfb5cec52e08a9392d4fcd905501d0",
+    "eval/sota_4node/run_tempo_go_c6_decoder_victim_client.py": "17942a2d4473b7fb4edfee1b2749edb648fd061f55ee57e254a5220e81a69e69",
+    "eval/sota_4node/run_tempo_go_c6_performance_client.py": "f3d77e736abeb1f9846e7f3055b7116ac79989dc2033a2017bad241057a68f9a",
+    "eval/sota_4node/run_tempo_go_c6_stream_client.py": "bde4fa1ab83ce5fd0f9f52967a08981c13bbd396443b496296cd221410b67a7a",
+    "eval/sota_4node/run_tempo_go_c7_joint_control_client.py": "9d840d00b1d33c6f4c9c56d6b10a2ad15a23ed8c16833fd4a4c56b9323ab89d1",
+    "eval/sota_4node/run_tempo_go_c7_joint_control_in_allocation.sh": "0888d0f0aa9dc59126f75272c285922afc11ea7cf49c9f66c88a94119d32788c",
+    "eval/sota_4node/run_tempo_go_c8_dual_regime_client.py": "5bb6ce2ae7237ba901a6ad394053b578fbd362fa07421f5f78eb24f00b6ca2d1",
+    "eval/sota_4node/run_tempo_go_c8_dual_regime_in_allocation.sh": "d8312e238f7ee46a977bb51bd1fd248c66bc133ae6041f62809a04b15b7e9a74",
+    "eval/sota_4node/run_tempo_pd_contention_fixed_client.py": "ca5afbee3f1d4082e0c0f8e730dc9cd40e05453ae576bc3a54af54b230ca71a4",
+    "eval/sota_4node/run_tempo_pd_stream_metrics_v1.py": "47baa53ce362709c443b1e6186b4f8b3cf2e3fa69bc791c7fdac4fbc891aba38",
+    "eval/sota_4node/tempo_pd_decoder_selecting_proxy.py": "b0c7f8c6cf8db8c919e4ce43f4b1c98b0989e0f4d0dbb377da14e2026ec85816",
+    "eval/sota_4node/tempo_pd_elastic_frontend.py": "6959300a52f4c0e63be9a1210ef49ad50f037bb52f2bd8aa3efa544d6a30ffcc",
+    "eval/sota_4node/tempo_pd_elastic_router.py": "45461046b192b076c26eff30303138dc4f86cd7bf2cfdab484768e97d73dea33",
+    "eval/sota_4node/vllm_lmcache_elastic_pd_node.py": "7ae7716417264f4884e4f835e544a944351bda35b68184605b88de8e6c3146a4",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c6_qualification_node.py": "63e35a8fd267df934711dad9eea8c14e2a295e833a77eabe58129013d968b720",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c7_joint_control_node.py": "902966e4f79de1183d6199181900d73247204845de82ac34494df440f0f864e0",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c8_dual_regime_node.py": "3676d6033aaf3ac542a39f745a828b11c2a03f5a2950be384c96fb73db64196d",
+    "eval/sota_4node/vllm_lmcache_tempo_pd_perf_node_v1.py": "7870fb2379a5087377e85dde12421492d992a2ee77e6820504cb2de11666f28d",
+    "tempo/pd_contention_workload.py": "3473b59f1375b4f3720f52ad8716f1741468a903430289c7fd572e2203a778f0",
+    "tempo/pd_global_agent.py": "0616edc71672e2d629e3ab53b039a835f9c4ac912d72d67fc830e7a468901623",
+    "tempo/pd_global_candidates.py": "84526dac13f8d82a029fa64937cc7b15266d82098f1c2dce1b8cd62a95944a3a",
+    "tempo/pd_global_coordinator.py": "adb84b6ea97006537bd0a87337ec96f88528bbafbee2d3725d669e3f5aac6ca5",
+    "tempo/pd_global_hierarchy.py": "1a4fbe548ed2325c351154633d1d93ea4fa71a00da599e5a0bbb9e8b94ac75e9",
+    "tempo/pd_global_orchestrator.py": "631d7bea28bdee46eef18dc046e92b95be71e9848fde08841b63946936b6bded",
+    "tempo/pd_global_profile.py": "fedafe514e3f5623077028a6eed069162416578334c6c71ca295b0116cf573ab",
+    "tempo/pd_global_telemetry.py": "550567d0e4b39f09bd8f2035bdd8d849d23643f0d51b10e1311336ae65e6701b"
+  },
+  "transport": {
+    "lmcache": "official checked-out LMCacheConnectorV1 NIXL UCX",
+    "nccl": "actual vLLM TP4 NCCL through NERSC AWS Libfabric",
+    "privileged_or_container_configuration_allowed": false,
+    "synthetic_network_background": false,
+    "topology": "Perlmutter P0/D0/P1/D1 TP4 with immutable P-by-D multi-decoder proxy topology in every arm"
+  }
+}

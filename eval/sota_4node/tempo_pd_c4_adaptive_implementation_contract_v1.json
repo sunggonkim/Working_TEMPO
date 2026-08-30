@@ -1,0 +1,68 @@
+{
+  "environment_versions": {
+    "lmcache": "0.1.dev1",
+    "python": "3.12.11",
+    "torch": "2.11.0+cu129",
+    "transformers": "5.15.0",
+    "vllm": "0.26.0+cu129"
+  },
+  "files": [
+    {
+      "path": "eval/sota_4node/analyze_tempo_pd_c4_adaptive_screen.py",
+      "sha256": "33a97c86a29838ffaf64700bef26a3e791c8d3bc2ab4fdcb783aaaef24c6d5d3"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_c4_adaptive_run_contract.py",
+      "sha256": "b374ff26c5c229970c59df8013d03f534133e7e8c63c398d1e4ae97f719e6cb4"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_c4_adaptive_screen_manifest.py",
+      "sha256": "66438df0dbd6ffe0e490b98ab4c30e0a86a4e9bfddaa258747a61784c10e1fdf"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_c4_calibrated_profiles.py",
+      "sha256": "5abafe40eba211b207e820f115a3d38470fb51f00fb104d240df081d98081aee"
+    },
+    {
+      "path": "eval/sota_4node/c4_adaptive_screen_pd_node_entry.sh",
+      "sha256": "18ae77f0ebf1b4f0cc0d428575f52a7d8b8c087aa81fbfde1993b720be50bcb6"
+    },
+    {
+      "path": "eval/sota_4node/replay_tempo_pd_c4_calibrated_controller.py",
+      "sha256": "25a5be357f77aa8896d12bb59bf226e08a7ba18384ef7f32d94f7138bb1360af"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_adaptive_screen_client.py",
+      "sha256": "2e742c92d4fd8dc3c3710c8486fd2a9a64bfc23f4694a86d9713b0a227070e85"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_adaptive_screen_in_allocation.sh",
+      "sha256": "ebbef3c6b3df5c6c28398926f3fd72eb18184bec53d267769cfee22f67059a0a"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_c4_persistent_campaign_in_allocation.sh",
+      "sha256": "4c65a7b49d15811e088082a17a7cb9a7093d8a89fd5066bbd8a5ea64545719ae"
+    },
+    {
+      "path": "eval/sota_4node/verify_tempo_pd_c4_adaptive_implementation.py",
+      "sha256": "7bd1770ca7bf227a86dae253aefd1fd2d7475523472698873308b6c7750642db"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_pd_c4_adaptive_screen_node.py",
+      "sha256": "7e4167a0d546f33341530e058655eca9bb1164158f5437ae37bacc1c6db90de1"
+    }
+  ],
+  "fingerprint_sha256": "cdfd106e28a9284f5c1390ab4766f56f9c19215789fef8ef02a0a672bb0c6fa6",
+  "fixed_c4_implementation_contract": {
+    "fingerprint_sha256": "f62bf421d6a60a218d18ea02a7b0bf8bc7737954b656a64c60c77c32f0b4eec0",
+    "path": "eval/sota_4node/tempo_pd_c4_implementation_contract_v1.json",
+    "sha256": "fa5b23288d14e8f938b0c7820016b5313a7140126252edbec36db7d1ff74a5a4"
+  },
+  "git_heads": {
+    "repository": "3894bd1f6c91d0498a970575dbbad988ce003c46",
+    "third_party_lmcache": "227d13f5c9fdb52ddb933641d34331f678de03a0"
+  },
+  "performance_claim_allowed": false,
+  "purpose": "post-C4 calibration-only adaptive screen",
+  "schema": "tempo-pd-c4-adaptive-implementation-contract-v1"
+}

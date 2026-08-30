@@ -1,0 +1,63 @@
+{
+  "schema": "tempo-go-c9-causal-burst-discovery-v1",
+  "purpose": "Whole-system C9 versus cross-layer-blind global ablation under a co-located NCCL plus official LMCache NIXL receiver-incast burst train",
+  "claim_boundary": {
+    "performance_claim_allowed": false,
+    "independent_validation_claim_allowed": false,
+    "discovery_only": true,
+    "reason": "The overload geometry and timeout-as-outcome rule were selected from a prior partial pilot; this campaign is frozen before allocation but remains discovery and cannot replace the fresh C9 independent result"
+  },
+  "system_under_test": {
+    "base_contract": "eval/sota_4node/tempo_go_c8_independent_validation_contract_v3.json",
+    "base_contract_sha256": "e2d07e8c50316620cee29a82ae06bbb4e3efd5e8c18c07347a34a4f532f07a76",
+    "source_policy": "unchanged_c9_source_inventory",
+    "topology": "P0-D0-P1-D1, Qwen2.5-7B-Instruct, TP4 per node, official LMCacheConnectorV1 NIXL-UCX",
+    "observer_scope": "P0-D0 co-located 8-rank NCCL and four-source NIXL receiver incast"
+  },
+  "execution": {
+    "one_campaign_no_retry": true,
+    "order": [
+      {"name": "00_app_global_only_a", "arm": "app_global_only", "port_slot": 2420},
+      {"name": "01_full_c9_a", "arm": "full_c7_managed_background", "port_slot": 2460},
+      {"name": "02_full_c9_b", "arm": "full_c7_managed_background", "port_slot": 2500},
+      {"name": "03_app_global_only_b", "arm": "app_global_only", "port_slot": 2540}
+    ],
+    "paired_indices": [[0, 1], [3, 2]],
+    "inference_timeout_s": 1800,
+    "cojob_readiness_timeout_s": 240,
+    "cooldown_s": 5
+  },
+  "burst": {
+    "traffic_pattern": "incast_4to1",
+    "minimum_blocks": 1,
+    "maximum_blocks": 256,
+    "minimum_active_duration_s": 1200,
+    "start_delay_s": 180,
+    "block_delay_s": 0.1,
+    "requests_per_source": 4,
+    "kv_mib_per_request": 128,
+    "token_iters": 4096,
+    "foreground_mib": 16,
+    "process_group_timeout_s": 120,
+    "nixl_transfer_timeout_s": 60,
+    "cojob_timeout_s": 1740,
+    "cojob_time_limit": "00:29:00",
+    "observer_max_age_ms": 60000,
+    "transport": {
+      "nccl": "AWS Libfabric over Slingshot/CXI",
+      "lmcache": "official NixlChannel with UCX",
+      "socket_fallback_forbidden": true
+    },
+    "interpretation": "Each block is a high-peak NCCL collective plus 2 GiB aggregate receiver-incast KV burst, followed by a 100 ms gap; the train is exogenous and identical in all four arms"
+  },
+  "gates": {
+    "correctness_required": true,
+    "minimum_full_supported_observer_fraction": 0.5,
+    "minimum_stressed_p99_reduction_fraction": 0.15,
+    "minimum_stressed_slo_good_ratio": 1.0,
+    "maximum_normal_p50_regression_fraction": 0.03,
+    "require_full_cross_layer_actuation": true,
+    "require_ablation_cross_layer_blind": true,
+    "require_native_transport_receipt": true
+  }
+}

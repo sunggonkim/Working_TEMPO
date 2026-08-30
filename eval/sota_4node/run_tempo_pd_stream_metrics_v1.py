@@ -117,6 +117,22 @@ def _is_terminal_service_lane_failure(row: dict[str, Any]) -> bool:
     )
 
 
+def _is_terminal_route_failure_decision(decision: dict[str, Any]) -> bool:
+    """Recognize a route-scoped upstream failure already receipted by TEMPO."""
+
+    failure = decision.get("frontend_tempo_go_failure")
+    failure_kind = decision.get("frontend_tempo_go_failure_kind")
+    return (
+        decision.get("phase") == "failed"
+        and decision.get("error") in {None, failure_kind}
+        and decision.get("frontend_tempo_go_failure_scope") == "route"
+        and isinstance(failure, dict)
+        and failure.get("schema") == "tempo-go-global-failure-v1"
+        and failure.get("terminal_phase") == "failed"
+        and failure.get("failure_kind") == failure_kind
+    )
+
+
 def _apply_decision_receipts(
     records: list[dict[str, Any]],
     decision_rows: list[dict[str, Any]],
@@ -134,6 +150,7 @@ def _apply_decision_receipts(
             row.get("phase") == "complete" and row.get("error") is None
             or _is_terminal_global_reject(row)
             or _is_terminal_service_lane_failure(row)
+            or _is_terminal_route_failure_decision(row)
             for row in decision_rows
         )
     )
@@ -163,6 +180,32 @@ def _apply_decision_receipts(
                 record["error"] = None
                 record["valid"] = True
                 continue
+            record["contract_violations"] = [
+                "unreceipted_terminal_service_lane_failure",
+            ]
+            record["valid"] = False
+            continue
+        if record.get("terminal_route_failure_candidate"):
+            if isinstance(decision, dict) and _is_terminal_route_failure_decision(
+                decision
+            ):
+                record["terminal_kind"] = "route_failure"
+                record["terminal_reason"] = decision.get(
+                    "frontend_tempo_go_failure_kind")
+                record["contract_violations"] = []
+                record["error"] = None
+                record["valid"] = True
+                continue
+            record["contract_violations"] = [
+                "unreceipted_terminal_route_failure",
+            ]
+            record["valid"] = False
+            continue
+            record["contract_violations"] = [
+                "unreceipted_terminal_route_failure",
+            ]
+            record["valid"] = False
+            continue
             record["contract_violations"] = [
                 "unreceipted_terminal_service_lane_failure",
             ]
@@ -415,6 +458,12 @@ def execute_request(
         global_reject_candidate = terminal_error_kind in _GLOBAL_REJECTION_KINDS
         service_lane_failure_candidate = (
             terminal_error_kind in _SERVICE_LANE_FAILURE_KINDS)
+        route_failure_candidate = (
+            isinstance(exc, error.HTTPError)
+            and int(exc.code) >= 500
+            and not global_reject_candidate
+            and not service_lane_failure_candidate
+        )
         record = {
             **common,
             "router": None,
@@ -432,13 +481,20 @@ def execute_request(
             "response_ids": [],
             "response_models": [],
             "contract_violations": (
-                [] if global_reject_candidate or service_lane_failure_candidate
-                else [terminal_error_kind]),
-            "error": None if global_reject_candidate or service_lane_failure_candidate
-            else f"{type(exc).__name__}: {exc}",
+                [] if (
+                    global_reject_candidate
+                    or service_lane_failure_candidate
+                    or route_failure_candidate
+                ) else [terminal_error_kind]),
+            "error": None if (
+                global_reject_candidate
+                or service_lane_failure_candidate
+                or route_failure_candidate
+            ) else f"{type(exc).__name__}: {exc}",
             "terminal_reject_candidate": global_reject_candidate,
             "terminal_service_lane_failure_candidate": (
                 service_lane_failure_candidate),
+            "terminal_route_failure_candidate": route_failure_candidate,
             "terminal_error_kind": terminal_error_kind,
             "transport_error": f"{type(exc).__name__}: {exc}",
         }
@@ -628,8 +684,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         kind = row.get("terminal_error_kind")
         if isinstance(kind, str):
             terminal_error_counts[kind] = terminal_error_counts.get(kind, 0) + 1
+    terminal_failure_count = sum(
+        row.get("terminal_kind") in {"service_lane_failure", "route_failure"}
+        for row in records
+    )
     performance_claim_allowed = (
-        terminal_contract_valid and global_rejected_count == 0)
+        terminal_contract_valid
+        and global_rejected_count == 0
+        and terminal_failure_count == 0
+    )
     artifact = {
         "schema": SCHEMA,
         "evidence": "actual_vllm_pd_router_client_stream",
@@ -669,6 +732,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 row.get("terminal_kind") != "global_reject" for row in records),
             "global_rejected_count": global_rejected_count,
             "terminal_error_counts": dict(sorted(terminal_error_counts.items())),
+            "terminal_failure_count": terminal_failure_count,
             "router_decisions_exact": decisions_exact,
             "terminal_contract_valid": terminal_contract_valid,
             "performance_claim_allowed": performance_claim_allowed,

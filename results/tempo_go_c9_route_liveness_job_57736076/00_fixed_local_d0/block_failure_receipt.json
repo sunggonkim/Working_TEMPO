@@ -1,0 +1,11 @@
+{
+  "schema": "tempo-go-c9-causal-burst-block-failure-v1",
+  "block": "00_fixed_local_d0",
+  "arm": "fixed_local_d0",
+  "failure_stage": "cojob_readiness",
+  "failure_detail": "co-job ready file was not published",
+  "inference_result_exists": false,
+  "measured_arm_retried": false,
+  "performance_result": false,
+  "failure_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_route_liveness_job_57736076/00_fixed_local_d0/block_failure_receipt.json"
+}

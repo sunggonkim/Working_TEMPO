@@ -10,7 +10,7 @@ from pathlib import Path
 from tempo.pd_global_profile import global_profile_fingerprint, load_global_profile
 
 
-MODE = "vllm_priority_remote_cache_v1"
+MODE = "vllm_priority_business_dual_route_v2"
 SOURCE_BALANCE_MODE = "telemetry_uncertainty_virtual_service_v1"
 
 
@@ -29,6 +29,8 @@ def main() -> int:
         "--decoder-background-max-wait-ms", type=int, default=60_000)
     parser.add_argument(
         "--source-balance-uncertainty-fraction", type=float, default=1.0)
+    parser.add_argument(
+        "--business-clean-pair-pressure-fraction", type=float, default=1.0)
     args = parser.parse_args()
 
     base = args.base.resolve()
@@ -52,10 +54,13 @@ def main() -> int:
         raise ValueError("decoder background max wait must be positive")
     if not 0.0 < args.source_balance_uncertainty_fraction <= 1.0:
         raise ValueError("source balance uncertainty fraction must be in (0, 1]")
+    if not 0.0 < args.business_clean_pair_pressure_fraction <= 1.0:
+        raise ValueError(
+            "business clean pair pressure fraction must be in (0, 1]")
 
     raw = json.loads(base.read_text(encoding="utf-8"))
     raw["profile_id"] = (
-        "tempo-go-qwen25-perlmutter-c8-global-business-drain-v4")
+        "tempo-go-qwen25-perlmutter-c9-dual-route-business-lane-v1")
     telemetry = raw.get("telemetry")
     if not isinstance(telemetry, dict):
         raise ValueError("base profile telemetry is missing")
@@ -89,6 +94,8 @@ def main() -> int:
         "mesh_near_tie_source_balance_mode": SOURCE_BALANCE_MODE,
         "mesh_near_tie_source_balance_uncertainty_fraction": (
             args.source_balance_uncertainty_fraction),
+        "business_clean_pair_pressure_fraction": (
+            args.business_clean_pair_pressure_fraction),
     })
     raw["fingerprint_sha256"] = global_profile_fingerprint(raw)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -111,6 +118,8 @@ def main() -> int:
         or config.mesh_near_tie_source_balance_mode != SOURCE_BALANCE_MODE
         or config.mesh_near_tie_source_balance_uncertainty_fraction
         != args.source_balance_uncertainty_fraction
+        or config.business_clean_pair_pressure_fraction
+        != args.business_clean_pair_pressure_fraction
     ):
         raise RuntimeError("C8 priority service lane did not round-trip")
     if (

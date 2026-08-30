@@ -1,5 +1,7 @@
 """TEMPO collective-group D2H checkpoint scheduling prototype."""
 
+from tempo.c0_admission import C0Admission, C0Config, C0Decision, C0Snapshot
+
 from tempo.group_credit_checkpoint import GroupCreditCheckpointer
 from tempo.resource_domain import (
     DOMAIN_CONTRACTS,
@@ -93,6 +95,10 @@ from tempo.observation_window import (
 
 __version__ = "0.1.0"
 __all__ = [
+    "C0Admission",
+    "C0Config",
+    "C0Decision",
+    "C0Snapshot",
     "GroupCreditCheckpointer",
     "DOMAIN_CONTRACTS",
     "DomainContract",

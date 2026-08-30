@@ -1,0 +1,12 @@
+{
+  "cojob_step_name": "c9-causal-cojob-p0-0-57736076",
+  "exit_code": 1,
+  "failure": "cojob_step_failed",
+  "native_only": true,
+  "observer": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_route_liveness_job_57736076/00_fixed_local_d0/cojob/nccl_observer.json",
+  "observer_producer_state": null,
+  "observer_sequence": null,
+  "result_dir": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_route_liveness_job_57736076/00_fixed_local_d0/cojob",
+  "schema": "tempo-go-cross-layer-cojob-failure-v1",
+  "slurm_job_id": "57736076"
+}

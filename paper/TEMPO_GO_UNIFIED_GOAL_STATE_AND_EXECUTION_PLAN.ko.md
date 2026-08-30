@@ -1,26 +1,32 @@
 # TEMPO-GO 단일 연구 목표·현재 결론·향후 실행계획
 
-문서 버전: `unified-goal-v8-c9-independent-c10-sota`
-기준일: 2026-08-25
+문서 버전: `unified-goal-v11-c9-candidate-m-native-negative`
+기준일: 2026-08-30
 대상 시스템: NERSC Perlmutter 전체 규모를 겨냥한 TEMPO-GO cross-layer global orchestrator
 현재 native testbed: 4 nodes / 16 A100 GPUs / 실제 vLLM P/D / frozen official `LMCacheConnectorV1:UCX` 경로
 
-최신 continuation 기준은 **§72의 C9 fresh held-out independent validation과
-C10 actual paper-policy comparison**이다. allocation `57586612`의 4-node/16-A100
-actual vLLM/official LMCache/NIXL-CXI run에서 TEMPO는 normal 60/60, miss-hot
-120/120, remote-favorable 30/30 SLO-good을 달성했고 p99은 각각
-3.150/3.337/3.357초였다. strongest fixed 대비 stressed p99은 66.12%/90.55%,
-predictor 대비 61.69%/93.36%, queue-GPU 대비 58.48%/93.54% 감소했다.
-fresh-allocation, one-shot, fairness, telemetry-overhead와 independent-positive gate가
-모두 true이며 C9 independent performance claim은 허용된다. 같은 allocation의 C10
-post-hoc extension에서 NetKV Algorithm-1 reproduction 대비 miss-hot/remote-favorable
-p99을 75.79%/93.77% 줄였고 SLO-good을 73→120, 0→30으로 높였다. Kairos는
-공개 코드 부재와 stock vLLM 경계 때문에 `X={512}` reproduction으로만 보고하며,
-C10 SOTA-independent claim은 fresh unchanged rerun 전까지 금지한다. current-source
-hierarchy benchmark는 1,024 logical pair에서 global payload를 87.499% 줄였지만 CPU
-control-plane evidence일 뿐 native production-scale win은 아니다. v0–v107과 모든
-failure receipt는 lineage/history로 보존한다. 최신 authoritative state는 문서 마지막
-§72를 먼저 읽는다.
+최신 continuation 기준은 **Candidate M pressure-spill을 실제 새 4-node/16-A100
+native vLLM P/D·official LMCache/NIXL·NCCL/Slingshot 경로에서 검증한 결과를
+고정하고, 다음 global orchestrator 설계의 병목을 정하는 것**이다.
+과거 C9/C10의 positive 수치와 Kairos/NetKV 동일-carrier 결과는 각각의 claim
+boundary를 가진 historical/post-hoc artifact로 보존한다. 현재 source-of-truth인
+C9 v27과 Candidate J native r5는 stressed performance gate를 통과하지 못했고,
+Candidate K도 transport/correctness는 통과했지만 protected service lane의 hard
+capacity semantics 때문에 native 성능 gate를 통과하지 못했다.
+Candidate M은 동일 7-arm/210-victim population에서 remote-favorable 구간을
+살렸지만 miss-hot 전체의 SLO와 tail을 지키지 못했고 observer support도
+45.2%였다. 따라서 이것은 재현 가능한 discovery negative이며, 현재 TEMPO의
+독립 native 성능 우위는 주장하지 않는다.
+`results/tempo_go_c9_candidate_k_protected_lane_v9/native_job_57715910_r1/`에
+K native negative가, `results/tempo_go_c9_causal_burst_job_57730228/`에
+v13의 7-arm negative가, `results/tempo_go_c9_causal_burst_job_57732862/`에
+M의 새 allocation 결과가 보존되어 있다. 다음 native gate는 threshold sweep이
+아니라 local GPU queue·remote KV/fabric timeout·observer coverage를 하나의
+admission, pair scaling, transfer-concurrency와 fairness loop로 묶는 frozen
+scheme이다.
+current-source hierarchy benchmark는 1,024 logical pair의 CPU control-plane
+evidence일 뿐 native production-scale win이 아니다. v0–v107과 모든 failure
+receipt는 lineage/history로 보존하며, 과거 수치를 현재 결과로 재분류하지 않는다.
 
 이 문서는 사용자의 요청에 따라 지금까지 흩어진 TEMPO 문서, 원본 목표, C4/C5 native receipt, 최신 Candidate G/I CPU audit와 향후 계획을 하나의 진입점으로 정리한 문서다. 과거 raw, profile, contract와 문서를 삭제하거나 덮어쓰지 않는다. 숫자나 결론이 충돌하면 다음 우선순위를 사용한다.
 
@@ -43,10 +49,10 @@ failure receipt는 lineage/history로 보존한다. 최신 authoritative state�
 | remote가 항상 나쁜가? | **아니다.** C1과 C3 rate 0에서는 remote가 local보다 유리했고, 최신 native epoch에서는 official remote가 가장 높은 request/output-token goodput을 냈다. |
 | local이면 contention을 피하는가? | **아니다.** local prefill과 decode가 같은 decoder GPU를 공유해 active service와 TPOT을 악화시킨다. visible queue가 0이어도 service inflation이 존재했다. |
 | global orchestrator가 필요한가? | **그렇다.** route, decoder, P/KV transfer, NCCL, Slingshot endpoint, tenant SLO와 pair capacity를 국소적으로 최적화하면 병목을 다른 layer로 밀어낸다. cross-layer global loop가 TEMPO의 핵심 가치다. |
-| 현재 TEMPO-GO가 strongest fixed/predictor보다 빠른가? | **그렇다.** C9 fresh held-out 4-node run에서 strongest fixed 대비 miss-hot/remote-favorable p99 66.12%/90.55%, predictor 대비 61.69%/93.36% 감소했고 세 regime 모두 offered victim 100% SLO-good이다. |
-| 현재 global candidate를 native로 더 돌려야 하는가? | **C9 tuning 반복은 STOP이다.** 다음 native 성능 실행은 unchanged C10 SOTA independent rerun, larger native rung 또는 새로운 failure/scale hypothesis에만 사용한다. |
-| native 성능이 음성으로 증명됐는가? | **아니다.** v107과 여러 초기 family의 bounded negative는 보존되지만 C9 whole-system candidate는 fresh independent native positive다. 이것을 4-node보다 큰 production-scale superiority로 확대하지 않는다. |
-| 연구를 폐기해야 하는가? | **아니다.** actual vLLM/LMCache/Slingshot/business 공동 제어의 4-node value가 검증됐다. 남은 일은 full Kairos/NetKV independent comparison, native scale와 paper artifact를 닫는 것이다. |
+| 현재 TEMPO-GO가 strongest fixed/predictor보다 빠른가? | **아직 미검증이다.** 과거 C9 fresh held-out positive는 historical artifact로 보존하지만, current-source C9 v27과 Candidate J/K는 stressed gate를 통과하지 못했고 Candidate L L8은 outer-timeout partial이었다. |
+| 현재 global candidate를 native로 더 돌려야 하는가? | **그렇다.** v13의 negative를 보존한 Candidate M pressure-spill 7-arm one-shot을 먼저 닫고, 이후 unchanged SOTA comparison과 1/2/4-node scale gate를 수행한다. |
+| native 성능이 음성으로 증명됐는가? | **TEMPO 전체에 대해서는 아니다.** K의 protected-lane policy negative와 L8 execution partial은 각각 mechanism/failure-boundary evidence일 뿐이며, global cross-layer TEMPO 전체의 최종 negative나 positive가 아니다. |
+| 연구를 폐기해야 하는가? | **아니다.** actual vLLM/LMCache/NCCL/Slingshot overload와 cross-layer observation은 재현됐다. 아직 남은 것은 그 상태를 이용한 offered-population utility win, SOTA comparison, native scale와 paper gate다. |
 | 지금 4노드 GPU를 왜 쓰는가? | **새 threshold를 찾기 위해서가 아니다.** frozen whole-system result의 independent replication, SOTA policy reproduction, failure robustness와 larger-rung mechanism을 검증하는 데만 쓴다. |
 
 ### v26/v28 same-allocation discovery 판정
@@ -119,7 +125,7 @@ v29f native attempt는 승인된 4-node/16-GPU allocation `57415765`에서 실�
 | application-only G/I branch | `COMPLETE: CPU NEGATIVE ONLY` | 두 구조적으로 다른 route/admission 후보의 frozen pre-native negative가 machine-check됐다. |
 | cross-layer state plane | `IMPLEMENTED: LIVE OBSERVER + JOINT ACTUATION PATH; NATIVE UTILITY OPEN` | `PairTelemetry.cross_layer`와 `tempo-go-cross-layer-envelope-v1`가 vLLM/LMCache endpoint batch에 연결됐고, Cassini per-NIC/TC vector·support·topology/epoch·derived route externality가 immutable decision provenance에 들어간다. block별 atomic `tempo-nccl-observer-v1` snapshot이 이제 `JointActuationPlan`의 독립적인 local/remote prefill·KV·semantic-op limit와 bounded stagger를 만들고, global admission과 pair router가 같은 plan을 enforce한다. 4-node vLLM/co-job에서 coupled utility를 개선하는 것은 아직 검증 전이다. |
 | 본래 TEMPO cross-layer campaign | `OPEN` | NCCL/Cassini/LMCache/vLLM/business를 결합한 hierarchical global candidate는 아직 만들어지지 않았으므로 G/I negative로 닫을 수 없다. |
-| 다음 native action | `GO FOR C6 WORKLOAD/ACTION QUALIFICATION` | synthetic p07을 headline에서 내리고 actual LMCache/NCCL victim slowdown과 opposite crossover를 먼저 고정한다. 그 뒤 P×D mesh, receiver completion credit, business admission/staggering을 하나의 frozen candidate로 검증한다. |
+| 다음 native action | `GO FOR CANDIDATE M NATIVE VALIDATION` | actual LMCache/NCCL victim slowdown과 opposite crossover는 v13에서 이미 고정됐다. 이제 새 threshold 탐색 없이 M의 pressure-triggered pair spill을 동일 7-arm/210-victim contract에서 검증하고, 그 뒤에만 P×D mesh·SOTA·1/2/4-node gate로 진행한다. |
 
 ---
 
@@ -7180,3 +7186,3709 @@ admission test 하나가 실패했다. C8 실패는 C10 전용 frontend entrypoi
 C8 단독 11/11, C9 independent/C10 focused 27/27이 통과했고, 실제 native arm은 서로 다른
 프로세스이므로 정책 혼입은 없었다. 최종 gate는 이 실제 배포 경계를 따라 C9와 C10을
 분리했으며 최초 실패 receipt도 삭제하지 않는다.
+
+## 73. supported NCCL/LMCache causal-burst 후속: 첫 campaign의 causal negative와 dual-route business lane
+
+이 절은 2026-08-26의 최신 continuation이다. §72의 C9 fresh held-out
+independent positive를 취소하거나 새 threshold tuning으로 대체하지 않는다. 이번
+후속의 목적은 §72.5-3에 남긴 hard gate, 즉 C9에서 unavailable이었던
+`nccl_collective_p99_ms`와 `lmcache_transfer_p99_ms`를 실제 opt-in co-job에서
+supported signal로 만들고, 동일 vLLM P/D workload가 official LMCache/NIXL receiver
+incast와 NCCL collective microburst를 동시에 받을 때 full global controller가
+application-only global policy보다 offered-population robustness를 높이는지 검증하는
+것이다.
+
+### 73.1 frozen causal-burst workload와 첫 allocation
+
+첫 source-bound discovery contract는
+`eval/sota_4node/tempo_go_c9_causal_burst_discovery_contract.json`, SHA
+`d39703cd67ebe610990acb4bcae2738598164922ab568505c2f351164a571020`이다.
+allocation `57622087`은 `gpu_interactive`, 4 nodes/16 A100, 4:00:00 no-shell이며
+노드는 `nid001221,nid001224,nid001225,nid001228`이었다. topology는 Qwen2.5-7B,
+P0-D0-P1-D1, endpoint당 TP4, official `LMCacheConnectorV1` NIXL-UCX와 NERSC
+NCCL AWS Libfabric다. root/container/UDI, privileged NIC/Slingshot 변경과 batch
+job은 사용하지 않았다.
+
+co-job은 두 노드/8 GPU에서 source 4개가 receiver 하나로 각각 4×128 MiB를 보내는
+2 GiB incast block, NCCL 16 MiB×4,096 token iteration, block gap 0.1 s,
+application 시작 뒤 180 s start delay, NIXL transfer timeout 60 s를 사용한다.
+단순 aggressor counter가 아니라 독립 vLLM victim의 SLO/tail과 official transfer/
+collective observer를 함께 측정한다. NIXL timeout은 readiness, 최소 한 개 correct
+active snapshot과 exact timeout signature가 있을 때만 `overload_timeout`이라는
+측정 outcome으로 영수증화하며 setup/rendezvous/CUDA/NCCL 오류와 구분한다.
+
+ABBA order는 `app_global_only`, `full`, `full`, `app_global_only`였고 measured arm은
+재시도하지 않는 계약이다. 첫 세 arm은 terminal inference result를 만들었지만 네 번째
+blind arm은 node-2의 네 번째 vLLM lifecycle이 server startup 전에 정지해 result 없이
+끝났다. 따라서 ABBA campaign 전체의 performance claim은 금지한다.
+
+| arm | normal SLO / p99 | miss-hot SLO / p99 | remote-favorable SLO / p99 | victim route/terminal |
+|---|---:|---:|---:|---|
+| app-global-only A | 53/60 / 30,084 ms | 39/120 / 3,184 ms | 30/30 / 4,802 ms | local 100, remote 29, reject 81 |
+| full A | 60/60 / 3,109 ms | 120/120 / 3,319 ms | 1/30 / 3,131 ms completed subset | local 181, reject 29 |
+| full B | 60/60 / 3,061 ms | 120/120 / 3,391 ms | 8/30 / 5,348 ms completed subset | local 181, remote 7, reject 22 |
+
+full A/B는 normal과 miss-hot collapse를 제거했지만 remote-favorable victim을 각각
+29/30, 22/30 reject했다. 이 짧은 completed-subset p99을 성능 win으로 사용하지
+않는다. 반대로 app-global-only A는 remote-favorable 30/30을 완료했지만 normal
+p99이 30 s로 무너지고 miss-hot 81건을 reject했다. 즉 severe shared burst에서
+한 fixed/global policy가 모든 regime을 지키지 못하는 bottleneck migration은 실제다.
+
+remote-favorable block의 background는 세 유효 arm 모두 1,344/1,344 complete했다.
+full의 victim collapse를 background drop으로 만든 positive로 해석할 수도 없고,
+background completion 손실 때문에 victim이 실패했다고 설명할 수도 없다. 전체
+background는 app-global-only A 2,748/2,748, full A 2,571/2,748, full B
+2,569/2,748이었다. tenant별 offered/completed/reject를 foreground와 분리해
+분모에 보존한다.
+
+co-job은 full A에서 block 5, full B에서 block 2의 official NIXL timeout까지
+correct active observer를 냈다. 마지막 observer의 full-A
+LMCache/NCCL p99은 41,521/1.004 ms, full-B는 5,601/1.123 ms였다. generic Cassini
+availability와 달리 실제 `nccl_collective_p99_ms` 또는
+`lmcache_transfer_p99_ms`가 decision provenance에 들어간 비율은 full A
+30/210(14.29%), full B 23/210(10.95%)였고, supported decision은 모두 bounded
+dispatch stagger와 pair-activation suppression을 실제 적용했다.
+
+authoritative incomplete root는
+`results/tempo_go_c9_causal_burst_job_57622087`이다. 네 번째 arm에는
+`03_app_global_only_b/block_failure_receipt.json`, root에는
+`campaign_failure_receipt.json`과 parser-fix receipt가 있으며, policy/workload
+unchanged, measured-arm retry false, performance claim false를 기록한다.
+
+### 73.2 분석기 보정과 정확한 causal dead end
+
+기존 C9 analyzer는 committed admission만 global decision으로 세고 reject decision과
+shared provenance를 누락했다. 현재 analyzer는 admit+reject를 모두 포함하고,
+generic telemetry availability와 실제 NCCL/LMCache observer support를 분리하며,
+foreground/background offered/completed/rejected/failure/output-token을 별도로
+집계한다. 이 parser 수정은 raw 정책 결과를 바꾸지 않으며 첫 incomplete ABBA를
+positive로 승격하지 않는다.
+
+remote-favorable raw의 causal chain은 다음과 같다.
+
+1. LMCache pressure가 높을 때 remote candidate는 business deadline 안에서
+   infeasible해 `deadline`으로 탈락했다.
+2. 같은 request의 local candidate는
+   `tenant_protected_capacity_reserve`에 막혔다.
+3. global queue는 `global_admission_queue_timeout`으로 끝났다.
+4. 당시 priority service lane은 `vllm_priority_remote_cache_v1`, 즉 exact cache-safe
+   remote request만 사용할 수 있었다. remote가 infeasible해지는 순간 globally
+   committed interactive request가 local vLLM priority lane을 사용할 경로가 없었다.
+
+따라서 이 결과는 “fabric telemetry가 쓸모없다”거나 “remote를 버려야 한다”는
+negative가 아니다. 실제 observer-supported control은 발동했지만 old actuator가
+remote-only라 병목이 remote deadline에서 local reserve로 이동한
+**cross-layer orchestration target failure**다.
+
+### 73.3 route-symmetric business dual-route lane
+
+새 mode `vllm_priority_business_dual_route_v2`는 기존 remote-only mode를 삭제하지
+않고 별도 candidate로 추가됐다.
+
+- global queue lease가 committed local route 또는 exact cache-affinity가 안전한
+  remote route에서만 bounded vLLM priority lane을 사용할 수 있다.
+- local도 global admission, tenant priority, destination ownership, physical
+  decoder capacity와 exactly-once release를 통과해야 한다. local fallback이나
+  request 도중 migration이 아니다.
+- remote는 기존 exact source/cache/edge/deadline/fabric guard를 유지한다.
+- remote-favorable background schedule과 `managed_by_tempo_go=false` 경계는
+  그대로다. 새 mode는 background를 지워 이기지 않고, protected foreground가
+  현재 feasible한 local/remote service lane으로 progress하도록 한다.
+- router는 global commit과 선택 mode가 일치할 때만 local 또는 remote upstream에
+  vLLM priority -2를 적용하고 eligibility/applied receipt를 남긴다.
+
+구현 경계는 `tempo/pd_global_orchestrator.py`,
+`eval/sota_4node/tempo_pd_elastic_router.py`,
+`eval/sota_4node/run_tempo_go_c8_dual_regime_client.py`, profile/contract builder와
+C9 launcher/analyzer다. legacy remote-only contract도 새 v46으로 source-bound해
+보존했고 관련 orchestrator/profile/router/C8/C9 suite는
+`145 passed, 11 subtests passed`, `bash -n`, `py_compile`, `git diff --check`를
+통과했다.
+
+### 73.4 첫 follow-up preflight failure와 새 immutable contract
+
+첫 follow-up base v4/outer contract는 새 mode를 profile과 contract에 올바르게
+기록했지만 native C8 binder가 historical remote-only 문자열만 허용해 네 노드 모두
+server startup 전에 `C8 global priority service-lane binding differs`로 종료됐다.
+이는 0 measured request, inference result 없음의 preflight failure이며 성능 결과가
+아니다. root는
+`results/tempo_go_c9_business_lane_followup_job_57622087`, receipt는
+`failed_attempt.json`과
+`00_app_global_only_a/block_failure_receipt.json`이다. 같은 measured arm은
+재시도하지 않았다.
+
+binder는 profile mode와 contract mode의 exact equality를 계속 요구하면서 legacy
+`vllm_priority_remote_cache_v1`과 새
+`vllm_priority_business_dual_route_v2`만 명시적으로 허용하도록 수정했다. 실제
+native node binding을 호출하는 회귀 테스트가 두 mode 모두 통과한다. preflight
+failure를 supersede하는 새 frozen identity는 다음과 같다.
+
+- base contract:
+  `eval/sota_4node/tempo_go_c9_business_lane_base_contract_v5.json`
+- base SHA:
+  `2cced9897a33899b470df5da5dbb4aee778c68d32c616502299aeb64711dffe5`
+- source inventory: 42/42
+- outer contract:
+  `eval/sota_4node/tempo_go_c9_business_lane_followup_contract_v2.json`
+- outer SHA:
+  `0fcf992908b347145b6568bc27cdcac7941897af33290b029ef125cd8232aa9e`
+- legacy remote-only contract v46:
+  `eval/sota_4node/tempo_go_c8_dual_regime_contract_v46.json`, SHA
+  `9c6ae501b16d55006ccb2cac7945f4239143f2c2b8c67ab8e43b2c7a2c73c9aa`
+
+새 contract도 same-allocation post-hoc discovery이므로
+`performance_claim_allowed=false`, `independent_validation_claim_allowed=false`다.
+ABBA order는 app-global-only A, full dual-route A/B, app-global-only B이고
+measured arm retry는 금지한다. hard gate는 remote-favorable global decision의 actual
+observer support 75% 이상, remote-block background completion 99% 이상 및 blind의
+99% 이상, stressed p99 15% 이상 감소, stressed SLO-good non-regression,
+normal p50 regression 3% 이내다. 이 gate를 결과 뒤 완화하지 않는다.
+
+### 73.5 allocation failure와 현재 GO/STOP
+
+allocation `57622087`은 네 번째 old step이 끝나는 동안
+`Reason=NodeDown`, `FailedNode=nid001225`로 1:04:22에 조기 종료됐다. job 전체
+state는 `NODE_FAIL`; TEMPO가 실행 중 allocation을 취소해 발생한 종료가 아니다.
+exact orphan step을 먼저 정리했고, 이후 사용자의 명시적 확인에 따라 이미
+`NodeDown/COMPLETING`인 old allocation에 `scancel 57622087`을 보냈다. active step은
+없었지만 down-node epilog 정리 때문에 job은 `COMPLETING`에 남았으며, 강제/privileged
+우회는 하지 않았다. 새 v5 캠페인은 이 allocation에서 시작되지 않았다.
+
+NERSC 공식 interactive 문서의 기본 약 6분 timeout과 `--immediate` 경계를 따라
+새 4-node/16-GPU/4-hour no-shell `gpu_interactive` allocation을 요청했다. 기본
+요청 두 번과 `--immediate=1800` 요청은 4개 reserved GPU node가 나오지 않아
+`Unable to allocate resources: Connection timed out`으로 자동 취소됐고 scheduler에
+job을 남기지 않았다. 마지막 단일 요청 `57622992`도 `PD/Priority`에서 후보 노드
+4개가 계속 미끄러진 뒤 `--immediate=3600` 경계에 같은 timeout으로 종료됐으며,
+종료 뒤 `squeue -j 57622087,57622992`에는 old `57622087`의
+`NodeDown/COMPLETING`만 남은 것을 확인했다. 따라서 old allocation 취소는 필요했지만
+새 allocation 미배정의 유일 원인은 아니며, 현재 4-node interactive 가용성과 priority도
+실제 실행 경계다. 중복 watcher/allocation은 없고 다른 계정 job과 unrelated
+debug/regular job은 조회만 하고 변경하지 않는다.
+
+현재 실행 판단은 다음과 같다.
+
+1. **GO:** 정상 4-node allocation이 생기면 node/GPU/QOS/time과 quiescence를 한 번
+   확인하고 v5/outer-v2 ABBA를 새 result root에서 정확히 한 번 실행한다.
+2. **STOP:** v4 failed arm retry, old C9 threshold tuning, background rate 변경,
+   observer gate 완화, root/container/UDI/privileged fabric 설정을 하지 않는다.
+3. full이 gate를 통과하면 §72 C9 independent positive에 severe causal-burst
+   robustness/mechanism evidence를 추가하되 이 same-allocation discovery 자체를
+   independent paper claim으로 쓰지 않는다.
+4. full이 background와 observer gate를 통과하면서 app-global-only보다 못하면
+   dual-route business-lane mechanism을 reproducible negative로 닫는다. observer
+   support가 부족하거나 ABBA가 incomplete면 성능 negative가 아니라 workload/
+   execution boundary로 남긴다.
+5. §72 C9 independent positive는 이 새 workload의 결과와 별개로 유효하다. 새
+   follow-up의 실패를 기존 frozen result에 소급 적용하거나, 반대로 기존 positive로
+   severe burst gate를 통과했다고 주장하지 않는다.
+
+---
+
+## 74. causal-burst 이후의 전체 완료 정의: 1/2/4-node real workload, SOTA와 논문
+
+§73의 한 번의 4-node causal-burst discovery는 전체 목표의 끝이 아니다. 최종 목표는
+actual vLLM P/D, official LMCache/NIXL-UCX, NCCL/Slingshot telemetry와 tenant business
+state를 공동 제어하는 **하나의 frozen TEMPO cross-layer global orchestrator**를
+확정하고, 같은 offered population과 같은 물리 자원 아래 1/2/4-node에서 다양한 실제
+workload를 사용해 strongest fixed, simple predictor와 구현 가능한 SOTA 2--3개보다
+좋은 latency/goodput/tail/fairness를 fresh validation으로 증명한 뒤 논문을 완성하는
+것이다. 이 완료 정의를 §73 mechanism test나 기존 C9 한 점의 결과로 축소하지 않는다.
+
+### 74.1 실행 순서와 변경 금지 경계
+
+1. 정상 4-node `gpu_interactive` allocation이 확보되면 먼저 §73 outer-v2 ABBA를
+   unchanged one-shot으로 실행한다. allocation·노드·GPU·QOS·시간·quiescence receipt
+   전에는 GPU step을 시작하지 않는다.
+2. §73 결과로 dual-route lane을 채택하거나 mechanism-negative로 닫는다. 결과를 본 뒤
+   gate, workload rate, burst timing, observer scope를 바꾸어 같은 run을 성공으로 만들지
+   않는다.
+3. 그 뒤 final TEMPO source/profile/contract를 동결한다. discovery와 independent
+   validation 사이에는 policy·threshold·workload implementation을 변경하지 않는다.
+4. topology는 1/2/4-node 각각에서 **동일한 총 GPU 수를 가장한 비교가 아니라**, 각
+   scale 내부에서 모든 policy가 같은 node/GPU/P-D role/TP/model/KV budget을 사용하도록
+   고정한다. scale별 절대 capacity와 offered load는 별도 capacity sweep으로 먼저
+   측정하고 정규화한다.
+5. headline workload는 최소한 trace-driven conversational/reuse, long-context
+   miss-heavy, remote-reuse-favorable, bursty multi-tenant SLO mix를 포함한다. synthetic
+   steady state나 fabric aggressor만 headline으로 사용하지 않고, 각 trace의 출처,
+   prompt/output length, prefix reuse, arrival process, tenant/SLO와 overload 배수를
+   machine-readable manifest에 고정한다.
+6. baseline은 local/remote/queue-GPU strongest fixed와 simple predictor를 항상 포함한다.
+   SOTA는 현재 actual-carrier NetKV와 공개 경계가 명시된 Kairos reproduction을 포함하고,
+   제3 후보는 공식 논문·공개 구현·현재 vLLM/Perlmutter에서 재현 가능한 action space를
+   확인한 뒤 동결한다. 이름만 붙인 근사 구현이나 TEMPO에 유리한 축소판을 full SOTA로
+   표기하지 않는다.
+7. 각 scale/workload의 discovery는 policy order를 counterbalance하고, 최종 headline은
+   source와 contract가 unchanged인 **새 allocation의 independent run**으로 반복한다.
+   failed setup, timeout-as-overload와 policy terminal을 구분하고 offered-population
+   분모에서 reject/failure를 숨기지 않는다.
+8. 마지막에 README와 논문을 aggregate analysis에서 다시 생성·검증한다. C9 independent,
+   C10 post-hoc, §73 discovery와 scale validation의 claim boundary를 분리하고 raw/result/
+   contract SHA, 실패 receipt, baseline limitation과 재현 명령을 artifact manifest에
+   넣는다. PDF build, citation/reference, 표·그림 시각 검사와 scoped Git diff를 통과해야
+   완료다.
+
+### 74.2 scale/workload 공통 hard gate
+
+모든 headline 비교는 같은 offered request population을 사용하고 completion, reject,
+failure, SLO-good, request/output-token goodput, E2E p50/p95/p99, TTFT/TPOT,
+tenant fairness/background utility를 함께 보고한다. TEMPO positive는 최소한 다음을
+동시에 만족해야 한다.
+
+- normal-load p50 regression `<=3%`와 SLO-good non-regression,
+- overload/microburst에서 strongest fixed 및 predictor 대비 stressed p99 `>=15%`
+  감소 또는 SLO-good/goodput의 사전 동결된 유의미한 증가,
+- 비교 대상보다 reject/failure를 늘려 completed-only latency를 낮춘 결과 금지,
+- victim 개선을 위해 opt-in background completion을 무너뜨린 결과 금지,
+- actual NCCL/LMCache observer support, route/admission/pair/priority actuation과
+  exactly-once release provenance 충족,
+- scale별 반복과 fresh validation에서 방향·크기가 재현되고 bootstrap confidence
+  interval과 run-to-run variance가 보고될 것.
+
+어떤 scale/workload에서 이 gate를 충족하지 못하면 raw와 failure receipt를 보존하고
+그 범위의 재현 가능한 negative로 보고한다. 이를 TEMPO 전체의 존재 부정으로 확대하지
+않는 동시에, 통과하지 않은 셀을 기존 C9 positive로 덮어쓰지도 않는다. 전체 논문 claim은
+실제로 fresh validation을 통과한 scale, workload와 baseline 범위까지만 허용한다.
+
+### 74.3 official Mooncake FAST'25 real-trace intake와 현재 구현 경계
+
+§74.1의 “trace 출처와 population을 먼저 machine-readable하게 고정한다”는 gate를
+2026-08-26에 구현했다. moving `main`이나 임의 길이 분포를 사용하지 않고 Mooncake
+공식 저장소 commit `cafc50785855f7904c7de7727a6c0baf5c7a3dc8`의 FAST'25 release를
+사용한다. upstream README가 공개한 세 workload와 현재 local receipt는 다음과 같다.
+
+| trace | requests | bytes | upstream Git blob | local SHA-256 |
+|---|---:|---:|---|---|
+| conversation | 12,031 | 3,029,533 | `5a371794b81d7fc7487ec8a02a2c631bcc7fbdf8` | `b8cbb061a85206d729d91cdc2981f43c9e0d99209dce588d3af5f7934408b9df` |
+| toolagent | 23,608 | 4,415,857 | `b765599d1e0828b37f68d481563c385d3c11de54` | `48a2db1a13d3bc05e6330140c64f604ba366df20d3c9e128b5c35a01c1fa5f71` |
+| synthetic | 3,993 | 1,136,313 | `e4838049c0dcfc358a5f24ab08251279475cba94` | `bd070915a98fc0ed264d7cfef2ce746002eb3076a695ec31ba2674c0111ec131` |
+
+authoritative source manifest는
+`eval/sota_4node/data/mooncake_fast25/source_manifest_v1.json`이고 SHA-256은
+`05805168bd5c6be4d258cce1e134a5149ccf1eb9fafa69e8545ae108485bdd1a`다. raw
+JSONL은 재다운로드 가능한 third-party data라 `.gitignore`하고 manifest의 exact URL,
+commit, byte count, blob ID와 SHA로 검증한다. 각 row의 exact schema,
+timestamp monotonicity, positive input/output, 그리고
+`len(hash_ids) == ceil(input_length / 512)`를 전 row에서 확인한다.
+
+새 `tempo/mooncake_fast25_workload.py`와
+`eval/sota_4node/build_tempo_go_mooncake_workload.py`는 다음을 fail closed한다.
+
+1. source trace에서 contiguous index window만 선택하고 첫 timestamp 기준 arrival을
+   보존한다. load multiplier를 적용하면 그 값과 effective offered rate를 sidecar에
+   기록한다.
+2. 동일 trace의 동일 `hash_id`를 항상 동일한 512-token block으로 물질화하여 공개된
+   prefix-sharing relation을 보존한다. 원문 prompt를 복원했다고 주장하지 않는다.
+3. `max_model_len` 초과는 `reject` 또는 prefix-preserving right clip 중 하나를 명시하고,
+   clipped request/token을 모두 센다. output 1-token row의 TPOT 측정을 위한 floor와
+   runtime-bound cap도 조정 request/token 수를 모두 센다. silent drop은 0이어야 한다.
+4. source SHA, semantic population SHA, materialized workload SHA, token-ID interval,
+   original/effective length distribution과 eviction을 가정하지 않은 prior reusable-prefix
+   upper bound를 sidecar에 보존한다.
+5. runtime tokenizer vocabulary/special-token 검증은 별도 native preflight hard gate이며,
+   이 offline materializer 결과만으로 실제 LMCache hit 또는 성능 claim을 허용하지 않는다.
+
+conversation index 0의 contiguous 64 requests를 4배 arrival, max context 32,768,
+output 2--512로 물질화한 bounded smoke는 64/64 schema 검증을 통과했다. effective
+offered rate는 14.0 request/s, context clip은 3 requests/74,349 input tokens, output
+cap은 15 requests/1,891 tokens, output floor는 1 request/1 token이었다. 63/64 requests가
+선행 요청과 최소 512-token complete leading prefix를 공유했다. 이 수치는 workload
+qualification receipt이지 TEMPO 성능 결과가 아니다.
+
+frozen C9/§73 source inventory를 바꾸지 않기 위해 실제 carrier 연결은 별도 파일로
+구현했다.
+
+- `eval/sota_4node/tempo_pd_real_trace_frontend.py`: token-ID prompt의 canonical
+  namespace/cache-group key를 계산하고 나머지 admission/routing/failure/stream lifecycle은
+  기존 canonical frontend에 위임한다.
+- `eval/sota_4node/run_tempo_go_real_trace_stream.py`: semantic trace ID를 arm·business
+  tenant wire ID로 사전 결정하고 token list, deadline, tenant header를 strict client에
+  전달한다. source arrival 위에 별도 request-rate override를 금지하고, 현재 synchronous
+  adapter는 client queue artifact를 막기 위해 `max_workers >= request_count`와 shared
+  ingress를 요구한다.
+- `eval/sota_4node/tempo_go_real_trace_business_profile_discovery_v1.json`: capacity sweep
+  전 discovery에서는 네 tenant를 균등 배치하되 숫자 deadline을 날조하지 않고 frozen
+  endpoint/global profile에 위임한다. scale별 capacity가 측정된 뒤 numeric SLO profile을
+  별도로 동결해야 한다.
+
+현재 CPU gate는 source/parser/materializer 6개와 client wire/payload 3개, 총 9개
+`unittest`가 Python 3.11에서 통과했고 관련 파일 `py_compile`과 `git diff --check`도
+통과했다. 반면 token-list frontend의 actual vLLM/LMCache native preflight, 32K engine
+capacity, natural partial-prefix hit receipt, 1/2/4-node saturation point는 아직 측정하지
+않았다. 따라서 다음 순서는 여전히 (a) 정상 4-node allocation에서 §73 frozen ABBA,
+(b) 별도 real-trace server preflight와 per-scale capacity sweep, (c) workload/SOTA
+contract freeze다. 이 offline 구현을 기존 C9 positive나 새 real-workload win으로 세지
+않는다.
+
+### 74.4 allocation `57623583` admission과 scratch inode hard stop
+
+2026-08-26에 NERSC 공식 interactive 문서의 외부 submit form
+`--qos=interactive --constraint=gpu --gpus=16`으로 새 no-shell allocation
+`57623583`을 확보했다. Slurm receipt는 `QOS=gpu_interactive`, `NumNodes=4`,
+`gres/gpu=16`, `TimeLimit=04:00:00`, nodes
+`nid[001208-001209,001212,001232]`, start/end
+`06:06:47/10:06:47 UTC` 예정이었다. 네 노드의 A100 16장은 admission 시점에 모두
+GPU utilization 0%, memory 0 MiB였다. old `57622992`는 이미 cancelled이고,
+`57622087`은 `NODE_FAIL` 뒤 down-node epilog 때문에 `COMPLETING`일 뿐 새 allocation의
+GPU를 점유하지 않았다.
+
+그러나 measured arm 시작 전 `/pscratch` user inode는 10,160,690개로 soft quota
+10,000,000을 160,690개 초과했고 grace가 expired였다. NERSC 공식 quota/job 문서상
+이 상태에서는 새 data write가 거부되며 job submit뿐 아니라 running job의 새 `srun`
+시점에도 quota check가 수행될 수 있다. 실제 Mooncake window manifest의 새 파일 생성은
+`EDQUOT`으로 실패했다. 따라서 result tree와 per-node log를 많이 생성하는 frozen
+ABBA를 시작하면 performance 이전에 artifact가 불완전해질 수 있어 hard stop했다.
+
+원인을 공유 filesystem 전체에서 추측하지 않고 이 repository의 명시된 경로만 bounded
+집계했다. `results/`는 520,764 entries, `.vllm_venv` 70,710,
+`.sota_venv` 29,571이며, 재생성 가능한 `*.pyc`는 17,570개뿐이라 cache 삭제만으로
+quota 아래로 내려갈 수 없다. `results/*574*/observer-history` 122개 디렉터리는
+265,946 entries라 quota를 회복할 수 있는 보존-archive 후보였다. project CFS
+`/global/cfs/cdirs/m1248`은 당시 288.17 TiB/350 TiB, 32.27 M/50 M inode였다.
+
+후보 목록은
+`/global/cfs/cdirs/m1248/sgkim/Skim-Tempo-archives/quota-recovery-20260826-job57623583/candidate-dirs.txt`
+에 기록했고 SHA-256은
+`9955cff1519df685248a9d2518c81e7b65092f44592a75af9f4ebb9d37605ad2`다. 하지만
+non-destructive tar attempt가 첫 old telemetry read에서 Lustre
+`cl_sync_io_wait`에 들어가 0-byte partial 상태로 멈췄다. `du`와 size-attributed
+`lfs find`도 같은 wait를 보인 반면 name-only bounded `lfs find`는 완료됐다. archive
+검증이 없으므로 old result, observer history, source snapshot은 한 개도 삭제하지
+않았다. 이 상태는 TEMPO performance negative나 interconnect failure가 아니라
+**measured campaign admission 이전의 filesystem quota/execution boundary**다.
+
+세 metadata read step은 각각 Lustre kernel wait에서 SIGKILL 뒤 terminal이 됐지만,
+allocation은 `06:32:38 UTC`에 `NODE_FAIL`, `FailedNode=nid001208`, `ExitCode=0:1`로
+조기 종료됐다. `nid001209`, `nid001212`, `nid001232`는
+`auto:drain:lustre:lfs-check-all`, `nid001208`은 exact `du` step을 kill하지 못한
+`Kill task failed (JobId=57623583 StepId=1)`로 drain됐다. SIGKILL은 이 agent가
+자신이 시작한 bounded metadata steps에만 보냈고 allocation이나 다른 사용자 job을
+취소하지 않았다. 하지만 kernel I/O wait에서 kill을 보낸 결과 `nid001208` drain에
+기여했으므로 같은 방식의 inode-size scan/archive를 interactive GPU node에서 반복하지
+않는다. CFS의 0-byte `.partial`만 terminal 확인 뒤 제거했고 candidate list는 receipt로
+보존했다. inference arm, victim request, co-job traffic은 하나도 시작하지 않았으므로
+이 allocation에는 performance sample이 없다.
+
+현재 GO 순서는 변하지 않는다.
+
+1. user scratch inode를 최소 200,000개 이상 안전하게 archive/정리해 soft quota 아래와
+   새-file write를 확인한다. frozen evidence나 unrelated user data를 임의 삭제하지 않는다.
+2. `57623583`과 drain된 nodes의 scheduler cleanup은 NERSC에 맡기고 privileged recovery,
+   node reconfiguration, 반복 metadata scan을 하지 않는다.
+3. quota와 scheduler 상태가 정상화된 뒤에만 새 승인 4-node interactive allocation을
+   하나 요청하고, fresh node/GPU/quiescence receipt 뒤 outer-v2 ABBA를 unchanged
+   one-shot으로 실행한다.
+4. quota 해결 전 workload/rate/gate를 줄이거나 CFS log latency가 섞인 emergency
+   launcher로 performance claim을 만들지 않는다.
+
+### 74.5 quota 지속 상태와 full SOTA carrier의 CFS clean-room 구현
+
+2026-08-26 후속 확인에서도 `/pscratch` user inode는 정확히
+`10,160,690 / 10,000,000`으로 grace expired 상태였다. bytes 사용량은 quota 원인이
+아니며 `lfs quota -u sgkim /pscratch/sd/s/sgkim`은 일부 device가 unavailable이라는
+경고도 함께 반환했다. 새 GPU allocation은 요청하지 않았고 §73 frozen ABBA도 시작하지
+않았다. `57622087`은 여전히 down-node epilog의 `CG`이고 `57623583`은
+`NODE_FAIL` terminal receipt만 남는다. unrelated user Slurm job은 조회만 하고 변경하지
+않는다.
+
+scratch에 새 source inode를 만들 수 없으므로 다음 clean-room 구현은 project CFS의
+`/global/cfs/cdirs/m1248/sgkim/Skim-Tempo-cfs-dev-20260826`에만 staging했다. 이 경로는
+아직 repository canonical source도, frozen contract도, native performance result도
+아니다. scratch quota가 회복되면 관련 파일을 명시적으로 port하고 source inventory와
+SHA를 새 contract에서 동결해야 한다.
+
+최종 headline SOTA 우선순위도 명확히 했다. C10의 NetKV는 natural prefix LCP와 실제
+completion-driven self-inflight가 빠진 approximation이고 Kairos는 `X={512}` subset이므로
+그 결과를 full SOTA로 승격하지 않는다. 새 primary 비교군은 (1) NetKV Algorithm 1의
+full policy action과 (2) NVIDIA Dynamo의 문서화된 default KV/load router다. Kairos의
+dynamic `{2048,1024,512,256,128}` scheduler는 실제 per-request vLLM scheduler handoff가
+완료될 때만 제3 비교군으로 쓰며, 그렇지 않으면 appendix subset 경계를 유지한다.
+
+CFS의 `tempo/pd_scale_paper_baselines.py`는 다음 policy core를 별도로 구현한다.
+
+- vLLM `BlockStored/BlockRemoved/AllBlocksCleared`의 parent-chain natural prefix index,
+  sequence gap/conflict/staleness fail-closed와 mixed full/partial block LCP;
+- NetKV memory feasibility, effective missing KV bytes, static/measured network oracle,
+  external congestion, completion 전까지 유지되는 self-inflight, queue와 first-decode-step
+  cost 및 score/commit 분리;
+- Dynamo documented default cost와 first-token prefill release/full-completion decode release의
+  exactly-once active-load ledger;
+- Kairos dynamic largest-safe chunk schedule와 scheduler schedule book(비-headline 후보).
+
+`tempo/vllm_kv_event_plane.py`는 source-bound vLLM 0.26 msgpack/ZMQ wire의
+topic·8-byte sequence·DP-rank를 검증하고, live SUB를 replay 전에 연결한 뒤 sequence 0부터
+ROUTER replay하는 intake를 구현한다. non-local 또는 non-full-attention event는 receipt와
+함께 제외하고, malformed batch/replay timeout/gap은 cache miss로 꾸미지 않고 worker index를
+unsupported로 만든다. fresh process에서 replay가 비어 있는 경우만 sequence `-1`의 explicit
+empty-startup receipt를 허용하고 첫 publisher sequence 0을 그대로 받는다.
+
+현재 Python 3.11 CPU gate는 baseline/event-plane 총 `22 tests`가 모두 통과한다. 반면
+installed `.vllm_venv`의 실제 `KVEventBatch` encode/decode compatibility probe는 Python
+process가 `/pscratch`의 `cl_sync_io_wait`에 들어가 terminal 결과를 만들지 못했다. 동일
+시점에 과거 pytest와 CFS rsync도 같은 wait에 남아 있으므로 강제 종료나 반복 import를 하지
+않는다. 이는 implementation pass도 fail도 아니며 filesystem health가 회복된 뒤 exact
+vLLM wire probe를 다시 한 번 수행해야 하는 execution boundary다.
+
+따라서 다음 GO 순서는 다음과 같다.
+
+1. old evidence를 검증 가능한 CFS archive로 옮기거나 사용자가 지정한 재생성 가능 경로를
+   정리해 scratch inode를 최소 200,000개 회복하고, 새 파일 생성과 actual vLLM import를
+   각각 한 번 확인한다.
+2. 정상 scheduler/filesystem 상태에서 한 개의 4-node/4-hour `gpu_interactive` allocation만
+   확보해 §73 outer-v2 ABBA를 source/workload/gate 변경 없이 one-shot 실행한다.
+3. dual-route mechanism 판정 뒤 final TEMPO를 freeze하고, precise KV event carrier에
+   NetKV와 Dynamo를 연결한다. 이름만 바꾼 C10 approximation을 재사용하지 않는다.
+4. Mooncake real-trace native preflight와 scale별 capacity sweep 후 1/2/4-node offered load를
+   정규화하고 fixed/predictor/NetKV/Dynamo/TEMPO를 counterbalanced discovery와 fresh
+   validation으로 비교한다.
+5. 각 단계에서 reject/failure/background utility와 unsupported telemetry를 분모에서
+   보존하고, 실제 native result가 생기기 전에는 새 성능 개선 수치를 쓰지 않는다.
+
+### 74.6 allocation `57631504`: phase-gated 4-node v2 campaign 결과와 dual-route 경계
+
+2026-08-26의 allocation `57631504`에서 v2 scale-paper campaign을 완료했다. receipt는
+`gpu_interactive`, 4 nodes/16 A100, 4시간, nodes
+`nid002097,nid008209,nid008212,nid008472`를 기록한다. node `nid002097`은 A100-SXM4
+40 GB 네 장이고 나머지 세 노드는 80 GB 네 장으로, 이 heterogeneous capacity는 모든
+정책에서 동일했다. source-bound contract는 actual vLLM P/D, official LMCache/NIXL-UCX,
+NCCL AWS Libfabric을 사용했고, co-job은 4 source → 1 receiver의 512 MiB/block
+incast와 4,096 token NCCL iteration을 사용했다. 각 block의 burst는 inference의
+정확한 control marker 뒤에 시작되도록 phase gate를 적용했다.
+
+6개 counterbalanced arm은 모두 inference와 co-job correctness를 완료했고, 모든 co-job의
+background payload 512 MiB/block은 검증됐다. 자동 verifier는 `null p99`인 완전 reject
+정책의 사후 분석을 허용하지 않아 실패했지만 raw/result/phase receipt는 완전하다. 따라서
+아래는 verifier 승격 결과가 아니라, 분모를 보존한 post-hoc discovery 집계다.
+
+| policy arm | offered | completed / SLO-good | global reject | failure | all-population e2e p99 |
+|---|---:|---:|---:|---:|---:|
+| NetKV A | 210 | 29 / 29 | 176 | 5 | 6,095.6 ms |
+| Dynamo A | 210 | 0 / 0 | 210 | 0 | null |
+| TEMPO remote-only A | 210 | 181 / 178 | 29 | 0 | 8,159.7 ms |
+| TEMPO remote-only B | 210 | 181 / 176 | 29 | 0 | 8,516.9 ms |
+| Dynamo B | 210 | 0 / 0 | 210 | 0 | null |
+| NetKV B | 210 | 3 / 1 | 207 | 0 | 54,674.8 ms |
+
+동일 co-job observer의 background completion p99은 arm 순서대로 NetKV A 51.72초,
+Dynamo A 53.84초, TEMPO A 93.90초, TEMPO B 92.51초, Dynamo B 59.66초,
+NetKV B 55.04초였다. NCCL token-tail p99은 baseline/NetKV에서 약 5.3 ms였고
+TEMPO A/B에서는 약 36.75 ms까지 관측됐다. 즉 realistic한 부하에서 병목은 실재한다.
+단일 NCCL 수치 하나로 원인을 단정할 수는 없지만, official LMCache/NIXL transfer
+completion tail이 50--94초로 폭증하고 NCCL collective tail도 같은 burst 구간에서
+상승했다. interconnect가 항상 steady-state로 100% 포화되어야만 문제가 생기는 것이
+아니라, receiver incast와 decoder admission이 겹치는 순간적인 shared-fabric/memory
+pressure가 service time과 tail을 폭발시킬 수 있다는 증거다.
+
+이 수치의 해석에는 중요한 제한이 있다. TEMPO가 더 빨리 foreground lifecycle을 끝내므로
+arm별 co-job이 노출한 총 burst block 수와 makespan이 같지 않다. 따라서 co-job p99의
+정책 간 우열을 headline으로 사용하지 않는다. 반면 모든 정책은 같은 210 offered victim
+population, 같은 phase 순서, 같은 node/GPU mapping, 같은 co-job contract를 사용했고,
+reject/failure는 숨기지 않았다. 현 v2가 안전하게 말할 수 있는 결론은 다음 두 가지다.
+
+1. 포화/마이크로버스트 문제는 Perlmutter 4-node actual carrier에서 재현된다. baseline의
+   `0/210` 또는 `29/210` completion은 단순 synthetic aggressor만의 결과가 아니라,
+   실제 vLLM P/D 요청과 official LMCache/NIXL receiver가 함께 있을 때의 offered-population
+   collapse다.
+2. 기존 TEMPO remote-only actuator는 정상·miss-hot 요청을 176--178 SLO-good으로
+   보존했지만 remote-favorable route는 각 TEMPO arm에서 1/30만 완료했다. 이는
+   telemetry 부족의 negative가 아니라 remote deadline infeasible → local protected
+   reserve → global queue timeout으로 병목이 이동한 actuator target failure다.
+
+따라서 v2 결과만으로 “TEMPO 최종 승리” 또는 “dual-route가 해결했다”고 주장하지 않는다.
+후속 dual-route contract
+`eval/sota_4node/tempo_go_c9_business_lane_followup_contract_v2.json`도 같은
+allocation에서 시도했다. attachment/resource/경로 오류를 고친 뒤 첫
+`app_global_only A` arm은 다음을 기록했다.
+
+| partial arm | offered | completed / SLO-good | reject / failure | all p50 / p95 / p99 | hot SLO-good | remote-favorable |
+|---|---:|---:|---:|---:|---:|---:|
+| app-global-only A | 210 | 210 / 204 | 0 / 0 | 3,066 / 3,637 / 31,423 ms | 148/150 | 30/30 |
+
+이 partial arm은 remote-only failure의 재현과 baseline reference일 뿐이며, full
+`vllm_priority_business_dual_route_v2` arm은 시작하지 못했다. 첫 inference result는
+terminal contract를 만족했고 co-job은 block 6의 공식 LMCache/NIXL timeout-as-overload를
+기록했다. 다만 다음 arm 전 quiescence probe가 parent attach step의 CPU cpuset에
+`--cpu-bind=cores`를 적용하다가 `Unable to satisfy cpu bind request`로 exit 192가 되어
+frozen outer ABBA가 정상적으로 중단됐다. 이는 inference/TEMPO 결과 실패가 아니다. 이
+결과는 setup/performance claim을 만들지 않으며, 새 arm을 같은 계약으로 재시도하지 않는다.
+`--cpu-bind=none` 및 allocation-level node-list 파싱을 적용한 수정 launcher와 새
+source-bound contract는
+`eval/sota_4node/tempo_go_c9_business_lane_base_contract_v7.json` 및
+`eval/sota_4node/tempo_go_c9_business_lane_followup_contract_v4.json`으로 준비했고,
+C9/C8 regression 18개가 통과했다. 관련 result root는
+`results/tempo_go_c9_business_lane_followup_job_57631504_final`이다.
+
+v2 collapse 결과는 frozen verifier의 `null p99` 정책 처리 한계 때문에 verifier 승격이
+아닌 것으로 끝났으므로, 원시 artifact를 수정하지 않는
+`eval/sota_4node/analyze_scale_paper_causal_sota_v2_posthoc.py`를 추가했다. 이 analyzer는
+완료 victim이 0인 정책의 p99를 null로 보존하면서 offered/completed/SLO/reject/failure와
+co-job background/NCCL tail을 함께 출력한다. 재생성된
+`results/tempo_scale_paper_causal_sota_v2_job_57631504/posthoc_analysis.json`은 6개 arm
+모두 population/terminal correctness gate를 만족함을 확인한다.
+
+현재 연구 결론과 다음 gate는 명확하다.
+
+- **확정:** contention이 실제로 생기며, LMCache/NIXL receiver tail·NCCL tail·decoder
+  business admission을 한 정책으로 공동 관측해야 한다. 정상부하 한 점이나 local-only
+  측정으로는 이 현상을 보지 못한다.
+- **미확정:** route-symmetric dual-route TEMPO가 remote-only보다 offered-population,
+  tail, fairness를 실제로 개선하는가. 이를 v2 결과로 추정하지 않는다.
+- **다음 실행:** scratch/quota와 allocation이 정상인 뒤, 동일 source/workload/gate를
+  새 승인 4-node interactive allocation에서 dual-route outer-v2 ABBA로 한 번 수행한다.
+  이후 final TEMPO를 동결하고 Mooncake real trace, 1/2/4-node capacity sweep,
+  NetKV/Dynamo/Kairos의 재현 가능한 action space를 연결한다. 그때에만 independent
+    validation과 논문 headline 수치를 만든다.
+
+### 74.7 allocation `57637968`: C9 pair-local v3 결과와 observer-gated v4 수정
+
+2026-08-26에 allocation `57637968`에서 C9 pair-local receiver-price
+campaign v3의 4-arm ABBA를 완료했다. allocation은 4-node/16-A100
+`gpu_interactive`였고, 각 arm은 실제 vLLM TP4 P/D, official
+`LMCacheConnectorV1` NIXL-UCX, NCCL `AWS Libfabric` transport와 같은
+4-to-1 receiver-incast co-job을 사용했다. `app_global_only`와
+`full_c7_managed_background`를 A/B 순서로 counterbalance했으며, 결과는
+`results/tempo_go_c9_pair_local_campaign_v3/job_57637968/analysis.json`에
+보존했다.
+
+v3의 population-level result는 다음과 같다. 두 blind arm의 결과를 합친
+비교이며, reject나 failed request를 completed-only latency에서 제거하지
+않았다.
+
+| regime | blind p99 (A/B) | full p99 (A/B) | aggregate p99 reduction | blind SLO-good | full SLO-good |
+|---|---:|---:|---:|---:|---:|
+| normal | 34.017 / 32.873 s | 3.233 / 3.228 s | 90.34% | 56/60 | 60/60 |
+| miss-hot | 3.727 / 5.031 s | 3.380 / 3.346 s | 23.20% | 120/120 | 120/120 |
+| remote-favorable | 3.369 / 10.800 s | 3.707 / 3.194 s | 51.29% | 29/30 | 30/30 |
+
+normal p50은 full이 blind보다 1.02% 낮았고, miss-hot은 0.21% 높았으며,
+remote-favorable는 1.96% 높았다. aggregate route count는 local 180,
+remote 30으로 같았지만, full arm의 local edge가 stress를 받은 `d0`에서
+`d1`로 이동했다. 즉 이번 결과는 global pair/edge selection과 business
+admission이 실제 receiver-incast 상황에서 tail을 줄일 수 있다는 strong
+discovery evidence다. 그러나 이 수치만으로 pair-local NCCL telemetry의
+인과 효과를 주장하지 않는다.
+
+v3에서 새로 도입한 pair-local observer의 실제 coverage는 다음과 같다.
+
+| gate | result | 정확한 해석 |
+|---|---:|---|
+| correctness/native transport | true | victim output/stream와 official native path는 유효 |
+| full observer supported decisions | 0 | pair-local NCCL/LMCache observer가 victim decision 시점에 valid하지 않음 |
+| full cross-layer actuation observed | false | observer signal에 의한 새 local-receiver price actuation을 증명할 수 없음 |
+| stressed p99 reduction | true | 기존 global admission/edge/business path의 성능 효과는 관측됨 |
+
+원인은 observer parser가 잘못된 값을 받아들인 것이 아니다. C9 launcher가
+co-job peer-init만 기다리고 victim start marker를 release했기 때문에 첫
+victim control block이 observer 첫 snapshot보다 먼저 끝났다. 이후 co-job은
+실제 official LMCache/NIXL `batched_write` 60초 timeout으로 종료됐고,
+뒤따른 victim block에서는 observer가 stale해져 fail-closed
+`not_collected`가 됐다. observer 파일의 마지막 receipt는
+`producer_state=active`, `correctness_met=true`였지만, 이후 victim 요청
+시점에는 freshness window를 벗어났다. 이것은 telemetry를 0으로 합산한
+것이 아니라, 잘못된 cross-host 또는 stale evidence를 policy 입력으로
+사용하지 않은 정상적인 safety 동작이다.
+
+따라서 v3의 허용 claim boundary는 다음으로 고정한다.
+
+> 동일한 4-node actual vLLM P/D와 official LMCache/NIXL receiver-incast
+> workload에서 full TEMPO global route/admission path가 blind global
+> ablation보다 normal/miss-hot/remote-favorable tail을 줄인 discovery
+> evidence가 있다. 단, pair-local NCCL/LMCache observer가 그 개선의
+> 원인이었다는 claim과 independent validation claim은 아직 허용하지 않는다.
+
+이 boundary를 닫기 위해 `eval/sota_4node/run_tempo_go_c9_causal_burst_discovery_in_allocation.sh`에 observer gate를 추가했다. 초기 구현을 static inspection하는 과정에서 co-job도 같은 `start_file`을 기다리는 순환 의존성을 발견해 실제 실행 전에 제거했다. 최종 bootstrap gate에서는 co-job이 victim start marker 없이 먼저 bootstrap block을 수행하고 observer를 publish하며, victim만 observer-ready 이후 `start_file`로 release된다. victim release 전에 반드시
+
+1. `nccl_observer.json` 존재,
+2. `producer_state=active`,
+3. `correctness_met=true`,
+4. `sequence >= 1`
+
+을 확인한다. peer initialization과 measurement readiness를 분리했으며,
+stale snapshot의 max-age를 늘려 결과를 맞추는 방식은 사용하지 않는다.
+이 launcher 변경을 위해 기존 v3/historical source inventory를 덮어쓰지
+않고, 중간 deadlock 가능성이 있는 v4 artifact도 실행용으로 재사용하지
+않으며, 다음 별도 source-bound v5 artifact를 만들었다.
+
+- profile: `results/tempo_go_c9_pair_local_campaign_v5/real_tempo_go_c9_pair_local_profile_v5.json`
+- base contract: `eval/sota_4node/tempo_go_c9_pair_local_base_contract_v5.json`
+- contract: `eval/sota_4node/tempo_go_c9_pair_local_contract_v5.json`
+- observer gate: `active_correct_sequence_at_least_one_before_victim_release`
+- bootstrap policy: `cojob_runs_before_victim_start_file; victim_release_waits_for_active_snapshot`
+
+v5 base inventory 44개와 contract inventory 11개의 현재 SHA가 각각
+불일치 0임을 확인했다. 관련 controller/router/observer 테스트는
+`127 passed`, Python compile과 launcher `bash -n`도 통과했다. 기존 frozen
+business contract test의 한 failure는 historical base contract가 이전
+launcher SHA를 의도적으로 고정하고 있기 때문이다. 이를 수정해 old
+receipt를 소급 변경하지 않는다.
+
+현재 allocation `57637968`은 v3 완료 후에도 약 30분만 남았고, v3 arm별
+소요가 약 11분이었다. 따라서 v5 전체 ABBA를 시작하면 allocation 종료 중
+partial result가 될 위험이 있어 실행하지 않았다. 다음 새 4-node
+interactive allocation에서 v5를 one-shot 실행하고, 먼저
+`full_cross_layer_supported_decisions > 0` 및 실제
+`lmcache_transfer_p99_ms`/NCCL signal contribution을 확인한다. 그 뒤에야
+fixed/predictor/TEMPO의 independent validation, real-trace workload와
+1/2/4-node scale/SOTA 비교에 v3 성능 수치를 연결한다.
+
+### 74.8 allocation `57643774`: v5 bootstrap-gated ABBA 완료 결과
+
+새 4-node `gpu_interactive` allocation `57643774`에서 v5의 네 arm을
+끝까지 실행했다. 모든 victim arm은 actual vLLM P/D와 official
+LMCache/NIXL-UCX를 사용했고, co-job은 Perlmutter NCCL `AWS Libfabric`
+over Slingshot/CXI 경로에서 `incast_4to1`을 수행했다. 네 arm 모두 210/210
+victim request가 terminal contract를 만족했고 native transport gate도
+통과했다. 결과 원본은
+`results/tempo_go_c9_pair_local_campaign_v5/job_57643774/analysis.json`이다.
+
+| regime | app-global-only aggregate p99 | full TEMPO business aggregate p99 | p99 reduction | blind SLO | full SLO |
+|---|---:|---:|---:|---:|---:|
+| normal | 32.686 s | 3.280 s | 89.96% | 111/120 | 120/120 |
+| miss-hot | 3.617 s | 3.324 s | 8.10% | 240/240 | 240/240 |
+| remote-favorable | 23.906 s | 4.875 s | 79.61% | 54/60 | 60/60 |
+
+full의 normal/miss-hot/remote-favorable p50은 각각 blind보다 1.77%,
+0.45%, 1.77% 높았다. remote-favorable background completion은 full과
+blind 모두 100%였고, 전체 stress business lane에서는 full이 5496개 중
+5078개 background request를 완료하며 418개를 global reject했다. 이 reject는
+foreground 420개를 모두 살리는 priority-drain business admission의
+의도된 actuation이다. 따라서 이 결과는 단순히 완료된 victim만 비교한
+착시가 아니라, foreground SLO와 background service를 함께 기록한
+cross-layer overload 결과다.
+
+v5에서 관측된 신호를 두 층으로 분리해야 한다.
+
+| 항목 | 결과 | 해석 |
+|---|---:|---|
+| full victim global decisions | 420/420 | global orchestrator decision path가 실제 victim에 적용됨 |
+| full endpoint cross-layer telemetry | 420/420 | Cassini endpoint delta와 LMCache remote inflight가 decision provenance에 존재 |
+| pair-local NCCL/LMCache observer-supported decision | 0 | pair-local observer 신호는 victim decision freshness gate를 통과하지 못함 |
+| NCCL observer bootstrap receipt | valid | `nccl_collective_p99_ms` 약 0.98--1.02 ms, `lmcache_transfer_p99_ms` 약 5.88--5.92 s, `active/correct` |
+| co-job terminal state | official overload timeout | `LMCache/NIXL batched_write` 60 s timeout; setup/NCCL/socket fallback failure 아님 |
+| full cross-layer actuation gate | false | observer signal이 원인인 actuation은 아직 증명하지 않음 |
+
+즉 v5는 v3의 start-order 문제를 고쳤고 observer bootstrap receipt까지
+만들었지만, burst producer가 block 31에서 official NIXL timeout으로
+멈추면서 뒤쪽 victim block에서는 snapshot이 stale해졌다. router는 이를
+synthetic zero pressure로 바꾸지 않고 fail-closed `not_collected`로
+처리했다. 동시에 full arm의 실제 application/fabric endpoint telemetry와
+business admission은 420/420 decision에 남아 있으며, 그 admission이
+background를 일부 제한해 foreground tail을 낮춘 것이 이번 성능 결과의
+검증 가능한 원인이다. 따라서 `full_cross_layer_actuation=false`를
+“TEMPO가 효과 없음”으로 해석하면 안 되고, “NCCL observer를 끝까지 유지한
+인과 validation이 아직 안 됨”으로 해석해야 한다.
+
+다음 gate는 이미 성공한 v5를 다시 돌리는 것이 아니다. 현재 allocation의
+남은 시간 또는 새 승인 interactive allocation에서 다음 순서로 진행한다.
+
+1. observer producer가 victim 전체 measured window 동안 active/correct
+   snapshot을 갱신하는 bounded burst 조건을 별도 source-bound v6으로
+   만든다. stale max-age를 늘려 gate를 통과시키지 않는다.
+2. 같은 workload population에 대해 app-global-only와 full TEMPO를 ABBA로
+   비교하고, `observer-supported decision > 0`, observer signal이 들어간
+   actuation, foreground SLO, background completion을 동시에 확인한다.
+3. 그 gate가 닫힌 뒤에만 fresh allocation independent validation 및
+   strongest fixed/simple predictor와의 head-to-head를 수행한다. 그 다음
+   1/2/4-node scale과 2--3개 SOTA를 붙인다.
+
+그러므로 §74의 전체 완료 상태는 여전히 `OPEN`이다. 다만 v5 시점에서
+“realistic overload가 실제로 victim tail을 망가뜨리는가?”에는 `그렇다`,
+“business-aware global admission이 실제 native P/D 경로에서 큰 개선을
+만들 수 있는가?”에는 `그렇다(최대 89.96%/79.61% p99 reduction)`,
+“pair-local NCCL/LMCache observer 기반 TEMPO 인과 효과가 독립적으로
+검증됐는가?”에는 `아직 아니다`가 현재의 정확한 결론이다.
+
+### 74.9 allocations `57643774`: v6/v7 observer-live boundary 실험
+
+같은 4-node `gpu_interactive` allocation에서 v5의 원인을 분리하기 위해
+두 개의 새 source-bound campaign을 순서대로 실행했다. v6은 block당
+512 MiB aggregate `incast_4to1` (`requests=2`, `kv=64 MiB`)로 낮췄고,
+v7은 128 MiB aggregate (`requests=1`, `kv=32 MiB`)로 더 낮췄다. 둘 다
+stale max-age grace를 늘리지 않고 observer bootstrap과 native
+NCCL/LMCache 경로를 유지했다.
+
+v6에서는 observer가 실제 pressure window를 성공적으로 유지했다. 예를
+들어 blind A에서 sequence 80에 NCCL p99 36.6 ms와 LMCache p99 44.9 s,
+full A에서 sequence 102에 NCCL p99 36.9 ms와 LMCache p99 61.8 s를
+`active/correct` snapshot으로 기록했다. full A/B inference는 각각
+normal p99 3.226/3.259 s, miss-hot 3.276/3.382 s를 기록하고 모든
+miss-hot victim 120/120을 완료했다. 반면 blind A는 normal p99 31.759 s,
+remote p99 68.559 s를 기록했고 miss-hot block은 끝내 percentile을 만들지
+못했다. blind B도 normal p99 30.827 s, remote p99 20.632 s, SLO 56/60,
+24/30으로 악화됐다. v6 전체는 blind A의 incomplete 때문에 ABBA
+performance gate를 닫지 않았고, 원본은
+`results/tempo_go_c9_pair_local_campaign_v6/job_57643774/`에 보존했다.
+
+v7은 더 낮은 128 MiB aggregate에서도 observer sequence가 366 이상까지
+증가했고, NCCL 약 39 ms와 LMCache 약 27.8 s의 live spike를 기록했다.
+그러나 producer를 900초에서 정상 종료시키자 기존 C8 client가 그 이후
+victim lifecycle과 충돌해 502/503을 내고 `raw.json` finalization timeout으로
+종료됐다. launcher는 이를 성능 결과로 세지 않고
+`block_failure_receipt.json`에 `performance_result=false`로 남겼다.
+v7은 첫 arm에서 one-shot 종료되었으며 같은 contract를 재시도하지 않았다.
+
+v8은 v7의 producer-lease race를 직접 수정한 확인 실험이었다. 같은 128 MiB
+aggregate burst에서 producer lease를 1500초로 늘려 victim보다 먼저
+종료되지 않게 했고, 실제로 첫 arm 동안 sequence가 300 이상까지 계속
+갱신되며 NCCL 약 6--41 ms, LMCache 약 20--28 s의 live pressure를
+기록했다. 그러나 blind victim은 200 응답 일부를 처리한 뒤 502/503이
+누적되었고, C8 node가 최종 `raw.json`을 기다리는 내부 bounded timeout에
+걸려 약 17분에 종료됐다. receipt는 다음과 같다.
+
+```text
+failure_stage=inference_lifecycle
+inference_exit_code=143
+cojob_exit_code=143
+inference_result_exists=false
+performance_result=false
+```
+
+v8은 co-job이 observer를 잃은 실패가 아니다. 오히려 observer lease를
+유지한 상태에서도 overload가 actual vLLM/LMCache measurement lifecycle의
+finalization을 깨뜨리는 것을 보여준다. 따라서 이 arm도 성능 비교에
+사용하지 않고
+`results/tempo_go_c9_pair_local_campaign_v8/job_57643774/`에 보존한다.
+
+이 두 boundary는 다음을 확정한다.
+
+1. Perlmutter `AWS Libfabric`/Slingshot/CXI에서 평균 링크 사용률이 낮아
+   보여도 receiver-incast burst가 NCCL collective tail과 LMCache/NIXL
+   transfer tail을 함께 수십 초까지 키울 수 있다.
+2. full TEMPO business admission은 그 압력 아래 foreground request를
+   100% 또는 거의 100% SLO로 보존할 수 있지만, v5/v6의 큰 차이는 우선
+   global admission/routing의 효과이며 pair-local observer가 원인이라는
+   인과 claim은 아직 잠겨 있지 않다.
+3. observer를 live로 만들기 위해 producer를 너무 짧게 끝내면 C8
+   measurement lifecycle이 깨지고, 너무 큰 incast를 유지하면 LMCache
+   official transfer timeout과 victim incomplete가 발생한다. 따라서 다음
+   구현 gate는 workload 크기만 조절하는 것이 아니라, producer와 victim의
+   measured-window lease 및 vLLM raw-finalization deadline을 공동 관리하는
+   global orchestrator lifecycle이다. 특히 victim failure를 단순한 arm
+   drop으로 숨기지 않고, business SLO와 service availability의 failure
+   signal로 global admission에 되먹임해야 한다.
+
+현재 allocation `57643774`는 4-node interactive 상태로 유지 중이며, 이
+실험에서 root/UDI/system configuration을 건드리지 않았다. v5는 유효한
+discovery ABBA, v6/v7은 observer/live 및 overload/lifecycle boundary
+receipt다. 따라서 §74의 최종 claim, fresh independent validation,
+strongest fixed/simple predictor head-to-head, 1/2/4-node scale과 SOTA
+비교는 여전히 `OPEN`이다.
+
+### 74.10 allocation `57643774`: bounded-resident observer-live v9 ABBA 결과
+
+v8에서 확인된 실패가 producer lease 자체가 아니라 `LMCache no memory
+available` 이후의 NIXL peer disconnect와 victim raw-finalization 붕괴였기
+때문에, 같은 4-node interactive allocation에서 v9를 새 source-bound
+contract로 실행했다. v9는 victim의 실제 C8 workload와
+`app_global_only`/`full_business_lane` 정책을 바꾸지 않고, co-job의 resident
+burst만 고정된 4-source × 8 MiB = 32 MiB/block, 0.25 s gap, 600 s minimum
+horizon으로 제한했다. 따라서 co-job buffer 누적을 원인으로 만들지 않으면서
+NCCL AWS Libfabric과 official LMCache/NIXL-UCX pressure를 victim measured
+window와 겹치게 하는 lifecycle 경계 실험이다.
+
+모든 arm은 inference `result.json`과 native transport receipt를 생성했고,
+observer는 각 arm에서 `producer_state=active`, `correctness_met=true`인
+상태로 수백 block 갱신된 뒤 victim 종료 후 complete receipt가 되었다.
+즉 v8과 달리 observer lease 손실, setup failure, raw-finalization timeout은
+없었다. co-job snapshot이 실제로 존재했다는 사실과, 그 snapshot이 TEMPO
+decision actuator에 의해 사용되었다는 주장은 분리해야 한다.
+
+| arm | normal SLO / p99 | miss-hot SLO / p99 | remote-favorable SLO / p99 |
+|---|---:|---:|---:|
+| app-global-only A | 53/60 / 11,388 ms | 97/120 / 9,361 ms | 26/30 / 12,969 ms |
+| full business-lane A | 58/60 / 9,441 ms | 39/120 / 12,235 ms | 30/30 / 3,273 ms |
+| full business-lane B | 50/60 / 11,967 ms | 16/120 / 12,074 ms | 30/30 / 3,170 ms |
+| app-global-only B | 21/60 / 11,914 ms | 61/120 / 11,522 ms | 25/30 / 11,454 ms |
+
+paired aggregate에서 full은 remote-favorable p99을 약 73.6% 줄이고 SLO를
+85%에서 100%로 올렸다. 반면 miss-hot p99은 16.4% 악화되었고 SLO는
+65.8%에서 22.9%로 떨어졌다. normal p99은 8.1% 줄었지만 full SLO는
+61.7%에서 90.0%로 올라갔다. 따라서 이것은 TEMPO가 무가치하다는
+negative가 아니다. 실제 pressure 아래 global route/admission이 remote
+fabric regime을 구한 대신 decoder-local/LMCache miss capacity를 고갈시키는
+**bottleneck migration**을 재현한 것이며, 현재 actuator가 cross-layer
+telemetry를 사용하지 못해 miss-hot service protection을 함께 보장하지
+못했다는 뜻이다.
+
+v9의 최종 gate는 `correctness`, `native_transport`, `same_population`,
+`ablation_cross_layer_blind`, `normal_p50_regression_bounded`,
+`remote_background_minimum_service`, `remote_background_retained_vs_blind`
+및 적어도 하나의 stressed p99 reduction은 통과했다. 그러나
+`stressed_slo_not_lower=false`, `full_observer_supported=false`,
+`full_cross_layer_actuation=false`이므로 v9를 performance headline이나
+cross-layer causal win으로 승격하지 않는다. 결과는
+`results/tempo_go_c9_pair_local_campaign_v9/job_57643774/analysis.json`과
+각 arm의 raw/observer history에 보존한다.
+
+이 결과 이후의 구현 gate는 co-job 크기를 더 조절하는 것이 아니다.
+TEMPO global orchestrator가 (1) decoder admission/capacity, (2) LMCache
+remote inflight/cache residency, (3) P/D edge 선택, (4) NCCL/Slingshot 및
+NIXL observer freshness를 하나의 decision epoch에서 읽고, miss-hot
+capacity가 위험해지면 background remote admission과 cache-producing MISS를
+즉시 줄이는 공동 actuator를 갖춰야 한다. 그 뒤 동일한 bounded observer-live
+ABBA에서 full의 remote 이득을 유지하면서 miss-hot SLO가 blind보다 낮아지지
+않는지 재검증한다. 그 gate가 닫히기 전에는 기존 C9 independent positive를
+취소하지도, v9를 논문 성능 승리로 과장하지도 않는다.
+
+### 74.11 allocation `57647989`: v10 pressure-aware pair-spill 7-arm ABBA
+
+v9의 miss-hot 실패 원인이 business-clean pair packing으로 보호된 MISS
+victim을 한 decoder pair에 과도하게 고정한 것이라는 raw decision audit에
+따라, v10에서 `business_clean_pair_pressure_fraction=0.5`를 도입했다.
+clean-pair isolation은 낮은 pressure에서만 유지하고, 관측된 pair utilization이
+threshold를 넘으면 전체 global score가 다른 pair로 spill하도록 한 변경이다.
+phase label과 future arrival을 policy input으로 추가하지 않았고, 같은 source
+workload·offered population·native vLLM/official LMCache/NIXL-UCX 경로를
+유지했다.
+
+allocation `57647989`는 4-node/16-A100/4-hour `gpu_interactive`였고,
+`NCCL_NET=AWS Libfabric`, `FI_CXI_RX_MATCH_MODE=hybrid`를 사용했다. 초기
+실행에서 nested one-node shell, 잘못된 source path, 잘못된 endpoint port-slot을
+각각 strict gate가 거부했으며, 이를 성능 결과로 세지 않았다. 올바른 source
+SHA와 contract port range로 재실행한 single-arm smoke와 fresh 7-arm campaign은
+네 노드 모두 terminal-complete 됐다. root/UDI/system 설정은 변경하지 않았다.
+
+최종 aggregate receipt는
+`results/tempo_go_c9_pair_local_campaign_v10/job_57647989_abba/analysis.json`이다.
+모든 7 arm의 raw/result가 존재하고, `correctness_gate=true`,
+`actual_native_transport=true`, `terminal_contract_valid_for_every_block=true`,
+`global_rejects=0`이었다.
+
+| arm | normal p50/p99, SLO | miss-hot p50/p99, SLO | remote-favorable p50/p99, SLO |
+|---|---:|---:|---:|
+| full TEMPO v10 | 2,934/2,962 ms, 60/60 | 3,071/3,340 ms, 120/120 | 3,081/3,330 ms, 30/30 |
+| queue-GPU | 2,895/3,036 ms, 60/60 | 2,998/7,708 ms, 120/120 | 40,533/52,825 ms, 12/30 |
+| predictor | 2,870/3,102 ms, 60/60 | 2,995/8,509 ms, 102/120 | 40,691/50,855 ms, 13/30 |
+| fixed remote `p1→d0` | 3,198/3,291 ms, 60/60 | 10,957/20,833 ms, 42/120 | 26,510/36,670 ms, 0/30 |
+| fixed remote `p0→d1` | 3,168/3,313 ms, 60/60 | 3,670/16,529 ms, 80/120 | 26,631/36,468 ms, 0/30 |
+| fixed local `d1` | 3,040/3,303 ms, 60/60 | 3,174/9,394 ms, 97/120 | 26,523/37,390 ms, 0/30 |
+| fixed local `d0` | 2,962/3,002 ms, 60/60 | 3,165/9,161 ms, 97/120 | 26,633/36,547 ms, 0/30 |
+
+full v10은 predictor 대비 miss-hot p99를 60.8%, remote-favorable p99를
+93.5% 줄였다. 가장 강한 fixed miss-hot arm(`fixed_local_d0`) 대비 miss-hot
+p99는 63.5% 낮았고, 가장 강한 fixed remote arm(`fixed_remote_p0d1`) 대비
+remote-favorable p99는 90.9% 낮았다. normal p50은 predictor보다 2.2%
+높아 공통 normal-load regression 경계 3% 이내였다. full route는
+decoder-local 180건과 official remote 30건을 모두 사용했고, 전체 edge는
+`local:d0=40`, `local:d1=140`, `remote:p0→d0=10`, `remote:p0→d1=5`,
+`remote:p1→d0=4`, `remote:p1→d1=11`로 v9의 단일-pair 집중을 완화했다.
+
+이 결과는 realistic mixed contention에서 global route/admission과 pressure-aware
+pair spill이 predictor 및 fixed policy보다 큰 tail/availability 이득을 낼 수
+있다는 강한 discovery evidence다. 특히 queue/predictor는 remote-favorable에서
+각각 12/30, 13/30 SLO에 그쳤고, fixed 정책은 0/30이었다. 초기 arm-side
+analysis snapshot은 legacy priority 필드만 읽어
+`remote_favorable_priority_service_lane_gate=false`로 기록했지만, raw decision을
+재검증한 re-audit에서는 v2 business lane의 accepted reservation 30/30을
+확인했다. 따라서 authoritative re-audit 결과
+`c8_dual_regime_discovery_positive=true`이며, 이는 analyzer compatibility
+수정으로 기존 raw 결과의 provenance를 다시 판정한 것이다. C9 contract 자체의
+`discovery_only`와 independent-validation claim boundary는 그대로 유지한다.
+
+또한 v10의 decision-time CUDA NCCL observer는
+`cuda_collective_observer_unavailable`로 표시됐고, Cassini endpoint evidence는
+실제로 수집됐지만 pause/ECN/retry가 거의 0이었다. 따라서 v10 수치로
+“Slingshot/NCCL fabric이 포화되어 TEMPO가 이를 해결했다”고 주장하지 않는다.
+현재 증거가 직접 입증하는 것은 endpoint/LMCache/decoder admission과 P/D edge
+선택의 공동 효과이며, NCCL causal attribution은 별도 supported observer gate가
+필요하다.
+
+v10 뒤의 순서는 threshold를 더 미세조정하는 것이 아니다.
+
+1. v10 profile과 7-arm result를 discovery receipt로 보존하고 policy를 새
+   결과에 맞춰 다시 바꾸지 않는다.
+2. priority service-lane receipt를 실제 remote completion 전체에 연결하는
+   source-bound implementation을 먼저 CPU/replay로 닫는다.
+3. NCCL collective latency/arrival-spread observer가 supported인 native
+   co-job에서 decision freshness와 actuation을 확인한다.
+4. 그 뒤 Mooncake FAST'25 real trace, 1/2/4-node capacity-normalized
+   workload, NetKV/Dynamo 및 조건부 Kairos action-space를 unchanged frozen
+   TEMPO와 counterbalanced discovery/fresh validation으로 비교한다.
+
+따라서 §74 전체 완료 상태는 여전히 `OPEN`이다. v10은 “문제가 작아서 1--5%
+개선밖에 안 된다”는 결론을 반박하는 native 4-node evidence를 제공하지만,
+1/2/4-node real-workload·SOTA 논문 claim과 NCCL causal attribution을 대신하지
+않는다. re-audit artifact는
+`results/tempo_go_c9_pair_local_campaign_v10/job_57647989_abba/analysis_reaudited_business_lane_v3.json`
+에 보존한다.
+
+### 74.12 allocation `57647989`: Mooncake FAST'25 token-list native fixed-arm screen
+
+v10 이후의 첫 real-trace screen은 공식 Mooncake FAST'25 upstream trace의
+`toolagent` population에서 prefix-reuse window를 고정하여 수행했다. population은
+64 requests, 364,225 materialized prompt tokens, 235 unique 512-token blocks,
+source trace SHA와 upstream commit을 manifest에 보존했고, source arrival rate는
+7.0007778642 requests/s였다. text prompt를 재생성하지 않고 materialized token ID를
+그대로 vLLM completion request에 전달했으며, 4-node/16-A100 Perlmutter
+`gpu_interactive` allocation에서 vLLM TP4 P/D, official LMCache/NIXL-UCX,
+Elastic-PD router를 사용했다.
+
+초기 실행 receipt는 성능 결과로 세지 않았다. (1) tokenizer endpoint 누락,
+(2) warmup이 immutable source manifest를 renamed population으로 바꾼 문제,
+(3) warmup이 measured prefix residency를 오염시킨 문제, (4) fixed remote arm에
+global-mesh placement와 priority lane을 잘못 적용한 문제, (5) natural LMCache
+hit을 synthetic pre-seeded catalog 규칙이 거부한 문제가 차례로 발견됐다. 이를
+통해 real-trace harness가 단순히 workload file만 바꾸면 되는 것이 아니며,
+warmup namespace, cold-start, fixed baseline placement, natural cache evidence를
+각각 분리해야 함을 확인했다. 이 과정에서 root/UDI/system 설정은 건드리지 않았고,
+orphaned experiment process는 해당 allocation의 own PID만 정리했다.
+
+clean-start fixed local arm 결과는
+`results/tempo_go_mooncake_fast25_native_discovery_57647989/toolagent_prefix_reuse_arms_v7_clean_start/local/real_trace_local/raw.json`,
+natural-cache fixed remote arm 결과는
+`results/tempo_go_mooncake_fast25_native_discovery_57647989/toolagent_prefix_reuse_arms_v12_remote_natural_evidence/remote/real_trace_remote/raw.json`
+에 보존한다. 두 결과 모두 64/64 HTTP 200, terminal contract valid,
+router decision exact였다.
+
+| arm | route | E2E p50 | E2E p90 | E2E p99 | mean |
+|---|---|---:|---:|---:|---:|
+| fixed local | `decoder_local_chunked_prefill` | 1,758.8 ms | 4,810.6 ms | 5,227.7 ms | 2,270.5 ms |
+| fixed remote | `official_lmcache_remote_prefill` | 2,042.3 ms | 4,194.6 ms | 4,939.9 ms | 2,367.5 ms |
+
+이 표는 동일 trace의 fixed-arm screen이지 TEMPO 성능 headline이 아니다.
+remote node-0 engine log에는 32개 engine observation 중 27개가 LMCache hit을
+보였고, external prefix cache hit rate는 67.7%로 기록됐다. 즉 LMCache가
+공식 prefix reuse를 실제로 수행한다는 것은 확인됐지만, 이 workload/rate는
+fabric saturation이나 global-orchestrator의 이득을 검증하는 stressed campaign이
+아니다. local 대비 remote p50은 16.1% 높고 p99는 5.5% 낮았으나, 이를 일반적인
+remote 우위/열위로 해석하지 않는다. arrival span이 약 9.02초이고 64개 request인
+단일 low-pressure window이므로 contention causal claim을 허용하지 않는다.
+
+현재 real-trace gate는 `fixed_native_transport=true`와
+`fixed_terminal_valid=true`까지 닫혔고, `tempo_exact_profile=false`로 남아 있다.
+기존 Elastic profile은 prompt/output geometry를 exact-row로 요구하는 18개
+screen geometry만 포함하여 Mooncake의 가변 geometry를 동적 TEMPO/predictor가
+fail-closed로 거부했다. 따라서 아직 이 trace에서 TEMPO 대 fixed/predictor의
+공정한 성능 비교를 만들지 않았으며, 수치를 외삽하거나 synthetic row를 꾸며
+claim하지 않는다.
+
+다음 실행 gate는 다음과 같다.
+
+1. fixed local/remote의 native receipts를 baseline으로 고정하고, natural cache
+   evidence와 prefix-group residency를 source-bound profile에 반영한다.
+2. Mooncake의 variable prompt/output geometry를 사전 capacity calibration으로
+   측정하여 exact profile을 만든다. 단순히 기존 18개 row를 복사하거나 평균값을
+   넣지 않는다.
+3. 같은 population에 대해 local, paired remote, predictor, frozen TEMPO를
+   counterbalanced로 재실행하고, burst/overload와 victim/fairness population을
+   추가한다.
+4. 각 arm에서 vLLM queue/GPU, LMCache hit/miss/inflight, NIXL transfer,
+   NCCL/Slingshot observer freshness와 endpoint decision을 함께 보존한다.
+   supported NCCL observer가 없으면 fabric causal claim은 금지한다.
+
+그러므로 §74 전체 상태는 여전히 `OPEN`이다. 이번 screen의 결론은 “문제가
+없다”가 아니라, 공식 prefix-reuse가 있는 real trace에서도 LMCache remote path가
+실제로 동작하며, 현재 병목/비교를 만들기 위해서는 exact geometry profile과
+overload/microburst population을 추가로 고정해야 한다는 것이다.
+
+### 74.13 allocation `57647989`: source-bound 8k microburst와 global admission 수정 screen
+
+§74.12의 64-request trace는 geometry가 가변이어서 동적 profile을 exact하게
+검증할 수 없었다. 따라서 원본 Mooncake population에서 `prompt=8064,
+max_tokens=128`인 여섯 request만 선택한 derived replay를 만들었다. token ID와
+semantic request ID는 원본 그대로이고 synthetic token은 없다. 원본 arrival
+offset을 100배 압축하여 0--89.99 ms에 6개가 도착하도록 했으며, manifest는
+`55.5617290810 requests/s`, `geometry_exact=true`, source workload SHA와
+derived replay provenance를 기록한다. 이 것은 공식 64-request trace 자체가
+아니라 공식 trace에서 유도한 controlled microburst screen이다.
+
+실제 Perlmutter 4-node/16-A100 `gpu_interactive` allocation에서 같은
+source-bound workload로 local fixed, natural-cache remote fixed, predictor와
+TEMPO를 각각 fresh lifecycle로 실행했다. vLLM TP4 P/D, official
+LMCache/NIXL-UCX, NCCL/Slingshot 환경을 유지했고 output/terminal/router
+contract를 검증했다. 사용한 screen artifact는
+`results/tempo_go_mooncake_fast25_native_discovery_57647989/toolagent_prefix_reuse_fixed8064_burst100_v4/`
+아래에 있다.
+
+| arm | valid/total | route | E2E p50 | E2E p90 | E2E p99 | mean |
+|---|---:|---|---:|---:|---:|---:|
+| fixed local | 6/6 | local 6 | 3,429.6 ms | 3,476.7 ms | 3,501.1 ms | 3,428.7 ms |
+| fixed remote | 6/6 | remote 6 | 4,491.8 ms | 4,689.4 ms | 4,716.3 ms | 4,438.0 ms |
+| predictor | 6/6 | remote 6 | 4,128.3 ms | 4,164.8 ms | 4,183.6 ms | 4,013.8 ms |
+| TEMPO initial profile | 4/6 | local 4; 2 global rejects | 3,663.7 ms | 5,594.3 ms | 6,316.5 ms | 4,216.3 ms |
+| TEMPO long-context SLO variant | 6/6 | local 6 | 3,292.4 ms | 6,247.1 ms | 6,298.3 ms | 4,269.9 ms |
+
+초기 TEMPO profile의 두 실패는 NCCL/LMCache transfer failure가 아니었다.
+두 latency request가 `global_admission_queue_timeout`으로 503됐고, decision
+receipt의 각 후보는 `tenant_ttft_slo`로 거부됐다. 즉 8k context request에
+기존 latency tenant의 1,000 ms TTFT/4,000 ms E2E SLO를 그대로 적용한
+profile/business contract 오류였다. latency tenant queue lease를 허용한 뒤에도
+그 SLO가 남아 같은 reject가 재현되었고, 최종 screen variant에서 해당
+long-context SLO를 2,000 ms TTFT/12,000 ms E2E로 명시하자 6/6이 완료됐다.
+이것은 global orchestrator가 transient pair occupancy와 business SLO를
+분리해 다뤄야 한다는 구현 교훈이며, SLO를 임의로 완화해 성능을 부풀린
+결과로 해석하면 안 된다.
+
+최종 variant의 six requests는 모두 `global_tenant_pair_scope_assigned_and_route_committed`
+또는 `global_min_cost_fair_route_committed` decision을 받았고, TEMPO route는
+전부 `decoder_local_chunked_prefill`이었다. 그러므로 이 screen은 (1) 실제
+burst에서 global admission이 부하를 거부할 수 있음을 재현했고, (2) business
+SLO/queue-lease contract를 고치면 correctness/availability가 회복됨을
+보였지만, (3) remote/fabric을 사용한 TEMPO latency win을 보이지 않았다.
+local fixed 대비 최종 TEMPO의 p50은 4.0% 낮지만 mean은 24.6% 높고 p99는
+80.0% 높다. 표본이 6개인 controlled screen이므로 이 작은 p50 차이는
+headline claim이 아니다. 이 결과로 “TEMPO가 이미 predictor와 fixed를
+능가했다”고 쓰지 않으며, 반대로 “contention 문제가 없다”고도 쓰지 않는다.
+
+이번 screen에서 닫힌 gate는 `source_bound_tokens`, `exact_8064x128_profile`,
+`native_vllm_pd`, `official_lmcache_nixl_ucx`, `same_input_all_arms`,
+`terminal_correctness`, `global_decision_receipt`, `burst_admission_failure_reproduced`
+이다. `TEMPO_beats_fixed_or_predictor`, `remote_fabric_causal_win`,
+`NCCL/Slingshot_bottleneck_attribution`, `multi-geometry_real-trace_win`은
+여전히 `OPEN`이다. 특히 모든 최종 TEMPO route가 local이었으므로 이 결과를
+cross-layer fabric orchestration의 검증으로 승격할 수 없다.
+
+다음 implementation gate는 이 screen의 SLO를 더 조정하는 것이 아니다. 먼저
+같은 source-bound burst에 실제 background/victim traffic을 겹쳐 local decoder
+queue, LMCache remote inflight/KV budget, NIXL transfer, NCCL/Slingshot
+telemetry를 동시에 포화시키고, business latency tenant의 bounded fairness를
+유지해야 한다. 그 뒤 TEMPO가 local-only fallback에 머무르지 않고 remote
+route를 선택할 때의 fabric freshness/credit/queue decision을 receipt로
+증명하며, strongest fixed와 predictor 대비 tail/goodput 개선 또는 재현 가능한
+negative를 보고한다. §74 전체 상태는 이 screen 후에도 `OPEN`이다.
+
+### 74.14 allocation `57647989`: 555.6 req/s extreme microburst 확인
+
+74.13의 controlled burst를 다시 10배 압축하여 여섯 개의 동일한
+source-bound 8,064-token/128-output request가 0--8.999 ms에 도착하는
+`555.6172908101 requests/s` replay를 만들었다. 이 실험은 원본 token ID와
+semantic identity를 보존하지만 arrival만 압축한 extreme microburst이므로,
+steady-state fabric capacity의 측정으로 해석하지 않는다.
+
+동일한 4-node native lifecycle에서 fixed local과 long-context business-SLO
+TEMPO를 실행한 결과는 다음과 같다.
+
+| arm | valid/total | E2E p50 | E2E p90 | E2E p99 | mean | route |
+|---|---:|---:|---:|---:|---:|---|
+| fixed local | 6/6 | 3,425.9 ms | 3,492.4 ms | 3,534.8 ms | 3,441.8 ms | local 6 |
+| TEMPO | 6/6 | 3,461.9 ms | 6,365.3 ms | 6,419.8 ms | 4,400.4 ms | local 6 |
+
+이 결과는 TEMPO global admission이 극심한 동시 도착에서도 request를
+유실하지 않고 모두 완료시킨다는 availability receipt이지만, fixed local
+대비 p99가 81.6% 높고 mean이 27.9% 높다. decision trace에는 모든 요청이
+`global_*_route_committed`로 admit되었고 remote route는 0건이었다. 따라서
+현재 구현은 local capacity가 충분한 경우에도 global pair ledger,
+business admission, telemetry/route commit 경로의 serialization 비용을
+추가하며, 이 조건에서 성능상 우위가 없다.
+
+74.13의 55.6 req/s screen과 합치면 현재까지의 직접 결론은 명확하다.
+실제 source-bound burst에서 contention/admission 문제는 존재하지만,
+현재 TEMPO actuator는 fabric bottleneck을 관측하거나 remote로 유익하게
+spill하지 못하고, local-only workload에서는 orchestration overhead가
+오히려 tail을 악화시킨다. 이것은 TEMPO의 최종 negative가 아니라 다음
+설계를 바꿔야 한다는 구현 진단이다. 특히 (1) local receiver/decoder
+headroom이 실제로 부족할 때만 global control을 critical path에 넣고, (2)
+pair 선택과 business admission을 nonblocking/lease-batched하게 하며, (3)
+remote/NCCL/Slingshot telemetry가 remote spill의 근거가 될 때만 remote
+route를 선택해야 한다.
+
+따라서 이 screen으로 닫힌 것은 `extreme_burst_native_execution`,
+`all_requests_completed_under_tempo`, `local_fixed_comparison`뿐이다.
+`TEMPO_tail_win`, `remote_spill_under_real_contention`,
+`fabric_bottleneck_attribution`, `background-victim fairness`는 여전히
+`OPEN`이며, §74 완료 상태도 `OPEN`이다.
+
+### 74.15 allocation `57647989`: 공식 LMCache/NCCL 양방향 victim qualification
+
+같은 4-node `gpu_interactive` allocation에서 C7 LMCache-victim ABBA와 C6
+NCCL-victim ABBA를 순서대로 실행했다. 두 실험 모두 2-node/8-rank pair,
+동일 physical node pair, 동일한 transfer/collective population을
+`control--hot--hot--control`로 counterbalance했고, 매 arm은 30초 이상의
+active horizon, correctness, native transport receipt를 검증했다. NCCL은
+Perlmutter PyTorch의 `NCCL_NET=AWS Libfabric` 경로였으며, synthetic CXI
+counter나 container/root 설정은 사용하지 않았다.
+
+C7은 실제 공식 LMCache NixlChannel UCX P-to-D를 victim으로 두고 NCCL
+all-reduce를 hot aggressor로 겹쳤다. 결과 artifact는
+`results/tempo_go_c7_lmcache_victim_job_57647989_run2/analysis.json`이다.
+
+| paired comparison | p50 ratio | p99 ratio | SLO drop | qualification |
+|---|---:|---:|---:|---|
+| control A -> NCCL hot A | 1.1242 | 1.0516 | 0pp | below gate |
+| control B -> NCCL hot B | 1.0787 | 1.0010 | 0pp | below gate |
+| ABBA median | 1.1015 | 1.0263 | 0pp | `C7=false` |
+
+모든 arm은 공식 LMCache bytes와 2-node topology를 정상 검증했지만, frozen
+gate인 p50 +25%, p99 2x, SLO drop 20pp 중 어느 것도 넘지 않았다. 따라서
+이 결과는 “NCCL/Slingshot이 항상 LMCache를 크게 망가뜨린다”는 증거가
+아니라, 이 2-node traffic intensity와 transfer shape에서는 평균적인
+cross-layer interference가 약 10% 수준이고 tail 폭증은 재현되지 않았음을
+뜻한다.
+
+C6은 방향을 반대로 하여 공식 LMCache NixlChannel UCX receiver-incast를
+NCCL all-reduce victim과 겹쳤다. 결과 artifact는
+`results/tempo_go_c6_nccl_victim_job_57647989_run2/analysis.json`이다.
+
+| paired comparison | NCCL victim p50 ratio | NCCL victim p99 ratio |
+|---|---:|---:|
+| LMCache incast A vs control A | 1.0622 | 1.3188 |
+| LMCache incast B vs control B | 1.0393 | 1.0590 |
+| ABBA median | 1.0507 | 1.1889 |
+
+C6 역시 native correctness, same population, same pair, 30초 horizon은
+통과했지만 p50 +25%, p99 2x, SLO drop 20pp gate에는 도달하지 못했다
+(`q1_real_nccl_victim_pass=false`). 즉 현재까지의 부하 실험은 “부하가
+없다”가 아니라, 실제 양방향 coupling은 측정되었으나 강한 overload
+regime는 아직 만들지 못했다는 결론이다.
+
+두 결과가 TEMPO 설계에 주는 의미는 다음과 같다. 74.13--74.14의 실제
+vLLM P/D microburst에서 보인 tail 악화는 global admission/route-commit
+경로의 local-only serialization과 일치하지만, C6/C7은 그 원인을
+interconnect saturation으로 귀속시키지 못한다. 현재 가장 큰 미해결점은
+“더 많은 component를 붙이는 것”이 아니라, (1) 실제 victim과 aggressor를
+동시에 유지하는 4-node co-job, (2) NIC/fabric counter의 관측 window와
+NCCL/NIXL timing의 동일 epoch 정렬, (3) local decoder queue/KV budget과
+remote pair credit을 함께 포화시키는 workload intensity calibration이다.
+
+따라서 C6/C7은 TEMPO 성능 비교 gate를 열지 않는다. 다음 run은 C9 causal
+burst에서 실제 vLLM P/D victim과 incast background를 동시 실행하고, 먼저
+observer-ready/transport-correctness를 닫은 뒤 local fixed, predictor,
+TEMPO를 동일 burst로 counterbalance해야 한다. 그 run에서도 fabric
+counter가 평평하면 “interconnect bottleneck이 아니다”라는 negative가
+유효하며, counter와 tail이 함께 상승할 때에만 global fabric-aware spill
+controller를 평가한다. §74 전체 상태는 여전히 `OPEN`이다.
+
+### 74.16 fresh allocation `57654145`: held-out C9 실제 vLLM P/D + background 독립검증
+
+C6/C7의 2-node component victim 결과만으로는 TEMPO의 가치를 판단할 수
+없었으므로, 새 4-node/16-A100 `gpu_interactive` allocation에서 실제 vLLM
+P/D와 공식 LMCache/NIXL-UCX를 유지한 C9 held-out campaign을 실행했다.
+allocation은 `nid[001180-001181,001184-001185]`, native `job_vni`, Slurm
+job `57654145`이며 root/UDI/container 설정은 사용하지 않았다. current
+checkout과 source inventory drift 때문에 과거 v3 계약을 덮지 않고
+`results/tempo_go_c8_independent_validation_contract_v4_current.json`을
+새로 고정했다.
+
+각 arm은 동일한 held-out request seed, arrival jitter, 7개 pressure block,
+동일한 4-node P/D topology를 사용했다. pressure는 clean control, 두
+decoder local-hot + remote-fabric-hot, selective remote edge-hot, P_ONLY
+dual-decoder-hot을 포함한다. 비교군은 `queue_gpu`, 단순 `predictor`, 두
+고정 remote edge, 두 고정 local decoder edge이고, headline arm은
+cross-layer TEMPO `full_c7_managed_background`다. 전체 결과는
+`results/tempo_go_c8_independent_validation_job_57654145_v4_current/analysis.json`
+에 있다.
+
+remote-favorable P_ONLY dual-decoder-hot block의 live 결과는 다음과 같다.
+
+| arm | remote route | p50 | p99 | SLO-good | 해석 |
+|---|---:|---:|---:|---:|---|
+| TEMPO full cross-layer | 29/30 | 3,100.1 ms | 3,395.7 ms | 30/30 | global edge/priority/fairness actuation |
+| queue_gpu | 17/30 | 39,929.1 ms | 52,530.6 ms | 12/30 | queue baseline tail 폭발 |
+| predictor | 0/30 | 40,613.5 ms | 50,368.1 ms | 13/30 | remote spill을 선택하지 못함 |
+| fixed remote p1->d0 | 30/30 | 26,250.5 ms | 35,782.8 ms | 0/30 | 고정 edge congestion |
+| fixed remote p0->d1 | 30/30 | 26,410.8 ms | 36,650.9 ms | 0/30 | 고정 edge congestion |
+| fixed local d1 | 0/30 | 26,552.8 ms | 37,058.6 ms | 0/30 | local hot decoder tail |
+| fixed local d0 | 0/30 | 26,606.8 ms | 36,509.1 ms | 0/30 | local hot decoder tail |
+
+따라서 remote-favorable regime에서 TEMPO p99는 best fixed 대비 90.5%,
+predictor 대비 93.3%, queue_gpu 대비 93.5% 낮았다. p50도 각각 88.2%,
+92.4%, 92.2% 낮았고, SLO-good은 predictor 대비 17건, queue_gpu 대비
+18건 증가했다. 이것은 6-request microburst만으로 얻은 수치가 아니라,
+동일한 held-out block에서 실제 victim/background request를 수행한
+30-request result다.
+
+miss-hot decoder block에서도 TEMPO p99는 3,278.3ms였고, queue_gpu
+8,374.6ms, predictor 8,742.6ms, fixed local 약 9,584--9,601ms보다 낮았다.
+TEMPO는 120/120 SLO-good, predictor 102/120, queue_gpu 113/120,
+fixed local 97/120을 기록했다. 반면 normal clean block에서는 TEMPO
+p50 2,930.2ms가 predictor 2,854.5ms보다 2.65% 높았다. 이 정상부하
+overhead는 preregistered 3% regression gate 안이지만, TEMPO가 모든
+상황에서 이긴다고 주장하지 않는다. 이 실험의 주장은 “remote/local
+resource pressure가 동시에 발생한 regime에서 global orchestration이
+tail/goodput을 크게 개선한다”이다.
+
+cross-layer telemetry와 fairness gate도 독립적으로 닫혔다.
+
+| gate | 결과 |
+|---|---:|
+| background completion | 86.61% |
+| minimum block-tenant completion | 79.06% |
+| tenant Jain fairness | 0.9958 |
+| service-lane failure fraction | 0.783% |
+| C8 background completion | 100% |
+| telemetry complete batch | 100% |
+| telemetry collection p50/p99 | 28.93/42.66 ms |
+| admission wait p50/p99 | 29.69/43.31 ms |
+| source virtual-service binding | 96.67% |
+
+실제 TEMPO remote decisions는 `allocation_scoped_global_frontend`의
+`tempo-go-joint-actuation-v2` receipt를 남겼고, telemetry sequence와
+global edge를 함께 기록했다. Cassini endpoint delta에서 pause/ECN/
+retry/timeout 및 packet-rate/host-posted/OXE signal을 수집했고, unavailable
+signal을 zero로 치환하지 않았다. 따라서 이 결과는 단순한 latency
+mock이 아니라 vLLM Prometheus, LMCache transfer, global pair ledger,
+business admission, NCCL/Slingshot-adjacent fabric telemetry를 같은
+epoch에서 검증한 것이다.
+
+frozen analyzer 최종 상태는 `fresh_allocation_gate=true`,
+`one_shot_execution_receipt_gate=true`, `base_performance_gate=true`,
+`independent_validation_positive=true`,
+`performance_claim_allowed=true`,
+`independent_validation_claim_allowed=true`이다. 이로써 TEMPO의 첫
+독립적인 4-node held-out 성능 gate가 닫혔다. 다만 §74 전체를 완료한 것은
+아니다. 아직 1/2/4-node scale matrix, 2--3개 SOTA 구현과의 동일
+workload 비교, 여러 실제 workload family, 반복 allocation confidence
+interval, 논문 본문/그림 재생성이 남아 있으므로 전체 상태는 `OPEN`이다.
+
+### 74.17 C10 SOTA extension 실행 경계 기록 (historical failed attempts; superseded by §74.18)
+
+C10은 `57654145`의 동일한 4-node `gpu_interactive` allocation에서
+Kairos와 NetKV를 실제 vLLM P/D + LMCache/NIXL-UCX carrier로 측정하도록
+시작했으나, Kairos arm은 성능 측정 전에 중단되었다. 원인은 NCCL,
+Slingshot, `/dev/shm` 용량 또는 root/UDI 설정이 아니다. 새 stage 이름이
+새 `/tmp` FlashInfer workspace를 만들면서 node-2에서 sampling/renorm
+CUDA extension의 첫 JIT compile이 8분 이상 `nvcc`에서 정체되었고,
+EngineCore는 그 결과로 shared-memory broadcast block 대기 메시지를
+반복했다. `/dev/shm` 사용률은 약 1%였으며, 결과 `result.json`은 생성되지
+않았으므로 이 arm을 성능 결과나 SOTA 비교에 포함하지 않는다.
+
+중단 후 남은 정확한 Slurm step은 `57654145.8`이었고 allocation은
+취소하지 않은 채 step 경계에서 회수했다. 후속 실행을 위해
+`vllm_lmcache_live_pd_node_v1.py`에 명시적인
+`TEMPO_SHARED_CACHE_MODE` 선택지를 추가했고, 네 node 모두 C9에서 이미
+완료된 동일 FlashInfer `sampling.so` cache를 확인했다. 재실행 요청
+`57657925`는 제출됐지만 당시 `urgent_gpu_ss11` partition 전체가
+`DOWN`/`drain` 상태여서 시작되지 않았다. 따라서 당시 C10에는 유효한
+Kairos/NetKV 성능 수치가 없었다. 이 상태는 §74.18의 fresh preflight 및
+동일-allocation paired 실행으로 갱신되었고, 재요청 job `57658182`도
+`PartitionDown` 상태에서 `Connection timed out`으로 종료된 historical
+boundary로만 남긴다. 최신 C10 결과와 claim boundary는 §74.18을
+authoritative record로 사용한다.
+이 실행 경계는 TEMPO negative가 아니라 측정 harness의
+first-run compilation confounder이며, 다음 SOTA claim에는 반드시
+cache-preflight와 warm binary receipt를 포함한다.
+
+추가로 `_stop()`의 SIGINT 경로를 수정했다. interactive Slurm step이
+SIGINT를 broadcast해도 process-group TERM 대기의 `sleep()`에서
+`KeyboardInterrupt`로 빠져나가지 않고 KILL/reap까지 진행한다. 이는
+성능 최적화가 아니라 native experiment isolation invariant이며, 다음
+C10 실행에서 orphan vLLM/NCCL child가 남아 subsequent arm이나 allocation
+cleanup을 오염시키지 않도록 하는 수정이다.
+
+### 74.18 allocation `57695991`: C10 실제 SOTA extension과 동일-allocation TEMPO paired 재검증
+
+새 4-node/16-A100 `gpu_interactive` allocation에서 C10을 다시 실행했다.
+첫 preflight 시도는 `gpu_memory_utilization=0.25`로 Qwen2.5-7B 가중치
+뒤에 KV cache block을 만들 수 없어 실패했고, 두 번째 시도는 3개 노드가
+성공한 뒤 느린 Lustre 모델 로딩 노드를 `srun --wait=10`이 조기 회수했다.
+둘 다 NCCL/Slingshot/LMCache failure가 아니며 성능 결과로 세지 않았다.
+preflight를 `0.80`, `--wait=600`으로 고친 뒤 네 노드 모두에서 FlashInfer
+`sampling.so` receipt를 만들었고, 실제 vLLM P/D + 공식 LMCache/NIXL-UCX
+경로로 C10을 끝까지 수행했다. preflight receipts와 두 baseline 결과는
+다음 directory에 보존되어 있다.
+
+`results/tempo_go_c10_paper_sota_job_57695991_current_preflight_v3/`
+
+처음에는 C10 analyzer가 TEMPO parent result의 `slurm_job_id=57654145`와
+현재 Kairos/NetKV 결과의 `57695991`이 다르다는 이유로 paired gate를
+거부했다. 따라서 같은 allocation에서 C8의
+`full_c7_managed_background` TEMPO arm을 동일 seed, block order, request
+population, SLO로 다시 실행했다. 그 결과는
+`tempo_current_same_allocation_v2/result.json`이고, C10 paired analyzer
+결과는 `analysis_same_allocation.json`이다. 이로써 아래 수치는 단순히
+과거 TEMPO 수치와 사후 baseline을 섞은 것이 아니라 동일한 live
+4-node allocation의 실제 paired evidence다.
+
+| regime / metric | TEMPO | Kairos X=512 | NetKV | TEMPO 개선 |
+|---|---:|---:|---:|---:|
+| normal p50 (ms) | 2,943.4 | 3,154.7 | 3,117.0 | 5.6--7.0% |
+| normal p99 (ms) | 3,147.6 | 3,299.8 | 3,328.0 | 4.6--5.4% |
+| normal SLO-good | 60/60 | 30/30 | 60/60 | Kairos 대비 +30 |
+| miss-hot p50 (ms) | 3,108.8 | undefined | 6,042.2 | NetKV 대비 48.5% |
+| miss-hot p99 (ms) | 3,321.5 | undefined | 11,801.2 | NetKV 대비 71.9% |
+| miss-hot SLO-good | 120/120 | 0/0 | 75/120 | NetKV 대비 +45 |
+| remote-favorable p50 (ms) | 3,160.5 | 4,716.3 | 53,768.6 | 33.0%, 94.1% |
+| remote-favorable p99 (ms) | 3,369.0 | 4,716.3 | 53,768.6 | 28.6%, 93.7% |
+| remote-favorable SLO-good | 30/30 | 1/1 | 0/1 | +29, +30 |
+
+Kairos의 miss-hot tail은 completed sample이 0건이라 p50/p99를 정의하지
+않았고, 이는 0 latency로 처리하지 않았다. NetKV의 remote-favorable
+population도 한 개의 completed victim만 남았지만 p99와 SLO failure가
+실측 receipt에 기록되어 있으며, analyzer는 undefined tail과 defined
+tail을 구분해 gate를 적용했다. 따라서 가장 강한 해석은 “TEMPO가 모든
+SOTA workload에서 항상 빠르다”가 아니라, 이 frozen C10 population의
+remote/miss pressure에서 TEMPO가 두 policy의 defined stressed service를
+엄격히 지배했고, normal regime overhead도 5% gate 안에 유지했다는
+것이다.
+
+C10 analyzer gate는 `actual_sota_extension_positive=true`,
+`tempo_beats_every_defined_sota_stressed_p99=true`,
+`tempo_retains_every_sota_stressed_slo_good=true`,
+`tempo_strictly_dominates_every_sota_stressed_service=true`로 닫혔다.
+또한 `sota_extension_is_actual_vllm_lmcache=true`이다. 그러나 C10
+manifest는 parent C8 allocation이 시작된 뒤 추가로 freeze된
+post-hoc extension이므로, 독립 SOTA claim은 아직 허용하지 않는다.
+현재 정확한 claim boundary는
+`sota_extension_independent_validation_claim_allowed=false`이며, 논문에
+독립적인 SOTA 우위로 쓰려면 이 변경되지 않은 C10 manifest를 새 fresh
+allocation에서 pre-register하고 TEMPO와 두 baseline을 다시 같은
+allocation에서 실행해야 한다.
+
+이번 결과로 닫힌 것은 `actual_vllm_sota_extension_positive`,
+`same_allocation_paired_comparison`, `remote_tail_win`,
+`miss_hot_service_win`, `preflight_cache_reproducibility`다. 반면
+`independent_sota_claim`, `1/2/4-node scale matrix`, `2--3개 정책의
+독립 재현`, `multiple real workload families`, `allocation confidence
+interval`, 논문 그림/본문 재생성은 여전히 `OPEN`이다. 따라서 §74 전체
+상태는 계속 `OPEN`이며, 다음 우선순위는 현재 positive C10을 과장하지
+않고 unchanged manifest fresh run으로 독립성을 닫은 다음 1/2/4 scale과
+반복 campaign을 실행하는 것이다.
+
+### 74.19 C10 독립 SOTA 실행 manifest 고정
+
+§74.18의 post-hoc 경계를 해소하기 위해 기존 manifest를 수정하지 않고
+`results/tempo_go_c10_paper_sota_independent_manifest_v1.json`을 새로
+추가했다. manifest SHA는
+`84e6fcc2e5a7176a6c9c2ead7e9f7438cc25fb63191434458573bb04650c997f`이며,
+§74.18의 source inventory·policy·request seed·block order·carrier를
+그대로 보존한다. `post_hoc_extension=false`,
+`independent_validation_claim_allowed=true`,
+`pre_registered_before_fresh_allocation=true`를 고정했고, parent/discovery
+allocation `57654145`와 `57695991`은 실행 금지 목록에 넣었다.
+
+post-hoc C10 runner/node/analyzer는 이 두 claim mode를 구분해 검사하도록
+일반화했고, independent mode에서는 금지 allocation과 source drift를
+fail-closed로 거부한다. 로컬 GPU 없는 qualification에서 parent contract,
+manifest identity, policy freeze, source inventory 검증은 통과했다. 따라서
+다음 실행은 이 manifest를 바꾸지 않은 채 새 4-node `gpu_interactive`
+allocation에서 preflight → TEMPO → Kairos → NetKV를 한 번씩 수행해야
+하며, 결과를 본 뒤 policy/workload/gate를 조정해서는 안 된다. 이 fresh
+run이 끝나기 전까지 독립 SOTA claim은 `OPEN`으로 유지한다.
+
+### 74.20 현재 allocation에서의 후속 실행과 scale receipt
+
+현재 allocation `57695991`은 그대로 유지했고, 중복 allocation이나
+`gpu_regular` 작업은 만들거나 취소하지 않았다. 기존 live v24
+loaded-saturated wrapper를 현재 checkout으로 재실행하려 했으나, 이는
+유효한 workload result가 아니다. 첫 시도는 no-shell nested step에서
+`SLURM_JOB_NUM_NODES`가 생략되어 wrapper guard가 중단했고, direct 4-task
+시도에서는 (a) 첫 단계의 `PYTHONPATH` 전달 누락으로 LMCache proxy가
+`ModuleNotFoundError: eval`을 냈고, (b) 이를 고친 시도에서는 현재 vLLM
+응답에 legacy disagg proxy가 요구하는 integer
+`num_lmcache_cached_tokens`가 없어 HTTP 500을 반환했다. vLLM 엔진과 NCCL
+초기화는 완료되었지만 request workload 이전에 끝났으므로 이 run은 성능
+표에 포함하지 않는다. 이 경계는 C10 current node의 성공 경로와 섞지
+않으며, 다음 독립 run은 C10 preflight/current node entry만 사용한다.
+
+CPU control-plane hierarchy receipt는 현재 source checkout에서 반복 15회로
+재생성했다. 결과는
+`results/tempo_go_hierarchy_scale_20260829_current/receipt.json`이며,
+schema는 `tempo-go-hierarchy-scale-receipt-v1`이다. pair count 2, 8, 32,
+128, 512, 1024를 동일 population으로 측정했고 bounded fan-in은 512/1024
+pair에서 global payload를 각각 75.0%/87.5% 줄였다. 1024 pair의 median은
+full reduction 35.76 ms, bounded global reduction 41.21 ms, bounded total
+control path 62.49 ms였다. 이는 prepartitioned CPU reducer의 제어경계
+증거일 뿐이며 GPU, NCCL, Slingshot, LMCache, vLLM latency/goodput claim은
+하지 않는다.
+
+따라서 현재 §74 gate 상태는 다음과 같다. C8 actual 4-node cross-layer
+positive와 C10 same-allocation actual SOTA extension은 닫혀 있고, CPU
+hierarchy receipt도 재현된다. 그러나 `C10 independent SOTA`, native
+`1/2/4-node` matrix, 여러 real workload family의 fresh repeated run과
+allocation confidence interval은 여전히 `OPEN`이다. 현재 allocation이
+끝나면 새 4-node `gpu_interactive`에서 frozen independent manifest를
+그대로 preflight → TEMPO → Kairos → NetKV 순서로 실행하고, 그 뒤에만
+independent claim을 갱신한다.
+
+현재 checkout의 C10 analyzer/baseline test와 C0 analyzer test는 `9 passed`
+로 통과했고, C10 node/analyzer/scale benchmark의 Python syntax 및
+`git diff --check`도 통과했다. 이 검증은 fresh GPU 실행의 대체가 아니며,
+다음 allocation에서 source drift와 분석기 회귀를 조기에 차단하는 정적
+gate다.
+
+fresh no-shell allocation의 nested-step 문제를 재현하지 않도록
+`eval/sota_4node/run_tempo_go_c10_paper_sota_direct_steps.sh`를 추가했다.
+이 launcher는 `TEMPO_GO_C10_DIRECT_JOB_ID`로 이미 RUNNING인 allocation에만
+`srun --jobid`를 붙이고, preflight와 두 policy를 각각 4-task direct step으로
+실행한다. job submit/cancel은 하지 않으며, independent manifest가 금지한
+`57654145`와 `57695991`을 fail-closed로 거부한다. 현재 allocation을 넣은
+guard test는 의도대로 exit 2로 거부했고, `bash -n`/`git diff --check`도
+통과했다. 따라서 다음 fresh allocation의 재현 명령 경계는 이 direct
+launcher를 authoritative하게 사용한다.
+
+### 74.21 allocation `57695991`: 실제 Mooncake 64-request burst에서 admission·remote failure 확인
+
+현재 4-node/16-A100 `gpu_interactive` allocation 안에서 source-bound
+Mooncake FAST'25 ToolAgent population을 64 request로 고정하고, effective
+output을 128 token 이하로 제한한 두 부하점을 실행했다. 100배 workload의
+offered rate는 약 700 req/s, 25배 workload는 약 175 req/s이며, 둘 다
+첫 request로부터의 상대 arrival offset과 token-ID/hash population을
+보존한 burst다. profile/manifest geometry는 59개 전부 exact match이고,
+각 arm은 같은 4-node P/D topology와 공식 LMCache/NIXL-UCX carrier를
+사용했다.
+
+보호형 TEMPO profile(`maximum_queue_wait_ns=2s`, 기존 tenant lease
+정책)의 결과는 다음과 같다.
+
+| workload / arm | 정상 완료 | reject/failure | accepted TTFT p50/p99 | accepted E2E p50/p99 |
+|---|---:|---:|---:|---:|
+| 100x TEMPO | 40/64 | 24 `global_admission_queue_timeout` | 1,610.1/6,335.6 ms | 3,228.3/7,890.3 ms |
+| 100x local fixed | 64/64 | 0 | 2,064.7/4,608.8 ms | 4,260.3/6,990.2 ms |
+| 100x remote fixed | 64/64 | 0 | 2,854.1/5,605.4 ms | 4,466.9/7,315.2 ms |
+| 25x TEMPO | 45/64 | 19 `global_admission_queue_timeout` | 1,418.1/6,400.2 ms | 2,869.6/9,160.7 ms |
+| 25x local fixed | 64/64 | 0 | 1,832.6/5,207.5 ms | 4,156.6/7,166.6 ms |
+
+이 표는 accepted-only latency와 total goodput을 분리해서 읽어야 한다.
+현재 TEMPO는 낮은 우선순위 backlog를 무한히 쌓지 않고 global admission에서
+보호적으로 reject한다. 따라서 accepted tail만으로 local보다 우수하다고
+주장할 수 없고, 이 결과의 확정된 결론은 “이 realistic burst에서 global
+orchestrator가 실제 overload boundary를 관측하고 service decision을
+내린다”이다. 100x에서 37.5%, 25x에서 29.7%의 reject는 TEMPO 성능 승리로
+세지 않으며, 다음 연구 단계는 이 business SLA와 goodput trade-off를
+명시적으로 최적화하는 것이다.
+
+같은 100x workload의 `predictor` arm은 성능 수치를 만들지 못했다. 4-node
+vLLM engine이 실제 LMCache/NIXL-UCX transfer 중
+`NIXL_ERR_REMOTE_DISCONNECT`로 EngineCore를 종료했고, prefill-side log에는
+remote agent disconnect가 남았다. 따라서 predictor는 zero latency나
+완료로 대체하지 않고 `transport/engine failure`로 분류한다. 반면 100x
+local과 remote fixed arm은 terminal contract를 만족했다. 25x remote arm은
+일부 HTTP 200 후 LMCache에서
+`declared total_chunks=32 but attempting 48 chunks` protocol violation이
+발생했고, 내부 29분 step timeout에서 raw 없이 종료되었다. 따라서 아직
+pass/fail latency 성능 결과로 세지 않되, remote path의 terminal failure
+receipt로는 보존한다. 이 경계 자체는 remote path가 단순히 항상 안정적이라는
+가정을 깨는 실행 영수증이다.
+
+queue drain variant도 별도 생성했다. 원래 2초 queue/admission 설정을
+그대로 둔 표와 섞지 않기 위해, discovery-only global profile v3에서
+queue wait를 60초, pending queue를 256, endpoint queue를 64로 늘리고
+모든 tenant의 `queue_lease_on_timeout`을 켰다. 그러나 실제 run에서도
+`completion_liveness_probe_inflight` 및 global queue timeout이 남았다.
+이는 단순 queue 길이보다 “route별 동시 probe 하나, completion credit,
+2-pair/16-sequence residual capacity”가 global controller의 hard safety
+boundary임을 확인한다. priority lane을 16으로 늘린 v1은 residual
+capacity invariant를 위반해 loader에서 즉시 거부되었고, 그 실패도
+성능 결과에 포함하지 않았다.
+
+따라서 §74.21의 gate 판정은 다음과 같다.
+
+| gate | 상태 |
+|---|---|
+| 4-node 실제 vLLM P/D + LMCache/NIXL 실행 | 닫힘 |
+| 64-request source-bound burst가 overload를 유발하는지 | 닫힘: 25x/100x에서 확인 |
+| TEMPO가 overload에서 reject/queue/route를 causal하게 기록 | 닫힘 |
+| accepted latency만으로 TEMPO 승리 주장 | 금지 |
+| predictor remote path의 고부하 안정성 | 실패 receipt: NIXL disconnect |
+| 25x remote baseline terminal-valid 성능 | OPEN: chunk protocol violation |
+| TEMPO total-goodput/SLO 개선 | OPEN: business policy와 drain capacity 재설계 필요 |
+
+이 실험은 “interconnect가 한가할 때의 1--5% 개선”을 측정한 것이 아니다.
+현재 burst에서는 queue admission, decoder residual capacity, LMCache/NIXL
+remote transfer가 실제 병목/실패 경계로 나타났다. 다만 TEMPO가 그 모든
+경계에서 아직 goodput 우위를 달성했다고 결론 내릴 단계도 아니다. 다음
+우선순위는 (a) reject를 숨기지 않는 total-goodput/SLO metric, (b) business
+priority별 admitted/completed/fairness, (c) fabric/NCCL/LMCache transfer
+counter와 route decision의 같은 epoch 상관, (d) queue lease/probe 정책을
+고정한 fresh repeated run이다. §74 전체와 독립 SOTA/1·2·4-node/multiple
+real-family gate는 계속 `OPEN`이다.
+
+### 74.22 v4--v6 headroom queue-lease 수정의 실제 검증 결과
+
+§74.21의 원인을 분해하기 위해 코드와 profile을 수정하고 같은
+`gpu_interactive` allocation `57695991`에서 새 디렉터리로 반복했다. 먼저
+잘못된 Elastic profile과 population manifest를 넘긴 두 실행은 readiness 및
+materialized-workload SHA contract에서 거부되었으므로 성능 결과에서
+제외한다. 올바른 조합은 `v4/elastic.json`의 fingerprint
+`95c328...`와 같은 workload 디렉터리의 `workload.manifest.json`이다.
+
+그 뒤 다음 opt-in 정책을 추가했다.
+
+* `completion_progress_v1`: 최근 first-response completion이 하나 이상이고
+  명시적 route failure가 없으며 endpoint queue headroom이 남은 경우,
+  completion credit가 아직 0이어도 native endpoint queue lease를 허용한다.
+* queue lease 후보에 대해서는 위의 동일한 measured-progress 조건에서만
+  deadline grace를 허용한다. global/fabric/route/cache guard와 endpoint의
+  실제 service-lane timeout은 그대로 hard failure다.
+* 이 정책은 `completion_liveness_shared_probe_mode`와 별개로 기록되며,
+  lease receipt에는 `completion_progress_headroom` binding을 남긴다.
+
+회귀 테스트는 90개에서 92개로 늘었고 모두 통과했다. 그러나 동일한
+100x/64-request 실제 trace의 결과는 다음과 같다.
+
+| profile | global admitted | queue lease | service-lane failure | HTTP 200 | HTTP 503 |
+|---|---:|---:|---:|---:|---:|
+| 기존 v4 | 39 | 0 | 0 | 39 | 25 global timeout |
+| v5 headroom | 37 | 0 | 0 | 37 | 27 global timeout |
+| v6 grace + headroom | 63 | 27 | 27 | 36 | 28 endpoint queue timeout |
+
+v6는 global controller가 보수적으로 버리던 27개를 실제로 endpoint queue에
+넘기기 시작했다. 하지만 `service_lane_reservation_failures=27`이고 모두
+`endpoint_bounded_queue_lease_timeout`으로 끝났다. 즉 현재 telemetry의
+`scheduler_waiting + completion_residual + queue_debt < endpoint_queue_capacity`
+판정은 실제 LMCache/vLLM service-lane가 수용할 수 있는 수보다 낙관적이다.
+`endpoint_queue_capacity=64`라는 global 숫자만으로는 vLLM의 실제
+`max_num_seqs=16`, active sequence, LMCache preflight 대기, P/D first-response
+window를 대변하지 못한다.
+
+실측 delivered goodput도 이를 확인한다. v4의 39/64 성공은 약 2.36
+requests/s, v6의 36/64 성공은 약 2.18 requests/s였고, 동일 workload의
+fixed-local은 64/64 및 약 7.79 requests/s, fixed-remote는 64/64 및 약
+7.32 requests/s였다. 성공 요청만 잘라낸 v6의 TTFT/E2E p50/p99는
+1,695.6/6,166.9 ms 및 2,775.9/7,633.9 ms로, accepted-only tail도
+기존 v4보다 좋아지지 않았다. 이 수치는 arm 실행 window를 분모로 한
+보수적 delivered-goodput이며, 503을 성공으로 세지 않았다.
+
+이 결과는 중요한 negative evidence다. shared probe나 deadline grace를 더
+키우는 것이 해법이 아니며, 현재 TEMPO는 queue lease의 실제 downstream
+acceptance를 관측하지 못한다. 따라서 v6의 36/64는 성능 개선으로 주장하지
+않는다. 현재 확정된 research finding은 “global admission pressure는
+실재하지만, global credit와 native endpoint service-lane credit를 하나의
+queue-capacity 수로 대체하면 overload에서 오히려 잘못된 lease와 timeout을
+만든다”이다.
+
+다음 구현 gate는 queue lease를 다시 넓히는 것이 아니다. 각 endpoint에
+대해 (1) vLLM running/waiting/KV pressure, (2) service-lane preflight
+pending 및 accepted/timeout, (3) LMCache/NIXL transfer in-flight와
+first-response completion, (4) NCCL/Slingshot fabric epoch counter를 같은
+monotonic epoch으로 수집하고, lease budget을 독립적으로 검증된 window의
+최솟값으로 계산해야 한다. 그 후 fresh 4-node run에서 fixed/local,
+fixed/remote, predictor와 동일 load로 total completed requests, goodput,
+TTFT/E2E tail, tenant SLO, service-lane timeout을 동시에 비교한다. 이
+cross-layer endpoint-credit gate를 닫기 전에는 TEMPO의 성능 승리나 50% 개선을
+주장하지 않는다.
+
+### 74.23 endpoint service-lane telemetry를 global admission에 연결한 현재 상태
+
+v6의 실패 원인을 코드 경계에서 다시 고정했다. canonical endpoint router는
+이제 다음 다섯 가지를 `tempo-go-endpoint-service-lane-v1`로 내보낸다.
+
+| 항목 | 의미 | global controller에서의 처리 |
+|---|---|---|
+| `endpoint_queue_requests` | endpoint router에 실제로 남아 있는 비종료 queue record | scheduler waiting과 겹칠 수 있으므로 `max`로 결합 |
+| `pending_queue_offers` | global promotion 전 endpoint가 보유한 queue offer | steady-state debt와 합산하는 transient state |
+| `pending_global_commits` | endpoint service-lane preflight 중인 global header | offer와 별개의 transient state |
+| `active_reservations` | 실제 service-lane reservation을 가진 비종료 request | endpoint ownership 감사용 |
+| `active_queue_leases` | global queue lease로 endpoint queue에 남은 비종료 request | queue debt와 일치성 검증용 |
+
+기존 구현은 `scheduler_waiting`, endpoint completion residual, global queue
+debt를 모두 더했다. 새 구현은 겹치는 steady-state 관측값
+(`scheduler_waiting`, `endpoint_queue_requests`, global queue debt)의 최댓값만
+사용하고, active first-response residual과 아직 commit되지 않은 offer/commit
+만 추가한다. 따라서 한 request를 vLLM queue와 TEMPO debt로 두 번 세지 않으면서,
+endpoint queue에 실제로 남은 request를 global admission이 볼 수 있다. 구형
+endpoint agent에는 기존 계약을 유지하는 명시적 fallback이 남아 있다.
+
+이 변경은 `PairTelemetry`와 JSON batch에도 선택적이고 완전한 service-lane
+필드로 전달되며, `completion_progress_v1`의 deadline grace를 넓히지 않는다.
+즉 telemetry를 추가했다고 queue lease를 자동 허용하지 않는다. 특히 v6처럼
+endpoint가 27건의 lease를 받았지만 27건 모두 bounded queue timeout으로 끝나는
+경우, 다음 fresh run에서는 service-lane pending/lease 상태가 decision receipt와
+같은 batch sequence로 기록된다. route failure가 없다는 이유만으로 downstream
+acceptance를 추정하지 않는 것이 이 gate의 핵심이다.
+
+현재 allocation `57695991`은 4시간 제한에 임박했으므로 이 변경 후 새 native
+campaign은 시작하지 않았다. 다음 실행 순서는 새로 승인된 동일한 4-node
+`gpu_interactive` allocation 안에서만 수행한다.
+
+1. corrected manifest/profile로 endpoint service-lane telemetry와 vLLM
+   running/waiting/KV snapshot의 sequence alignment를 preflight한다.
+2. 같은 source-bound 64-request burst에서 fixed-local, fixed-remote,
+   predictor, TEMPO를 counterbalanced order로 실행한다.
+3. 각 arm에 대해 HTTP 200뿐 아니라 offered/completed/503, delivered goodput,
+   TTFT/E2E p50/p99, tenant SLO, queue offer/lease/timeout을 함께 계산한다.
+4. LMCache/NIXL first-response, NCCL observer, Cassini/Slingshot sample이
+   같은 epoch으로 유효할 때만 cross-layer attribution을 연다. 그렇지 않으면
+   interconnect 원인으로 해석하지 않고 endpoint/service-lane 원인으로
+   제한한다.
+
+CPU 회귀검증은 110개 테스트가 통과했다. native performance result는 아직
+추가하지 않았으며, v4/v6의 2.36/2.18 requests/s 대 fixed-local 7.79
+requests/s라는 negative evidence와 이번 telemetry contract를 함께 보존한다.
+
+### 74.24 C8 v48 service-lane campaign: 첫 native global-orchestration 승리
+
+위의 다음 실행 순서를 실제로 수행했다. 새 4-node `gpu_interactive`
+allocation `57700216` (`nid[001192-001193,001196-001197]`)을 사용했고,
+allocation record의 `Network=job_vni`를 확인했다. 로그인 노드에서 GPU를
+돌리지 않았고, 다른 `gpu_regular` 잡이나 root/UDI 설정은 건드리지 않았다.
+현재 source-bound workload와 native vLLM P/D + official LMCache/NIXL/UCX
+경로를 동일하게 유지한 C8 v48 contract의 SHA는
+`049c835c9359c17558000d02b39405989ed7dd24183573f63b886a1c669564ed`이다.
+
+고정 정책 4개, 단순 predictor, queue-aware controller, TEMPO full arm을
+각각 독립 process로 순차 실행했고, 각 arm은 동일한 7개 block
+(`control_a`, remote-cool/hot 두 방향, combined-hot 두 방향,
+`p_only_dual_decoder_hot`, `control_b`)을 처리했다. 모든 arm에서 victim
+210/210개가 terminal contract를 만족했고 victim 기준 HTTP/route failure와
+global reject는 0이었다. 따라서 아래 수치는 실패 요청을 성공으로 바꾼
+결과가 아니라 동일한 offered victim population의 SLO/tail 비교다.
+
+| arm | victim SLO-good | E2E p50 (ms) | E2E p99 (ms) | victim route |
+|---|---:|---:|---:|---|
+| fixed local d0 | 157/210 | 3046.3 | 33348.7 | local d0 |
+| fixed local d1 | 157/210 | 3176.6 | 32722.0 | local d1 |
+| fixed remote p0→d1 | 144/210 | 3469.8 | 31907.8 | LMCache remote |
+| fixed remote p1→d0 | 101/210 | 8569.3 | 31706.3 | LMCache remote |
+| predictor | 182/210 | 2963.7 | 50169.6 | local d0/d1 |
+| queue_gpu | 184/210 | 3028.8 | 50483.1 | local + 18 remote |
+| **TEMPO full managed background** | **210/210** | **2996.7** | **3243.1** | **180 local + 30 remote** |
+
+특히 `p_only_dual_decoder_hot` block에서 TEMPO는 30/30 SLO-good,
+E2E p50/p99 `3043.8/3617.1 ms`였다. predictor는 13/30 및
+`40550.2/51067.4 ms`, queue_gpu는 14/30 및 `39916.1/50665.5 ms`였고,
+가장 강한 fixed arm들도 0/30 SLO-good 및 약 36--38초 p99였다. 따라서
+동일한 remote-favorable burst에서 TEMPO의 p99는 predictor 대비 92.9%,
+queue_gpu 대비 92.9%, strongest fixed 대비 90.3% 낮았다. miss-hot
+구간에서도 predictor 대비 p99 62.5%, strongest fixed-local 대비 63.9%
+낮아, “정상부하 평균의 1--5% 차이”가 아니라 overload regime의 큰 tail
+차이를 관측했다.
+
+이번 full arm의 route는 한쪽 정책으로 고정되지 않았다. 전체 210 victim 중
+180개는 `decoder_local_chunked_prefill`, 30개는
+`official_lmcache_remote_prefill`였고, remote block의 pair 분포는
+`p0→d0:10`, `p0→d1:5`, `p1→d0:5`, `p1→d1:10`이었다. 즉 TEMPO가
+remote를 무조건 피한 것이 아니라, service-lane/fabric/business 상태가
+허용하는 remote 전송만 남기고 hot decoder에는 local 보호를 적용했다.
+
+동시에 background aggressor는 실제로 조절됐다. combined-hot block의
+background 요청은 대략 179--190개가 완료되고 42--53개가 global reject로
+종료됐으며, service-lane failure도 block당 관측됐다. 반면 interactive
+victim은 두 combined-hot block 모두 30/30 SLO-good이었다. p-only block의
+router receipt에는 `queue_leases=30`, `queue_timeouts=187`,
+`service_lane_reservation_failures=10`, `service_lane_queue_promotion_rejections=10`,
+`route_failures=0`가 기록됐고, decoder business admission은 interactive
+180개를 보호하고 background 2563개를 별도 limit(각 decoder 8)으로
+admit했다. 이는 decoder admission·fairness가 실제로 business priority를
+조절한 receipt이지, 단순 predictor latency가 아니다.
+
+Cross-layer telemetry도 같은 run에서 유효했다. p-only block의 4 endpoint
+Cassini snapshot은 `all_streams_valid=true`, `router_decisions_exact=true`,
+`terminal_contract_valid=true`였고, observed OXE channel active fraction
+최대는 약 `4.75e-5`, pause/ECN/retry/receive-overflow는 0이었다. 따라서
+이번 C8의 큰 성능 차이를 “Slingshot wire가 full saturation됐다”고
+과장해서는 안 된다. 현재 더 정확한 결론은 **실제 background contention에서
+vLLM decoder/service lane과 LMCache remote activation을 business-aware
+global admission으로 함께 조절해야 tail을 지킬 수 있으며, fabric counter가
+포화되지 않은 경우에도 고정 placement/predictor는 실패한다**는 것이다.
+이것이 TEMPO의 cross-layer 가치와 다음 실험의 경계다.
+
+이번 결과로 C8 discovery/performance gate는 닫혔지만 independent validation
+gate는 아직 `OPEN`이다. `analysis.json`의 campaign gate는 correctness,
+remote activation, source balance, exact LMCache full hit, priority
+service-lane, decoder business admission, predictor/fixed robustness를 모두
+통과했고 `performance_claim_allowed=true`로 판정했다. 그러나 paper의 최종
+독립 주장은 아직 하지 않는다. 다음 순서는 (1) 새 allocation에서 source와
+arm order를 고정한 repeated C8, (2) 1/2/4-node scale, (3) 다른 real-family
+workload, (4) NCCL/Slingshot counter가 실제로 상승하는 victim/background
+burst를 별도 구성하고 native LMCache/vLLM telemetry와 epoch-align하는
+것이다. 그 뒤에만 SOTA 표와 논문 headline을 확정한다.
+
+### 74.25 C8 held-out independent validation contract preregistration
+
+C8 v48 discovery가 끝난 뒤 독립성 조건을 먼저 고정했다. 최초 held-out
+contract v5는 보존하고, runner의 stale 기본 contract와 outer-step network
+전달 누락을 정적으로 수정한 뒤 v6을 현재 실행 contract로 다시 고정했다.
+현재 held-out contract는
+`results/tempo_go_c8_independent_validation_contract_v6_c8v48.json`이며,
+파일 SHA는
+`47a5d0f5c2c6e11ed54eb77c601535410b0b90094cb12262c692f5aaf1146655`이다.
+v5의 SHA는
+`53973fcc4ff14cfc3cd5ed26ad7534a4a5c80e1343c18f38fe5ac5af3ad689c0`으로
+역사적 preregistration receipt로 남긴다.
+parent는 C8 v48 contract/analysis이고, discovery allocation `57700216`을
+포함한 이전 allocation들은 모두 forbidden job으로 등록했다. request seed는
+`2026082901`, preregistration time은 `2026-08-29T12:15:37Z`이다.
+
+독립 실행은 discovery의 반대 순서를 사용한다.
+
+* arm: full → queue_gpu → predictor → fixed remote p1→d0 → fixed remote
+  p0→d1 → fixed local d1 → fixed local d0
+* block: control_b → p-only dual-decoder hot → combined-hot d1 →
+  remote-cool/hot d1 → combined-hot d0 → remote-cool/hot d0 → control_a
+
+`one_shot_no_retry=true`와 `fresh_allocation_required=true`를 유지한다. v6
+runner는 기본값도 이 contract를 가리키며, allocation 및 foreground step의
+`Network=job_vni`를 모두 검사하고 outer `srun`에도 명시적으로 전달한다.
+따라서
+현재 discovery allocation `57700216`은 contract에 의해 명시적으로 금지되며,
+현재 allocation이 종료된 뒤 새 4-node `gpu_interactive`에서만 실행할 수 있다.
+이 contract가 통과하기 전에는 C8 v48 수치를 independent paper claim으로
+승격하지 않는다.
+
+### 74.27 current-source C9 contract builder
+
+기존 C9 contract를 그대로 재사용하면 현재 C8 source inventory와 drift할 수
+있다는 사실을 C9 attempt `57700216`에서 확인했다. 이를 방지하기 위해
+`eval/sota_4node/build_tempo_go_c9_causal_burst_contract.py`를 추가했다.
+이 builder는 C9 causal-burst template의 execution/burst geometry는 유지하되,
+현재 C8 base contract의 상대경로·SHA·source inventory를 다시 binding한다.
+
+현재 생성된 discovery contract는
+`results/tempo_go_c9_causal_burst_current_source_v1.json`이고 SHA는
+`cc6d414ef8c4689eaf39dd79e8400244fa3954c86ce674587289ace684bb2c71`이다.
+base는 C8 v48 contract이며 source inventory 33개를 현재 worktree에서 모두
+재검증했다. 다음 fresh 4-node interactive에서는 stale
+`tempo_go_c9_pair_local_contract_v10.json`을 사용하지 않고 이 contract만
+사용한다.
+
+### 74.26 C9 causal-burst attempt의 source-drift 중단
+
+현재 allocation `57700216`에서 NCCL/Slingshot receiver-incast attribution을
+확인하기 위해 C9 discovery contract를 한 번 실행했으나, 첫 block
+`00_app_global_only_a`의 vLLM readiness 단계에서 중단됐다. node stderr의
+정확한 원인은 `C8 source drift detected:
+eval/sota_4node/analyze_tempo_go_c8_dual_regime.py`였고, 이는 기존 C9
+contract가 예전 source inventory를 고정하고 있었기 때문이다. interconnect
+오류나 NCCL `Connection refused`가 아니며, C9 성능/포화 결과로 해석하지
+않는다.
+
+contract의 `one_campaign_no_retry=true`를 지켜 이 C9 campaign은 재시도하지
+않았고, `execution_failure_receipt.json`으로 실패를 보존했다. 다음 C9
+실행은 현재 source inventory와 C8 v48 service-lane telemetry를 포함한 새
+contract를 다시 preregister한 뒤 fresh 4-node interactive에서 수행해야
+한다. 즉 이번 시도는 TEMPO의 성능 evidence가 아니라 **cross-layer
+experiment도 source-bound contract drift를 먼저 막아야 한다**는 실행
+경계 receipt다.
+
+### 74.29 C9 launcher freeze v4
+
+74.28의 nested-step 오류를 고친 뒤 C9 runner는 실행 전에 provenance의
+source inventory를 검증하고 `bash -n`으로 parent/child launcher를 검사하도록
+강화했다. 이어서 outer parent의 historical resource-shape 오류를 제거해
+`--gpus-per-node=4`, 명시적 `--network=job_vni`, no `--exact`, no short
+`--wait`로 고정했다. current-source C9 contract v4는
+`results/tempo_go_c9_causal_burst_current_source_v4.json`이며 SHA는
+`d4cdee88f7601bebc2575cc33a36d9731cec89b77c93f274c14de59d4a30e287`이다.
+다만 v4 실행에서 template의 `node_entry` 누락이 발견되어, runner가 C8
+independent 기본 entry로 fallback하지 않도록 builder가
+`c9_gate_node_entry.sh`를 직접 기록·강제한다. 이 수정으로 만든 실행 후보
+C9 v5 contract는
+`results/tempo_go_c9_causal_burst_current_source_v5.json`이며 SHA는
+`a7e9b4f54030e608ad82fdeca4aa142ffb3916fc1dbe0f3d82c8ba676125c5dd`이다.
+여기에는 C9 전용 launcher/node/analyzer 5개와 C8 base source inventory 33개가
+각각 기록돼 있다.
+
+따라서 다음 C9 실행의 순서는 고정된다. (1) 새 4-node interactive의
+`Network=job_vni` 확인, (2) contract source inventory 검증, (3) nested child
+step의 `--network=job_vni` receipt 확인, (4) 그 뒤에만 NCCL/LMCache
+receiver-incast를 시작한다. 이전 C9 attempts `57700216`은 모두
+`performance_result=false`이고, 이전 v3 contract로 재시도하지 않는다.
+
+독립 C8 runner도 같은 경계를 적용했다. 최신 v6 contract의 39개 source
+inventory, 최신 contract 기본값, allocation/step `Network=job_vni` 검사를
+정적 테스트로 고정했고 관련 C8/C9 테스트 9개와 launcher `bash -n`을
+통과했다. 구형 C9 business-lane test는 과거 SHA mismatch를 정상적으로
+드러내도록 바꾸었다. 즉 stale contract를 억지로 green으로 만들지 않고
+`historical and not reusable`로 판정하며, current-source builder로 새
+contract를 만들어야만 다음 실행에 사용할 수 있다.
+
+### 74.30 current allocation network smoke receipt
+
+새 validation을 재사용하지 않고, 현재 idle allocation `57700216`에서
+수정된 outer-step network 경계만 읽기 전용으로 확인했다. 명시적
+`srun --jobid=57700216 --overlap --exact --network=job_vni`가 4개 노드
+(`nid001192`, `nid001193`, `nid001196`, `nid001197`)에서 하나의 step으로
+생성됐고, 각 노드에서 A100 4장이 보였다. 각 rank의 receipt는
+`job=57700216`, `step=15`, `network=job_vni`였으며 `Error configuring
+interconnect`는 발생하지 않았다. 모델, vLLM, LMCache, NCCL traffic은
+실행하지 않았으므로 이 receipt는 성능·포화 evidence가 아니라 다음 fresh
+validation 전에 outer `job_vni` launch boundary가 동작한다는 smoke evidence다.
+같은 allocation에서 C9와 동일한 2-node/8-task/4-GPU-per-node child shape도
+step `16`으로 생성됐고, 모든 rank가 `network=job_vni`를 보고했다. 따라서
+이전 C9의 `network=default` 오류는 현재 launcher 경계에서 재현되지 않는다.
+이 역시 NCCL connectivity나 application performance를 증명하는 결과는 아니다.
+
+그 뒤 수정된 outer shape로 component smoke를 한 번 실행했다. 결과 root는
+`results/tempo_go_c9_network_fix_component_smoke_job_57700216_v2`이며,
+child step `57700216.20`은 `COMPLETED`했다. official LMCache NIXL UCX가
+초기화되고 NCCL runtime `2.28.9`가 시작됐으며, 1 MiB transfer의
+`overall_correctness_met=true`, observer `producer_state=complete`가
+기록됐다. 첫 v1 smoke의 outer resource-shape failure는
+`results/tempo_go_c9_network_fix_component_smoke_job_57700216`에 보존하며,
+두 결과 모두 vLLM victim을 포함하지 않으므로 C9 causal 또는 성능 결과로
+세지 않는다. 이 smoke는 다음 fresh allocation C9에서 parent/child
+resource-shape와 native NCCL/LMCache 초기화가 함께 성립할 가능성을 높이는
+execution evidence일 뿐이다.
+
+### 74.31 C9 v4 node-entry fallback failure
+
+C9 v4를 current allocation `57700216`에서 한 번 시작했지만, 첫 block의
+vLLM readiness 전에 모든 node가 `independent C8 preregistration differs`로
+종료됐다. v4 contract의 `system_under_test.node_entry`가 누락되어 C9 runner의
+허용된 historical fallback인
+`c8_independent_validation_node_entry.sh`가 선택된 것이 직접 원인이다.
+실제 vLLM/NCCL/LMCache 측정은 시작되지 않았으며, receipt는
+`results/tempo_go_c9_causal_burst_job_57700216_current_source_v4/execution_failure_receipt.json`
+에 `performance_result=false`, `measured_arm_retried=false`로 보존했다.
+
+이 문제를 막기 위해 current-source C9 builder가 contract에
+`eval/sota_4node/c9_gate_node_entry.sh`를 강제로 기록하고, current v5
+contract를 새로 생성했다. v4는 재시도하지 않으며, v5에서만 C9 discovery를
+다시 수행한다.
+
+### 74.28 C9 current-source attempt의 실제 nested-step 실패
+
+§74.27의 current-source contract로 다시 실행한 C9도 첫 block에서
+측정 전에 종료됐다. 이번에는 vLLM readiness는 통과했고 co-job이 시작됐지만,
+실제 child step의 transport receipt가 `network=default`로 남았으며 Slurm이
+`Error configuring interconnect`를 보고했다. 즉 4-node parent allocation의
+`Network=job_vni`만 맞춰서는 부족하고, nested 2-node NCCL/NIXL child
+`srun`에도 반드시 `--network=job_vni`를 전달해야 한다.
+
+실행 중 launcher 파일을 수정한 시점과 child shell parse가 겹쳐 secondary
+`unexpected EOF`도 남았으므로, 이 시도는 network attribution이나 성능
+결과로 사용하지 않는다. 이후
+`run_lmcache_nixl_contention_2node_in_allocation.sh`의 기본 network mode를
+`job_vni`로 고정하고 `job_vni`/diagnostic mode에 대한 shell regression test를
+추가했다. 현재 파일은 `bash -n`을 통과하며, 다음 C9 실행은 수정된 파일을
+먼저 freeze한 뒤 새 allocation에서만 수행한다. 이 receipt는 기존 MD가
+요구사항을 알고 있었지만 parent/child Slurm network 경계를 launcher에서
+끝까지 구현하지 못했던 이유를 명확히 남긴다.
+
+### 74.32 C9 v6/v10 native causal-burst 결과와 harness 버그 수정
+
+#### 실제로 재현된 현상
+
+현재 4-node `gpu_interactive` allocation `57700216`에서 C9 current-source
+v10 campaign을 one-campaign/no-retry로 실행했다. v10 contract SHA는
+`f3f3193b70d8d6f51e0fcf9d7014fb1a219b5362b79997611c45139177ffec55`이고,
+결과 root는
+`results/tempo_go_c9_causal_burst_job_57700216_current_source_v10/`이다.
+`00_app_global_only_a`, `01_full_c9_a`, `02_full_c9_b` 세 block은 inference가
+완료됐고, 모두 같은 native co-job overload가 관측됐다.
+
+| block | inference victim | SLO-good | global reject | route | co-job 결과 |
+|---|---:|---:|---:|---|---|
+| app-global-only A | 124/210 | 120/210 | 86 | local 94, remote 30 | exit 134, LMCache/NIXL timeout |
+| full C9 A | 208/210 | 105/210 | 2 | local 176, remote 32 | exit 134, LMCache/NIXL timeout |
+| full C9 B | 208/210 | 103/210 | 2 | local 176, remote 32 | exit 134, LMCache/NIXL timeout |
+
+세 block의 observer에는 8-rank, 2-node/4-GPU-per-node co-job이 기록됐고,
+LMCache transfer p99는 각각 약 `54.5 s`, `45.2 s`, `6.16 s`까지 상승했다.
+v6에서 보존된 native stderr에는
+`official LMCache/NIXL batched_write exceeded 60.000s`와 UCX
+`mem type unpack ... Input/output error`가 함께 있다. 따라서 이것은
+“Perlmutter interconnect가 한가해서 synthetic하게 만든 문제”가 아니라,
+실제 official LMCache/NIXL data plane이 receiver-incast burst에서 timeout/
+transport failure로 전환된 evidence다. 다만 Cassini OXE counter가 곧바로
+switch wire saturation을 뜻하지는 않으므로, 현재 claim은 **native
+LMCache/NIXL·UCX service/data-plane overload**까지이며 특정 Slingshot link의
+물리 포화까지는 아니다.
+
+#### v10 campaign을 중간에 멈춘 harness 버그
+
+v10의 세 block은 성능 결과가 아니라 C9 discovery receipt다. 네 번째
+`03_app_global_only_b`를 시작하기 전 runner가 이전 vLLM lifecycle의 종료를
+기다리면서 `nvidia-smi`를 단 한 번만 조회했다. 아직 정상적으로 drain 중인
+GPU process가 보이면 `srun`이 exit 1을 반환했고, top-level `set -e`가
+block failure receipt를 쓰기 전에 campaign을 종료시켰다. 이 종료는
+LMCache failure와 별개인 **quiescence-check race**다.
+
+수정 방법은
+`eval/sota_4node/run_tempo_go_c9_causal_burst_discovery_in_allocation.sh`의
+one-shot `test -z "$(nvidia-smi ...)"`를 최대 120초 bounded polling으로
+바꾸는 것이다. 매초 compute-app 목록을 다시 읽고 비면 통과하며, 120초 뒤에도
+남아 있으면 명시적으로 fail-closed한다. process kill, root/UDI 설정 변경,
+`scancel`, 무한 watcher는 사용하지 않는다. 이 source 변경을 반영해 새
+current-source contract v11을 생성했고, 그 SHA는
+`436eca3690909752b48d69b0b351e17114b4979028840e86bade42599d2d23cb`이다.
+
+또 하나의 harness 오류도 수정했다. 이전 stream client는 router decision에
+명시된 HTTP 502 route-failure receipt를 “알 수 없는 HTTP error”로 취급해
+`subprocess.run(check=True)`로 inference lifecycle을 종료했다. 이제 receipt가
+있으면 `route_failure` terminal event로 정확히 닫고, receipt가 없을 때만
+unreceipted failure로 fail-closed한다. analyzer도
+`service_lane_failure`와 `route_failure`를 모두 terminal failure로 세며,
+global reject 또는 terminal failure가 하나라도 있으면
+`performance_claim_allowed=false`다. 관련 regression과 current C8/C9
+source-bound test는 `18 passed`다.
+
+#### 현재 해석과 다음 실행
+
+1. realistic burst를 만들면 실제 bottleneck과 failure가 생긴다. 이번 C9는
+   receiver-incast LMCache/NIXL timeout/UCX error를 직접 남겼다.
+2. 이 사실만으로 TEMPO 성능 우위를 주장할 수는 없다. C9 v10은 discovery
+   중간 결과이고 co-job overload 및 global reject가 있었으므로 independent
+   performance claim은 닫혀 있다.
+3. global orchestrator의 actuator는 route 하나가 아니다. business admission,
+   decoder service lane, P×D pair/source balance, LMCache in-flight/receiver
+   reservation, fabric/transport health, failure quarantine를 함께 조절해야
+   overload에서 victim과 background를 동시에 평가할 수 있다.
+
+이 절의 다음 순서였던 v11 source-bound C9 실행은 이후 v17 four-arm discovery로
+완료됐다. C9 v10 partial 결과를 complete campaign처럼 합치지 않는다. C8 v48의
+큰 positive table도 discovery 결과로 보존하되 independent result로 승격하지 않는다.
+현재 해석과 다음 mechanism은 아래 §74.33을 따른다.
+
+### 74.33 pair-local receiver-price 수정 후 C9 v17 native 결과
+
+#### 이번 단계에서 고친 것
+
+기존 기록을 다시 대조한 결과, v0~v600의 결과가 없었던 것이 아니라 서로 다른
+질문과 source snapshot이 섞여 있었다. 이번 단계에서는 최신 C9를 새로 날려
+과거 수치를 덮지 않고, 다음 네 가지 결함을 각각 분리해 고쳤다.
+
+1. **정책 profile 누락:** v11 profile에는
+   `cross_layer_local_receiver_price_ms`가 없어 pair0의 관측된 LMCache receiver
+   pressure가 같은 decoder pair의 local 후보 비용으로 들어가지 않았다. 기존
+   `_local_receiver_externality_ms()` 구현은 있었지만 profile이 이를 켜지 않아
+   기능적으로 dead path였다. v51 C8 base는 기존 pair-local profile v3와
+   `0.1 ms` receiver price를 명시적으로 고정한다.
+2. **controller action 오염:** pair-scoped LMCache pressure를 local 후보 점수에
+   반영하는 것과 local dispatch를 sleep/stagger하는 것은 다른 actuator다. 이전
+   수정은 remote pressure를 local action signal에도 넣어, local work까지
+   불필요하게 지연시켰다. 이제 pressure는 route score에만 externality로 적용하고,
+   local dispatch limit/stagger는 해당 local work가 실제로 공유하는 NCCL/Cassini
+   signal만 사용한다. `test_pair_local_receiver_price_moves_local_work_off_hot_decoder`
+   regression으로 pair0→pair1 이동을 고정했다.
+3. **native launcher port 충돌:** v15에서 이전 arm의 잔존 listener와 고정 NIXL
+   port가 겹쳐 rank4가 `ZMQError: Address already in use (tcp://*:37030)`로
+   종료됐다. 이는 interconnect 성능 결과가 아니다. 결과 root의 SHA를 port offset에
+   넣어 같은 allocation의 분리된 campaign이 서로 다른 rendezvous port를 쓰도록
+   바꿨다.
+4. **pre-performance receipt 누락:** vLLM/co-job/observer readiness에서 실패하면
+   attempt를 `failed_before_performance_result`로 닫는 receipt를 즉시 쓴다. 따라서
+   readiness/setup 실패가 성능 negative나 positive로 집계되지 않는다. HTTP 5xx도
+   명시적인 route-failure receipt가 있을 때만 정상 terminal event로 닫고, 무증빙
+   5xx는 fail-closed한다.
+
+CPU regression은 C9/controller/telemetry 관련 테스트 **98 passed**이며 runner와
+node entry의 `bash -n`도 통과했다. root/UDI/sudo/Slurm cancel은 사용하지 않았다.
+
+#### v15 setup failure와 v17 discovery를 분리
+
+v15 결과 root
+`results/tempo_go_c9_causal_burst_job_57704230_current_source_v15_r1/`는
+위 port collision으로 inference 성능 측정 전에 닫힌 setup-only receipt다. 이를
+성능 결과에 합치지 않는다.
+
+수정된 launcher로 같은 승인된 4-node `gpu_interactive` allocation
+`57704230`에서 v17을 한 campaign/no-retry로 실행했고, 결과는
+`results/tempo_go_c9_causal_burst_job_57704230_current_source_v17_r1/`에 있다.
+네 arm 모두 native co-job과 observer를 완료했다. v17 contract SHA는
+`da7152f335b421441ce05a13f4c68ddd4e1d272d70e5977388cec8d183af8dec`이며,
+다음 실행을 위한 현재 source-bound contract는
+`results/tempo_go_c9_causal_burst_current_source_v18.json` (SHA
+`132ce364f44f2688ee0a560594c22bb1b86538292c26ef42cc6bec6ab1adaea3`)으로
+동결했다. v18은 launcher 변경 이후의 재현 계약이고 아직 native 성능 run을
+의미하지 않는다.
+
+#### v17 관측값과 해석
+
+| arm | normal SLO / p99 | miss-hot SLO / p99 | remote-favorable SLO / p99 | route 변화 |
+|---|---:|---:|---:|---|
+| app-global-only A | 54/60 / 21.873 s | 109/120 / 10.773 s | 30/30 / 3.212 s | local 180, remote 30 |
+| full C9 A | 60/60 / 3.229 s | 25/120 / 29.321 s | 30/30 / 3.425 s | local 172, remote 37 |
+| full C9 B | 60/60 / 3.210 s | 20/120 / 20.093 s | 30/30 / 5.803 s | local 178, remote 32 |
+| app-global-only B | 50/60 / 9.560 s | 120/120 / 3.311 s | 30/30 / 3.351 s | local 180, remote 30 |
+
+full C9는 pair-local receiver price 때문에 local:d0가 143건에서 115/123건으로
+줄고 local:d1 및 remote p0→d1/p1→d1 edge가 실제로 열렸다. 즉 cross-layer
+telemetry가 관측만 된 것이 아니라 route actuation까지 발생했다. 그러나 remote
+receiver pressure가 이미 높은 burst에 remote victim을 더 보낸 결과 miss-hot
+tail이 악화됐다. analyzer의 aggregate gate는 다음과 같다.
+
+- `native_transport=true`, `correctness=true`, `full_cross_layer_actuation=true`
+- `at_least_one_stressed_p99_reduction=false`, `stressed_slo_not_lower=false`
+- normal은 full p99가 약 79.5% 낮고 SLO 60/60이지만, miss-hot은 full SLO
+  fraction 0.1875 대 blind 0.9542, p99 reduction `-250.8%`다.
+- observer는 co-job evidence가 수집된 pair0에 대해서는 정확했으나 pair1을
+  `not_collected`로 둔 설계 때문에 `full_observer_supported=false`
+  (supported 200/420, 0.4762)다. 이 값을 임의로 0.5 이상으로 보정하지 않는다.
+
+따라서 v17의 결론은 “문제가 없다”도 “TEMPO가 무의미하다”도 아니다. 실제
+official LMCache/NIXL-UCX receiver-incast에서 transfer p99가 약 6–39초까지
+상승했고, 일부 arm에서는 NCCL p99도 약 38.7 ms까지 관측됐다. 이것은 realistic
+overload가 실존한다는 증거다. 동시에 단일 scalar receiver price로 route만
+바꾸는 현재 정책은 그 overload를 해결하지 못하며, 오히려 피해자를 이미 뜨거운
+remote service로 이동시킬 수 있다는 재현 가능한 negative다.
+
+#### 다음에 고칠 mechanism과 기존 결과 사용 규칙
+
+다음 policy는 coefficient를 더 조정하는 방향이 아니라, (a) pair별 local/remote
+receiver service budget, (b) source·edge·receiver 공동 admission과 in-flight
+reservation, (c) hot pair quarantine 및 bounded fallback/reject, (d) pair1까지
+포함한 co-job telemetry coverage를 하나의 decision transaction으로 묶어야 한다.
+그 정책으로 v18 source-bound native discovery를 한 번 수행한 뒤, 같은 population의
+blind/full paired gate를 통과할 때만 성능 claim으로 승격한다.
+
+기존 v0~v600 결과는 다음처럼 사용한다.
+
+- C4 및 route-only 결과: shared decoder admission과 fairness가 빠지면 안 된다는
+  **negative motivation**.
+- v0~v450 actual vLLM/LMCache와 v452~v544b late raw: workload, cache residency,
+  phase/microburst, failure 및 환경 boundary를 찾은 **mechanism discovery**.
+- C7/C8 및 C9 historical positive: global transaction이 잘 맞는 regime의
+  **discovery/후보 evidence**이지 current source의 independent headline이 아님.
+- C9 v10/v11/v17: native overload, harness boundary, receiver-price policy의
+  **failure/negative evidence**. setup receipt와 성능 receipt를 섞지 않는다.
+
+즉 “기존 것을 다시 했는데 왜 시간 낭비했나”에 대한 답은, 과거 기록이 해결한 것은
+각각의 이전 gate였고 최신 목표의 source-bound causal gate까지 자동으로 닫아주지는
+않았기 때문이다. 이번 v17은 그 경계를 명확히 했고, 다음 작업은 같은 burst를
+반복하는 것이 아니라 receiver-aware 공동 admission mechanism을 구현한 뒤 v18
+계약으로 새로 검증하는 것이다.
+
+### 74.34 receiver hard-guard 구현과 v19 native 결과
+
+#### v17에서 확인된 결함을 어떻게 고쳤는가
+
+v17의 negative는 receiver signal을 읽지 못한 것이 아니라, 읽은 signal을
+`local receiver price`라는 scalar route score로만 사용한 것이 문제였다. hot한
+`p0→d0` remote 후보의 비용을 올려도, 후보 생성기가 다른 remote edge 또는
+local decoder를 계속 선택할 수 있었고, source·edge·receiver의 남은 budget을
+동시에 예약하지 않았다. 따라서 다음 수정은 계수 조정이 아니라 feasibility
+단계에 hard guard를 넣는 것이었다.
+
+구현 위치는 `tempo/pd_global_orchestrator.py`다.
+
+```text
+cross_layer_remote_receiver_guard_mode = "disabled" | "deny_while_hot"
+cross_layer_remote_receiver_guard_p99_ms > 0
+```
+
+`deny_while_hot`일 때 pair-scoped
+`lmcache_transfer_p99_ms >= cross_layer_remote_receiver_guard_p99_ms`인
+REMOTE 후보를 feasibility 단계에서 거부하고 rejection reason을
+`cross_layer_remote_receiver_hot`으로 남긴다. 이 guard는 다음 세 가지를
+명확히 분리한다.
+
+1. receiver pressure를 utility score에 더하는 soft externality,
+2. hot receiver에 새 remote work를 보내지 않는 hard admission,
+3. local fallback·bounded wait·business reject를 결정하는 global lease.
+
+이번 v19에서는 profile
+`results/tempo_go_c9_pair_local_campaign_v5/real_tempo_go_c9_pair_local_profile_v5_receiver_guard.json`
+에 guard mode와 `250 ms` p99 ceiling을 명시했다. C8 base contract는
+`results/tempo_go_c8_dual_regime_contract_v52_receiver_guard.json`이며 SHA는
+`b13e7f056dd338c071b22094a97b82e84fc3b8555381e1c62c3293b0aa1bfadc`다.
+receiver guard profile SHA는
+`3407288ffacc73f532767fcd26c6572a74a5c1b28650f9bb588e362a4ea48f34`다.
+
+CPU regression은 hot remote 후보가 거부되는지, local fallback은 여전히
+가능한지 확인한다. 전체 controller/source regression은 **124 passed**로
+끝났고, shell syntax도 통과했다. 따라서 v19의 관측값은 수정되지 않은
+v17 source에서 나온 결과가 아니라 guard를 포함한 current-source chain이다.
+
+#### 실행 경계와 실패 receipt
+
+v19 native campaign은 승인된 4-node `gpu_interactive` allocation
+`57704230`에서 진행했다. 앞선 r1–r6은 서로 다른 launch-boundary 문제를
+성능 결과와 섞지 않고 setup-only receipt로 분리했다.
+
+| attempt | 결과 | 성능 집계 여부 | 직접 원인 |
+|---|---|---:|---|
+| r1 | setup-only failure | 아니오 | outer step이 1 node/8 CPU shape라 nested 4-node runner를 수용하지 못함 |
+| r2 | setup-only failure | 아니오 | 잘못된 outer shape와 vLLM/NIXL lifecycle 잔류 |
+| r3 | launch failure | 아니오 | child/outer `job_vni` interconnect configuration failure |
+| r4–r5 | setup-only failure | 아니오 | 이전 실패 뒤 잔류한 exact result-root process/state |
+| r6 | setup-only failure | 아니오 | GPU reservation 없이 native vLLM을 시작한 뒤 child 8-rank step이 interconnect 실패 |
+| r7 | **complete** | **예, discovery만** | full allocation shape를 그대로 attach한 `srun --jobid=... --overlap --exact --network=job_vni` |
+
+최종 r7 결과 root는
+`results/tempo_go_c9_causal_burst_job_57704230_current_source_v19_r7/`이고,
+분석 receipt는 그 아래 `analysis.json`이다. current-source contract는
+`results/tempo_go_c9_causal_burst_current_source_v19.json`이며, base C8 v52와
+다음 source inventory를 고정한다.
+
+```text
+contract: tempo-go-c9-causal-burst-discovery-v1
+base: C8 v52 receiver-guard
+node entry: eval/sota_4node/c9_gate_node_entry.sh
+transport: official LMCacheConnectorV1 NIXL-UCX + NCCL AWS Libfabric/CXI
+burst: 4-to-1 receiver incast, 2 GiB aggregate KV burst, 100 ms gap
+claim boundary: discovery_only=true, performance_claim_allowed=false
+```
+
+여기서 `r7`의 성공은 Slurm/network launch와 application receipt가 완결됐다는
+뜻이지, 특정 물리 Slingshot link가 wire-rate 포화됐다는 뜻은 아니다. v19가
+직접 확정하는 병목은 official LMCache/NIXL receiver-incast service/data-plane
+overload이며, Cassini counter만으로 switch link saturation을 주장하지 않는다.
+
+#### v19 결과
+
+두 paired arm을 합친 aggregate는 다음과 같다. 모든 arm에서 native transport와
+correctness receipt는 닫혔지만, 이 campaign은 prior pilot에서 선택한 overload
+geometry를 사용하므로 independent performance claim은 계속 닫혀 있다.
+
+| arm | regime | blind SLO-good | full guard SLO-good | blind p99 | full p99 | 판정 |
+|---|---|---:|---:|---:|---:|---|
+| normal | app-global-only → full C9 | 106/120 (88.3%) → 120/120 (100%) | 20.536 s → 3.234 s | 정상 regime 개선 |
+| miss-hot | app-global-only → full C9 | 236/240 (98.3%) → 38/240 (15.8%) | 6.089 s → 26.528 s | **stressed negative** |
+| remote-favorable | app-global-only → full C9 | 60/60 (100%) → 60/60 (100%) | 3.236 s → 3.467 s | 유의미한 우위 없음 |
+
+분석 receipt의 정확한 policy aggregate는 `app_global_only`와 `full_c9` 아래에
+있으며, 주요 gate는 다음과 같다.
+
+```text
+native_transport                         true
+correctness                              true
+full_cross_layer_actuation               true
+same_population                          true
+normal_p50_regression_bounded             true
+full_observer_supported                  false (207/420 = 0.492857)
+at_least_one_stressed_p99_reduction      false
+stressed_slo_not_lower                   false
+performance_claim_allowed                false
+```
+
+guard가 실제로 작동했다는 증거도 raw receipt에 있다. 다음 두 full arm의
+hot-d0 raw file에서 각각 `cross_layer_remote_receiver_hot` rejection이
+**62회** 발생했고, full A에서는 hot pair `remote:p0→d0` edge가 사라지고
+대체 `remote:p1→d1` edge가 33회 열렸다. full B에서도 hot edge는 줄었지만
+`remote:p0→d0`가 25회 남았고 대체 edge들이 함께 사용됐다. 즉 controller가
+무시되거나 항상 local만 고른 것이 아니다. hard guard는 admission을 바꿨지만,
+대체 receiver의 budget과 decoder service debt를 공동 예약하지 못해 피해가
+다른 경로로 이동했다.
+
+#### v19가 확정한 연구 결론
+
+v19는 다음 세 문장을 분리해서 확정한다.
+
+1. **현상은 실존한다.** realistic한 burst를 실제 vLLM P/D, official
+   LMCache/NIXL-UCX, NCCL/CXI co-job과 함께 주면 receiver-incast p99가
+   수 초에서 수십 초로 튀며 timeout/transport failure와 tail 붕괴가 생긴다.
+2. **orchestration은 필요하다.** normal과 miss-hot의 최적 경로가 다르고,
+   local/remote 어느 하나도 항상 안전하지 않으므로 business admission,
+   decoder lane, source/edge/receiver capacity, cache inflight, fabric health를
+   함께 볼 global controller가 필요하다.
+3. **현재 TEMPO mechanism은 아직 해결책이 아니다.** pair-local scalar price와
+   receiver hard guard만으로는 부족하다. v19의 stressed SLO 15.8%는 blind
+   98.3%보다 낮고 p99도 6.089초에서 26.528초로 악화됐다. 이것은 TEMPO의
+   가치가 없다는 결과가 아니라, global orchestrator가 “뜨거운 edge를 피하는
+   router”보다 강해야 한다는 falsifiable negative다.
+
+따라서 다음 implementation gate는 더 많은 threshold sweep이 아니다. 필요한
+것은 다음 하나의 atomic decision transaction이다.
+
+```text
+observe pair-local telemetry for P0-D0 and P1-D1
+  → reserve source + edge + receiver + decoder service budget together
+  → admit only if the whole route has a bounded completion envelope
+  → otherwise bounded local fallback or explicit business-aware reject
+  → quarantine hot pair and release every lease exactly once
+```
+
+특히 pair1도 co-job·LMCache semantic/byte·NCCL/CXI signal을 같은 epoch에서
+수집해야 한다. 현재 observer support 207/420은 거의 절반이므로, 다음 성능
+campaign 전에 `full_observer_supported >= 0.5`를 형식적으로 넘기는 것이 아니라
+두 pair 모두의 supported scope를 명시적으로 닫아야 한다.
+
+#### 기존 결과를 읽는 법과 버그 수정 위치
+
+수백 개의 v 파일은 한 줄짜리 연속 버전이 아니다. 아래 순서로 읽어야 한다.
+
+| 목적 | 우선 읽을 위치 | 무엇을 배웠는가 |
+|---|---|---|
+| 전체 목표·gate·실패 이유 | 이 문서 §74.24–§74.34 | 현재 source와 claim boundary |
+| v0–v450 실제 P/D·LMCache | `paper/TEMPO_RESEARCH_MASTER_STATE_AND_NEXT_GOAL.ko.md` | endpoint, cache, phase, workload 발견 |
+| v452–v544b late raw/실험 | 같은 master state 및 각 `results/` compact analysis | setup·timeout·negative 분류 |
+| route-only 실패 | C4 관련 `eval/sota_4node/TEMPO_PD_*.md` | decoder admission/fairness 없이는 부족 |
+| controller·business·pair scaling | `paper/TEMPO_GLOBAL_ORCHESTRATOR_CANONICAL_PLAYBOOK.ko.md` | global transaction의 설계 근거 |
+| 최신 native overload | C9 v10/v17/v19 결과 root | 문제 실존과 현재 policy 실패 |
+| 버그 수정 코드 | `tempo/pd_global_orchestrator.py`, `tempo/pd_global_profile.py`, `eval/sota_4node/run_tempo_go_c9_causal_burst_discovery_in_allocation.sh` | guard/profile/port/quiescence/receipt |
+
+실패를 고칠 때는 다음 규칙을 지킨다.
+
+- profile에 값이 없으면 “지원 안 됨”이지 0 pressure가 아니다. 필요한 signal은
+  contract와 profile에 명시한다.
+- parent `job_vni`만 맞추지 말고 nested child `srun`에도 같은 network mode를
+  전달한다. outer allocation shape는 full allocation에 attach하고, 임의의
+  1-node/8-CPU outer step로 4-node child를 감싸지 않는다.
+- NIXL rendezvous port는 결과 root hash로 분리한다. 고정 port를 재사용하지
+  않는다.
+- `nvidia-smi` quiescence는 bounded polling으로 확인하고, readiness·transport
+  failure는 성능값으로 집계하지 않는 pre-performance receipt를 쓴다.
+- exact result-root에 속한 process만 정리한다. root/UDI/sudo/system 설정과
+  알 수 없는 process kill, 무승인 Slurm cancel/retry는 하지 않는다.
+
+이 절의 최종 상태는 “다시 처음부터 컴포넌트를 만들자”가 아니다. v0–v600에서
+발견한 모든 partial signal을 유지하되, 다음 실험의 대상은 **Perlmutter 4-node
+global admission transaction** 하나로 고정한다. 성공 조건은 같은 native burst와
+동일 population에서 strongest fixed·simple predictor·cross-layer-blind보다
+stressed p99/SLO·background goodput·fairness가 함께 좋아지는 것이고, 실패하면
+어느 shared budget reservation이 빠졌는지 raw receipt로 특정하는 것이다.
+
+### 74.35 v21–v26 launch-boundary 재검증: 실제 원인과 현재 상태
+
+v21에서 다시 발생한 `Error configuring interconnect`는 TEMPO policy나 LMCache
+transfer latency가 만든 overload 결과가 아니었다. `results/tempo_go_c9_causal_burst_job_57708417_current_source_v21_r2/`
+의 launcher stderr에는 co-job child의 task 0–3이 Slurm interconnect 구성 단계에서
+실패하고, 살아남은 rank 4–7이 `nid001216:36027` TCPStore를 기다린 기록이 있다.
+따라서 v21은 `failed_before_performance_result`이며 성능 표본이 아니다.
+
+원인은 parent attach, vLLM child, NCCL/LMCache child가 모두 `job_vni`를 요청한
+동시 step 구조였다. Perlmutter 공식 문서는 GPU `srun`에 GPU 자원을 명시해야
+한다고 설명하고, DDT 문서도 필요한 `srun` 자원 인자가 빠지면 같은
+`Error configuring interconnect`가 날 수 있다고 명시한다. 동시에 실행하는
+실제 application step만 native network resource를 사용해야 한다. 따라서 현재
+구조는 다음처럼 고정한다.
+
+```text
+4-node allocation: Network=job_vni
+  outer orchestration attach: --network=no_vni
+    vLLM P/D child: --network=job_vni, --gpus-per-node=4, --cpus-per-task=128
+    NCCL/LMCache child: --network=job_vni, --gpus-per-node=4, --cpus-per-task=32
+```
+
+v22는 이 수정 위치를 runner 내부 vLLM step에 잘못 적용해 vLLM child 자체를
+`no_vni`로 만들었으므로 폐기했다. v23/v24는 parent-step receipt parser의
+중복 `Network=` 출력과 `awk` 내장 함수명 충돌을 드러냈고, v25에서 parser가
+정상 통과했다. 그러나 v25는 이전 중단 실행이 남긴 vLLM router/frontend가
+`27420`과 `30420`을 점유해 `address already in use`로 끝났다. 이 역시
+performance-invalid이다.
+
+현재 v26은 이 세 문제를 모두 반영한다. runner는 outer step이 실제로
+`no_vni`인지 확인하고, vLLM/co-job child에는 각각 고유 step name을 부여한다.
+종료 시에는 현재 allocation의 해당 exact named child step만 정리하며 allocation
+자체나 무관한 step은 건드리지 않는다. arm 간 quiescence probe도 `no_vni`로
+분리하고, result-root hash를 vLLM port에 반영해 이전 root의 listener/TIME_WAIT
+충돌을 줄인다. 관련 source-bound contract는
+`results/tempo_go_c9_causal_burst_current_source_v26.json`(SHA
+`b480542edc63bb9d81f7936d7cee8d11bb81f497ff532472d84a50eacc26b43c`)이며,
+관련 static/source-bound test는 **13 passed**다.
+
+승인 allocation `57708417`에서 v26은 현재 첫 arm의 실제 측정 중이다. 실행 receipt는
+outer `.20 Network=no_vni`, vLLM `.21 Network=job_vni`, co-job `.22
+Network=job_vni`를 보였고, native co-job은 `nixl-ready`,
+`producer_state=active`, `correctness_met=true`를 먼저 발행했다. 이 arm의
+`result.json`과 네 arm aggregate가 닫히기 전에는 v26을 성능 positive/negative로
+승격하지 않는다. v21–v25의 setup/parser/stale-process 실패도 기존 v17/v19
+성능 결과와 합치지 않는다.
+
+이번 재검증으로 “기록을 안 봐서 같은 일을 반복했다”는 문제도 명확해졌다. §58,
+§62와 §74.34에 이미 원칙이 있었지만, 실제 launcher의 **outer attach와 inner
+vLLM step을 구분하는 필드**, 중단 시 **named child-step cleanup**, 그리고
+**vLLM port까지 result-root에 bind하는 규칙**이 완전히 닫히지 않았다. 이제
+다음 판단은 launch가 아니라 v26 전체 arm의 동일-population latency,
+SLO-goodput, fairness, background completion과 observer coverage다.
+
+v26 첫 arm의 중간 receipt는 이 판단의 workload가 실제로 과부하를 만들고 있음을
+보여준다. co-job block 19에서 rank 0–3의 official LMCache/NIXL
+`batched_write`가 60초를 넘었고, receiver rank에는 UCX
+`uct_ep_put_short()` I/O error가 남았다. observer는 sequence 19까지
+`correctness_met=true`였다. 이것은 “부하가 안 생긴다”가 아니라 실제 P/D
+victim과 같은 allocation에서 발생한 NIXL receiver/data-plane overload다.
+반면 아직 C5 `result.json`이 닫히지 않았으므로 이 중간 receipt만으로 TEMPO의
+latency 개선률이나 물리 switch wire-rate 포화율을 주장하지 않는다.
+
+### 74.36 v26 후처리 portability hardening과 실제 중단 원인
+
+v26의 raw를 다시 확인한 결과, vLLM inference 자체는 일곱 measured block의
+raw를 모두 기록했다. 각 block은 `validation.all_streams_valid=true`,
+`terminal_contract_valid=true`, failure 0으로 닫혔고, 예를 들어
+`00_control_a`는 30건, `01_remote_cool_hot_d0`는 264건,
+`02_combined_hot_d0`는 498건, `05_p_only_dual_decoder_hot`는 1,374건을
+완료했다. 그러나 co-job은 block 19에서 의도한 overload timeout으로 exit 134했고,
+runner가 그 사실을 검증하는 부분에 다음 호출이 남아 있었다.
+
+```bash
+rg -q 'official LMCache/NIXL batched_write exceeded [0-9.]+s' \
+  "${cojob_dir}"/cojob-rank-*.stderr.log
+```
+
+Perlmutter login/compute step에서 `rg`가 보이는 경우도 있지만 이는 VS Code
+확장 경로에 의존한 것이며 native launcher의 보장된 시스템 유틸리티가 아니다.
+따라서 이 호출을 `/usr/bin/grep -Eq`로 바꿔 portability를 harden했다. 다만
+compute step에서 `rg`가 실제로 없었다는 것은 v26 receipt로 입증되지 않았다.
+이 변경을 v26 중단의 직접 원인으로 기록하지 않는다.
+
+v26이 block execution receipt와 top-level `analysis.json`을 남기지 않은 직접 원인은
+다음과 같다. co-job이 block 19에서 overload timeout으로 종료한 뒤 C8 inference는
+raw bundle을 쓰고 node-0의 최종 complete/result 정리를 진행 중이었다. 당시 세션이
+끊긴 것으로 판단해 exact child step `.20`과 `.21`을 수동 정리했고, 실제 stderr에는
+`.21 ... CANCELLED ... DUE to SIGNAL Killed`가 기록됐다. 이 정리로 inference
+finalizer가 죽어 `result.json`, block receipt, top-level analysis가 생기지 않았고
+`attempt.json`은 `running`으로 남았다. 즉 v26은 **native overload evidence는
+있지만, 중간 정리로 campaign finalization을 잃은 execution-incomplete receipt**다.
+NCCL/Slingshot/LMCache의 두 번째 원인이나 `rg` command-not-found로 단정하지 않는다.
+
+수정은 `grep -Eq`로 대체하고 `test_tempo_go_c9_causal_burst_discovery.py`에
+`rg -q`가 없으며 해당 `grep -Eq`가 존재한다는 regression을 추가하는 것이다.
+현재 source-bound contract는 버전 suffix 변경으로 launcher hash를 다시 깨뜨리지
+않도록
+`results/tempo_go_c9_causal_burst_current_source.json`으로 고정했고 SHA는
+`1e1074614826d12fe865d1b23a58aef57a8db06b7a7fdd33932c6b856c564c28`이다.
+`bash -n`과 C9 current-contract/discovery test는 **9 passed**다.
+
+따라서 v26의 올바른 판정은 다음과 같다.
+
+- `57708417`의 `.20` outer attach는 `no_vni`, `.21` vLLM과 `.22` native
+  co-job은 `job_vni`였고, launch-boundary bug는 해결됐다.
+- v26 raw는 실제 native LMCache/NIXL receiver overload의 discovery evidence다.
+- 하지만 inference child를 finalization 전에 정리했으므로 v26은 complete
+  four-arm C9 performance result가 아니다. raw를 임의로 final result로 승격하지
+  않고, 수정된 current-source contract로 새 one-campaign run을 해야 한다.
+- 다음 실행 전 필수 preflight는 `command -v grep`, `bash -n`, source inventory
+  SHA, exact child-step network receipt와 GPU quiescence이며, `rg` 의존성을
+  다시 추가하지 않는다.
+
+### 74.37 v27 C9 완주: launch/finalization은 해결됐지만 receiver guard는 negative
+
+수정된 current-source contract
+`results/tempo_go_c9_causal_burst_current_source.json`(SHA
+`1e1074614826d12fe865d1b23a58aef57a8db06b7a7fdd33932c6b856c564c28`)로 승인된
+allocation `57708417`에서 v27 C9를 한 campaign/no-retry로 완주했다. 결과 root는
+`results/tempo_go_c9_causal_burst_job_57708417_current_source_v27_r1/`이고,
+`completed_attempt.json`과 top-level `analysis.json`이 존재한다. 네 block 모두
+inference `result.json`, `block_execution_receipt.json`, native co-job failure
+receipt를 남겼으며 co-job observer는 correctness를 유지한 채 `sequence=19,
+36, 36, 20`, LMCache transfer p99 약 `6.0–6.5 s`에서 official NIXL timeout으로
+종료했다. v26과 달리 inference child를 finalization 전에 정리하지 않았다.
+
+v27 analyzer의 최종 gate는 다음과 같다.
+
+```text
+correctness                         true
+native_transport                    true
+same_population                     true
+full_cross_layer_actuation          true
+normal_p50_regression_bounded        true
+full_observer_supported              false (208/420)
+at_least_one_stressed_p99_reduction false
+stressed_slo_not_lower              false
+performance_claim_allowed           false
+```
+
+| regime | blind/full SLO | full p99 | 판정 |
+| --- | ---: | ---: | --- |
+| normal | 0.9333 / 1.0000 | 28.51 s aggregate full arm 기준 | 정상부하 개선은 관측됨 |
+| miss-hot | 0.9958 / 0.1417 | 6.42 s blind 대비 full reduction `-215.7%` | receiver guard가 대체 경로로 부하를 이동시킨 negative |
+| remote-favorable | 1.0000 / 1.0000 | full reduction `-31.7%` | remote correctness는 유지되나 tail 개선 없음 |
+
+full arm의 개별 실행에서도 miss-hot SLO는 `14/120`, `20/120`으로 반복됐고
+p99는 각각 `18.22 s`, `26.73 s`였다. app-global-only arm은 `118/120`,
+`119/120`이었으므로 workload와 victim traffic 자체가 사라진 것이 아니다.
+모든 block의 co-job outcome은 `overload_timeout`, exit `134`, observer
+`correctness_met=true`였으므로 native LMCache/NIXL receiver overload도 반복됐다.
+
+이 결과는 v17/v19의 결론을 강화한다. pair-local receiver price와
+`deny_while_hot` hard guard는 hot remote 후보를 차단하는 actuator이지만, source·edge·
+receiver·decoder의 남은 service capacity를 하나의 transaction으로 예약하지 않아
+miss-hot 피해를 다른 경로로 이동시킨다. 따라서 receiver threshold, p99 ceiling,
+route weight를 더 sweep하지 않는다. 다음 Candidate J는 pair×route별 decoder/P/
+remote/transfer/semantic/endpoint residual을 deadline까지의 service forecast로
+계산하고, latency/interactive protected lane과 batch/background elastic lane을
+분리하는 service-feasibility lease를 구현해야 한다. lease 불가능 시에는 surviving
+pair 재평가 또는 명시적 `global_service_lane_unavailable`/`global_tenant_slo_infeasible`
+terminal event를 남겨 completed-only latency로 결과를 숨기지 않는다.
+
+### 74.38 Candidate J CPU closure와 native 승격 전 상태
+
+v27의 negative를 receiver threshold 조정으로 덮지 않고, 관측된 service residual을
+global admission transaction에 넣는 Candidate J를 구현했다. 변경된 source는
+`tempo/pd_global_orchestrator.py`의 opt-in
+`service_feasibility_mode=deadline_residual_v1`과
+`service_forecast_safety_factor`이며, profile round-trip은
+`tempo/pd_global_profile.py`와
+`eval/sota_4node/build_tempo_go_admission_budget_profile.py`에서 닫힌다.
+일반 admission decision은 decoder running+waiting, endpoint residual/queue,
+pending service-lane reservation, remote이면 source/edge/semantic/KV residual을
+겹치는 관측값으로 중복 합산하지 않고 최대 service wave로 계산한다. deadline까지의
+예상 service가 남은 budget을 넘으면 `global_service_lane_slo_infeasible`로
+거부하고, 선택된 request의 decision receipt에
+`service_queue_delay_ms`와 `service_forecast_ms`를 남긴다. 기본 mode는 disabled라서
+historical profile의 semantics는 바뀌지 않는다.
+
+수정 중 발견된 실제 regression은 일반 `_dispatch_locked`가 선택된 Candidate J
+forecast field를 `GlobalDecision`에 전달하지 않던 누락이었다. 이를 고친 뒤 공식
+Perlmutter `.vllm_venv` (`pytorch/2.8.0`)에서 다음 결과를 얻었다.
+
+```text
+focused orchestrator + cross-layer tests: 94 passed
+all tempo/test_pd_*.py: 345 passed, 2 failed (historical fixture mismatch)
+```
+
+두 실패는 Candidate J와 무관하다. `test_pd_cache_affinity_composition_v9.py`는
+구현의 `qwen25-7b-tp4x2-warm-affinity-8`과 다른 `...-9` ID를 기대하고,
+`test_pd_workload_policy_fail_closed.py`는 현재 구현이 허용하는 output=256 경로를
+여전히 unvalidated로 기대한다. 이 두 history/implementation 충돌은 임의로 바꾸지
+않고 별도 정리 대상으로 남긴다.
+
+Candidate J profile
+`results/tempo_go_c5_candidate_j_service_feasibility_v1/frozen_global_profile.json`을
+생성해 기존 held-out frozen profile을 보존했다. 같은 2,712-row workload와
+baseline profile을 분리해 deterministic replay한 receipt는
+`results/tempo_go_c5_candidate_j_service_feasibility_v1/heldout_cpu_replay.json`이다.
+모든 arm은 terminal/leak invariant를 통과했지만 이 harness는 GPU/NCCL/LMCache/
+Slingshot latency를 모델링하지 않으므로 `performance_claim_allowed=false`이고
+native 승인을 주지 않는다. Candidate J의 CPU replay는 control-plane feasibility
+guard가 실행된다는 사실만 보이며, native 성능 개선으로 해석하지 않는다.
+
+다음 실행 gate는 다음 순서로 고정한다.
+
+1. Candidate J source/profile/launcher를 새 immutable current-source contract에
+   결박하고, 기존 workload/tenant/population을 그대로 유지한다.
+2. 승인된 하나의 4-node/4-hour `gpu_interactive` allocation에서 preflight,
+   child-step network receipt, GPU quiescence, observer readiness를 확인한다.
+3. v27과 동일한 four-arm native C9를 one-campaign/no-retry로 실행하되, inference
+   finalizer가 끝나기 전에 child를 수동 정리하지 않는다.
+4. blind/full과 Candidate J를 normal, miss-hot, remote-favorable별로 p50/p95/p99,
+   request/output-token goodput, SLO-goodput, reject reason, tenant fairness,
+   service forecast receipt, NCCL/LMCache observer sequence로 분석한다.
+5. stressed p99 또는 SLO-goodput 개선 gate가 닫히지 않으면 positive claim을
+   만들지 않고, 어느 service wave가 실제 병목인지 raw receipt로 분리한다.
+
+### 74.39 Candidate J native C9 결과: overload는 재현됐지만 hard feasibility만으로는 부족
+
+Candidate J native contract
+`results/tempo_go_c9_candidate_j_service_feasibility_v1/tempo_go_c9_candidate_j_contract.json`
+(SHA `8cb0e5bd90d836591017f9b9beb505ad3e0fa130a31353538afdc7fb1cc20ccb`)를
+승인된 4-node allocation `57708417`에서 실행했다. `r2`와 `r3`는 각각 outer
+orchestrator/GRES 및 nested CPU/GPU step shape 문제로 측정 전에 종료되어
+failure receipt로 보존했고, 최종 `r5`는 outer `no_vni`, vLLM/co-job
+`job_vni`, rank-0 단일 orchestrator, `--gpus=0 --gres=none` control step으로
+네 arm을 모두 완주했다. 최종 결과는
+`results/tempo_go_c9_candidate_j_service_feasibility_v1/native_job_57708417_r5/analysis.json`
+(SHA `884bc0c860db16e81c08c9932bbfc2b3dc885c8d59dbc184321a177ece605a3d`)이다.
+
+| arm | normal p99 / SLO | miss-hot p99 / SLO | remote-favorable p99 / SLO |
+| --- | ---: | ---: | ---: |
+| app-global-only A | `9.03 s / 50/60` | `10.46 s / 115/120` | `3.25 s / 30/30` |
+| full C9 A | `3.18 s / 60/60` | `23.09 s / 14/120` | `3.32 s / 30/30` |
+| full C9 B | `3.20 s / 60/60` | `22.98 s / 24/120` | `3.37 s / 30/30` |
+| app-global-only B | `31.96 s / 56/60` | `3.30 s / 120/120` | `3.25 s / 30/30` |
+
+네 block의 native observer는 모두 correctness를 유지한 채 active window를
+발행했고 sequence는 `20, 37, 36, 19`였다. full arm의 LMCache transfer p99는
+약 `61.5 s`, `6.1 s`로 관측됐고 co-job은 모두 official NIXL timeout
+`exit=134`였다. 따라서 “Perlmutter에서 실제 contention이 없다”는 가설은
+기각된다. 반대로 full C9의 miss-hot SLO는 두 번 모두 `14/120`, `24/120`으로
+낮았고 top-level gate는 다음과 같았다.
+
+```text
+correctness                         true
+native_transport                    true
+same_population                     true
+full_cross_layer_actuation          true
+normal_p50_regression_bounded       true
+full_observer_supported              false (205/420 = 0.4881)
+at_least_one_stressed_p99_reduction false
+stressed_slo_not_lower              false
+performance_claim_allowed           false
+```
+
+이것은 Candidate J 구현 실패가 아니라 scheme boundary를 보여주는 negative다.
+현재 forecast는 관측된 service wave가 deadline을 넘으면 후보를 거부하지만,
+surviving decoder/endpoint/remote lane을 victim과 함께 실제로 예약하거나
+background aggressor를 격리하지 않는다. 그래서 full arm은 normal에서는 local
+service를 보호했지만 miss-hot에서는 동일한 shared decoder/endpoint path의
+residual tail을 victim에게 남겼다. 다음 후보는 단순 reject/score penalty가
+아니라 `tenant × service lane × pair/edge`의 admission lease를 원자적으로
+예약하고, lease를 얻지 못한 background work를 bounded queue/backpressure로
+분리해야 한다. lease가 없는 후보를 다른 pair로 옮기는 fallback도 aggregate
+decoder/receiver/fabric capacity를 다시 계산해야 한다.
+
+따라서 v27과 Candidate J 모두에서 공통으로 확정된 결론은 다음이다. realistic한
+동시 workload에서 bottleneck은 존재하며 global cross-layer orchestration은
+필요하다. 그러나 receiver guard 또는 deadline hard-feasibility 하나만으로는
+50% 개선을 만들 수 없다. 다음 native experiment는 victim protected lane,
+background victim/aggressor isolation, pair×edge shared residual reservation을
+같은 contract에 넣고, fixed/predictor와 동일 population에서 SLO-goodput과
+tail을 다시 측정해야 한다.
+
+### 74.40 기존 결과를 재사용하기 위한 버그 수정 색인과 forecast provenance closure
+
+현재 저장소의 v0–v600 파일은 버려진 초안이 아니라 다음 구현을 고정하는
+실험 기록이다. 다만 모든 `vN`이 독립적인 성능 결과는 아니다. 먼저 unified plan의
+§74.35–§74.39에서 해당 run을 `setup-only`, `execution-only`, `native negative`,
+또는 `terminal-valid performance`로 분류한 뒤, 결과 root의 `analysis.json`과
+`completed_attempt.json`을 함께 확인한다. 특히 `Error configuring interconnect`,
+stale port, child timeout, finalizer 이전 정리는 성능 수치로 승격하지 않는다.
+
+재현 시 우선순위가 높은 수정 위치는 다음과 같다.
+
+| 증상 | 수정 위치 | 고정된 원칙 |
+| --- | --- | --- |
+| parent/child `Error configuring interconnect` | C9 launcher와 §74.35–§74.36 | outer attach는 `no_vni`, 실제 vLLM/NCCL/LMCache step만 `job_vni`; GPU step에는 명시적 GRES/CPU shape를 사용 |
+| stale rendezvous port 또는 다른 run과의 충돌 | C9 launcher/result-root allocator | port는 exact result-root hash로 분리하고 고정 port를 재사용하지 않음 |
+| observer가 있는데 native decision이 지원되지 않음 | C9 observer/telemetry receipt | request-triggered fresh epoch, pair별 support와 sequence를 기록; partial support를 full support로 세지 않음 |
+| Candidate J forecast가 decision에는 있으나 native row에서 사라짐 | `tempo/pd_global_orchestrator.py`, `eval/sota_4node/tempo_pd_elastic_frontend.py`, `eval/sota_4node/tempo_pd_elastic_router.py` | `service_queue_delay_ms`와 `service_forecast_ms`를 함께 optional header/commit provenance로 전달하고, 값 하나만 오면 fail closed |
+| 기존 route commit regression | `tempo_pd_elastic_router.py`와 endpoint-router tests | forecast는 기존 route identity의 required field가 아니며, historical direct/global commit semantics를 변경하지 않음 |
+| 결과가 정상처럼 보이지만 child가 먼저 끝남 | C9 finalizer/analysis | readiness·transport·lifecycle 실패는 pre-performance receipt로 격리하고 completed subset만 headline으로 집계하지 않음 |
+
+이번 provenance closure에서 실제로 발견한 버그는 `GlobalDecision`에 Candidate J
+forecast를 넣은 뒤 frontend가 decision fingerprint만 전송하고, router의
+`router_decisions` 행에는 그 값을 평탄화하지 않던 것이었다. 이를 다음처럼
+수정했다.
+
+1. frontend가 두 forecast 값을 canonical decimal string으로 global commit과 함께
+   전송한다.
+2. router는 두 값이 모두 없으면 기존 contract를 그대로 처리하고, 하나만 있거나
+   음수·비유한 값이면 즉시 거부한다.
+3. accepted global commit과 terminal row에 두 값을 그대로 남긴다. 이 값은
+   decision SHA에 포함된 forecast와 native endpoint receipt를 대조하는 데 쓴다.
+4. historical request는 해당 header가 없으므로 forecast가 `null`이며, 과거 결과를
+   사후적으로 Candidate J 결과로 재분류하지 않는다.
+
+이 수정 뒤 공식 Perlmutter `.vllm_venv`에서 endpoint-router,
+global-orchestrator, cross-layer suite를 합쳐 `135 passed`를 확인했다. 이것은
+관측·provenance bug의 closure이지 native 성능 개선 결과가 아니다. 다음 native
+실험에서 반드시 확인할 것은 각 full arm의 `router_decisions`에 forecast가
+실제로 존재하는지, forecast receipt와 endpoint decision history의 route/pair가
+일치하는지, 그리고 `performance_claim_allowed` gate가 이와 독립적으로 닫히는지다.
+
+따라서 현재 작업의 올바른 순서는 다음과 같다.
+
+```text
+기존 result root/receipt 분류
+  → source/profile/launcher SHA 고정
+  → provenance/unit gate
+  → 승인된 4-node gpu_interactive에서 one-campaign native run
+  → victim protected lane + background isolation + pair×edge reservation
+  → fixed/predictor와 동일 population의 tail/SLO-goodput 비교
+```
+
+forecast header를 추가했다고 해서 Candidate J가 성공한 것으로 기록하지 않는다.
+현재까지의 native 결론은 여전히 “부하는 실재하고 global orchestration은 필요하지만,
+receiver guard와 hard reject만으로는 victim을 보호하지 못했다”이다.
+
+### 74.41 Candidate K protected service lane 구현과 현재 검증 경계
+
+Candidate J native negative의 원인은 단순한 forecast 계산 누락이 아니라, forecast가
+실행 중인 decoder·endpoint·remote edge의 잔여 capacity를 victim과 원자적으로
+예약하지 않았다는 데 있다. 따라서 Candidate K는 threshold를 다시 조정하는 후보가
+아니라, `tenant × service lane × exact P→D edge`를 하나의 admission lease로 묶는
+opt-in mechanism이다. 구현 위치는 다음과 같다.
+
+| 항목 | 위치 | 의미 |
+| --- | --- | --- |
+| protected-lane mode/validation | `tempo/pd_global_orchestrator.py` | `tenant_pair_edge_reservation_v1`; legacy profile은 disabled 유지 |
+| local reservation | 같은 파일의 protected guard | decoder active/endpoint request residual에서 protected capacity를 보존 |
+| remote reservation | 같은 파일의 protected guard | `p→d` exact edge별 semantic/endpoint residual을 함께 보존 |
+| nonprotected admission | 같은 파일의 candidate evaluation | protected debt를 제외한 residual만 batch/background에 사용 |
+| profile round-trip | `tempo/pd_global_profile.py`, `eval/sota_4node/build_tempo_go_admission_budget_profile.py` | mode/capacity/min-priority를 source-bound profile에 기록 |
+| decision provenance | `GlobalDecision`, snapshot | protected 여부, exact edge key, before/after debt를 남김 |
+
+핵심 invariant는 다음과 같다.
+
+1. protected tenant는 exact local decoder 또는 remote `p→d` edge의 reserved
+   capacity를 먼저 얻어야 admit된다.
+2. nonprotected request는 그 reservation을 침범하지 않는 residual capacity만
+   사용할 수 있다. 부족하면 `protected_service_lane_reserve` 또는
+   `protected_service_lane_edge_reserve`로 명시적으로 거절한다.
+3. reservation debt는 request start부터 HTTP EOF까지 유지하고, decision이
+   실제로 release될 때만 줄어든다. reject/failure는 기존 exactly-once lifecycle로
+   반환한다.
+4. protected lane의 exact key와 before/after 값은 decision에 포함한다. 이를
+   기록하지 못한 native row는 성능 결과가 아니라 provenance failure다.
+
+CPU 검증에서는 local decoder reservation과 remote exact-edge reservation이 각각
+분리되어 동작하고, protected debt가 snapshot에 남는 것을 확인했다. Candidate K
+artifact는 다음에 고정되어 있다.
+
+- profile: `results/tempo_go_c9_candidate_k_protected_lane_v1/real_tempo_go_c9_candidate_k_protected_lane_v1.json`
+- C8 base contract: `results/tempo_go_c9_candidate_k_protected_lane_v1/tempo_go_c8_candidate_k_contract.json`
+- C9 discovery contract: `results/tempo_go_c9_candidate_k_protected_lane_v1/tempo_go_c9_candidate_k_contract.json`
+- profile fingerprint: `0da2314927123293472eec7abac099009607271de130a984ba5b592a22a7faee`
+- C9 contract SHA: `ada130f459787e5a7c7b11ceb5ab9bc48f55019d912da324b1bb3887a8ce628a`
+
+v46 계약은 과거 artifact로 보존하고, 그 뒤 `route_failure` terminal 분류가 추가된
+현재 소스에 대해서는 동일한 C8 조건을 새 v47 contract로 다시 결박했다.
+`eval/sota_4node/test_tempo_go_c8_dual_regime.py`도 v47을 검사하도록 갱신했으며,
+v46 JSON이나 과거 결과는 수정하지 않았다. 새 contract SHA는
+`e33f4a76574a09af55871cbd79e276352c78df37814345a200ac006ddbbf357d`이고,
+관련 source-bound suite는 `141 passed`로 통과했다. `git diff --check`와 Python
+compile도 통과했다.
+
+따라서 Candidate K의 현재 상태는 **구현·CPU invariant 검증 완료, native utility
+미검증**이다. allocation `57708417`은 이미 4시간 중 약 3시간 이상을 사용하고
+있어, 남은 시간에 전체 C9 four-arm을 억지로 시작해 partial artifact를 만드는
+것은 허용하지 않는다. 다음 새로 승인된 4-node `gpu_interactive`에서만 다음
+순서로 실행한다.
+
+```text
+preflight: source/profile/contract SHA + exact child network + GPU quiescence
+  → app-global-only / fixed or predictor / Candidate K matched arms
+  → protected-lane decision receipt와 observer freshness 확인
+  → offered-population p50/p95/p99, SLO-goodput, reject, fairness, background
+  → gate 미충족이면 negative로 고정하고 다음 부족한 shared budget을 특정
+```
+
+이 절에서 허용하는 결론은 “Candidate K가 J의 reservation gap을 구현했다”까지다.
+native에서 protected lane이 victim tail과 전체 business utility를 함께 개선하기
+전에는 TEMPO의 최종 성능 우위나 50% 개선을 주장하지 않는다.
+
+### 74.44 Candidate K native 결과: transport는 정상, protected admission은 negative
+
+승인된 Perlmutter `gpu_interactive` 4-node allocation `57715910`에서 v9
+population contract를 한 campaign으로 완주했다. 결과 root는
+`results/tempo_go_c9_candidate_k_protected_lane_v9/native_job_57715910_r1/`이며,
+최종 집계는 `analysis.json`, attempt/lifecycle 판정은
+`completed_attempt.json`에 고정되어 있다. 일곱 arm 모두 correctness와 native
+transport receipt를 남겼고, 두 physical P/D pair 각각에 NCCL/official
+LMCache-NIXL co-job이 실행됐다. 따라서 이번 negative의 원인은
+`Error configuring interconnect`나 socket fallback이 아니다. co-job 자체는
+overload에서 exit `134`로 종료됐지만 native pressure/transport 관측은 성립했다.
+
+`analysis.json`의 핵심 gate는 다음과 같다.
+
+| 항목 | 결과 |
+| --- | ---: |
+| correctness / native transport / same population | `true / true / true` |
+| full cross-layer actuation | `true` |
+| full observer supported fraction | `23/210 = 10.95%` |
+| TEMPO foreground offered/completed | `210 / 97` |
+| TEMPO foreground global rejects | `113` |
+| miss-hot TEMPO p99 / strongest fixed p99 | `35.420 s / 9.303 s` |
+| miss-hot TEMPO SLO-good fraction | `0/120` |
+| remote-favorable p99 reduction vs strongest fixed | `91.30%` |
+
+즉 remote-favorable 한 regime에서는 K의 cross-layer route 선택이 큰 tail
+개선을 보였지만, miss-hot의 전체 business utility와 SLO를 보장하지 못했다.
+정상 구간에서도 K는 p50은 strongest fixed보다 11.84% 낮았지만 p99는 91.55%
+악화됐다. 그러므로 이 campaign은 TEMPO 성능 우위가 아니라, 기존 protected-lane
+구현의 실패를 재현한 negative다.
+
+#### 실제 버그의 증거
+
+가장 중요한 raw receipt는
+`06_candidate_k/inference/tempo_go_c8_dual_regime/`
+`c8_dual_full_c7_managed_background_measured/00_control_a.raw.json`이다.
+이 block은 background aggressor가 없는 control인데도 victim arrival 0–3은
+각 exact local lane에 admit되고, 이후 24개는 모두 약 2.04초를 기다린 뒤
+`global_admission_queue_timeout`으로 끝났다. 각 후보의 rejection binding은
+`global_protected_service_lane_reservation_v1`와
+`protected_service_lane_exhausted`였다. raw decision의 lane counter가
+`before=0→after=1`, `1→2`로 증가한 뒤 더 이상 admit되지 않는 것으로 이 현상을
+직접 확인했다.
+
+현재 구현은 `tempo/pd_global_orchestrator.py`의
+`_protected_service_lane_guard`에서 다음 두 역할을 하나의 정수 capacity로
+겹쳐 놓는다.
+
+1. protected tenant가 우선 사용할 수 있는 예약 바닥(reserve/floor)
+2. protected request가 실제로 동시에 실행될 수 있는 hard concurrency ceiling
+
+그 결과 service time이 약 30초까지 늘어난 realistic overload에서 lane당
+capacity 2는 총 네 개만 in-flight로 허용한다. remote 후보는 co-job의 shared
+receiver guard에 의해 함께 제외되므로, controller는 기다리거나 surviving
+pair로 spill하지 않고 2초 후 전역 reject한다. 이는 “global orchestrator가
+부하를 해결했다”가 아니라 “admission을 닫아 throughput을 버렸다”는 결과다.
+
+#### 고치는 방법
+
+다음 Candidate L은 capacity 숫자만 2→8로 바꾸는 parameter sweep으로 취급하지
+않는다. 정책의 의미를 분리해야 한다.
+
+1. `protected_reserve`는 lower-priority background가 선점하지 못하는
+   decoder/endpoint/remote-edge의 최소 headroom으로 유지한다.
+2. protected victim 자체는 그 reserve 안에서 반드시 hard reject하지 않고,
+   bounded endpoint queue lease 또는 다른 surviving P/D pair로 재평가한다.
+   단, queue lease에는 실제 endpoint queue headroom/completion-credit와
+   deadline을 함께 증명한다.
+3. reserve가 모든 pair에서 부족할 때만 `global_service_lane_unavailable`를
+   terminal event로 기록한다. 이를 일반 `global_admission_queue_timeout`으로
+   숨기지 않는다.
+4. protected lane debt는 exact `tenant × P→D edge`별로 추적하되, 첫 response
+   이후 release와 queue promotion에서 같은 request를 두 번 계산하지 않는다.
+   이미 고친 `already_owned` promotion regression test를 보존한다.
+5. K의 remote-favorable 개선을 보존하면서 miss-hot에는 receiver guard의
+   차단 후보를 무조건 reject하지 말고, source/edge/decoder/endpoint/fabric
+   vector를 재계산한 fallback 또는 bounded stagger를 적용한다.
+
+수정 후 필수 회귀 조건은 CPU invariant에서 (a) clean control victim 전량
+admit/queue, (b) lower-priority background가 reserve를 침범하지 않음, (c) queue
+promotion exactly-once, (d) remote exact-edge 공유 receiver 보호, (e) 모든
+reject가 명시적 원인과 business outcome을 남김을 확인하는 것이다. 그 뒤 새
+source-bound contract와 새 4-node `gpu_interactive`에서 fixed 4종·predictor·
+queue-GPU·Candidate L을 같은 population으로 실행한다. K의 `analysis.json`은
+보존하고 덮어쓰지 않는다.
+
+현재 연구 결론은 명확하다. realistic concurrent workload와 interconnect/receiver
+pressure는 실재하며 global cross-layer orchestration의 문제 정의는 유효하다.
+다만 K의 현재 protected admission semantics는 해결책이 아니며, 다음 성능 실험은
+“얼마나 reject했는가”가 아니라 victim SLO-goodput, background goodput/fairness,
+route/edge별 fabric tail을 동시에 개선하는지 검증해야 한다.
+
+### 74.45 Candidate L 구현 및 source-bound CPU gate
+
+Candidate L은 K artifact를 수정하지 않고 새 mode
+`tenant_pair_edge_reservation_v2`를 추가했다. `v1`의 동작은 과거 결과 재현을
+위해 그대로 둔다. v2에서 `protected_service_lane_capacity`는 protected
+tenant가 우선 사용할 수 있는 reserve/floor이며, protected request의 총
+동시성 상한이 아니다. protected request는 lane debt가 reserve를 초과하더라도
+물리 `ResourceVector`, endpoint queue/debt, mesh/fabric, deadline guard를
+통과하는 한 admission 후보가 될 수 있다. 반대로 lower-priority request에는
+기존처럼 `capacity - protected_debt` residual만 제공한다.
+
+구현 변경은 `tempo/pd_global_orchestrator.py`의 mode validation 및
+`_protected_service_lane_guard`에 한정했고, profile 생성기
+`eval/sota_4node/build_tempo_go_admission_budget_profile.py`가 v2를 명시적으로
+받도록 했다. regression은 physical capacity가 2이고 protected reserve가
+1일 때 protected request 2개는 admit되지만, 그 뒤 background는 residual
+reserve에 막히는지를 검증한다. queue promotion의 exactly-once test와 기존
+v1 tests는 유지한다.
+
+새 source-bound artifacts는 다음과 같다.
+
+- profile:
+  `results/tempo_go_c9_candidate_l_protected_reserve_v1/real_tempo_go_c9_candidate_l_protected_reserve_v1.json`
+  (fingerprint `9860243c5e3b3efba3bef442701536b7bb7d2881ab4447fa6b08fd40c7b1f654`)
+- C8 contract:
+  `results/tempo_go_c9_candidate_l_protected_reserve_v1/tempo_go_c8_candidate_l_contract.json`
+  (SHA `99015d438a6c7e5d858d706aaf74c8ca599fa2e8ebcc6877edac18857e1271d0`)
+- C9 population contract:
+  `results/tempo_go_c9_candidate_l_protected_reserve_v1/tempo_go_c9_candidate_l_population_contract.json`
+  (SHA `8b0c6bbd23ac5b94503cf68b0e094eb2a343b70ab1496b3fcf9b100d1260466f`)
+
+현재 source-bound C8/C9/orchestrator/profile regression은 `143 passed`다. 이
+수치는 CPU semantics와 contract integrity만 증명하며 native 성능을 대신하지
+않는다. 다음 승인된 4-node `gpu_interactive`에서 L population을 실행한 뒤,
+K의 `210 offered / 97 completed / 113 rejects`와 직접 비교하지 않고 동일
+population의 fixed·predictor·queue-GPU arm과 함께 새로 집계한다.
+
+### 74.42 Candidate K population contract: fixed/predictor 비교축 보강
+
+기존 Candidate K C9 contract는 `app_global_only`와 full TEMPO만 비교했으므로,
+최종 목표의 strongest fixed·simple predictor 비교를 native에서 직접 닫지 못했다.
+기존 C8 client가 이미 지원하는 arm을 C9 causal-burst wrapper에 연결하고, wrapper의
+고정된 4-block 제한과 analyzer의 full-vs-ablation 전용 집계를 확장했다.
+
+현재 population contract의 arm은 다음 일곱 개다.
+
+```text
+fixed_local_d0, fixed_local_d1,
+fixed_remote_p0d1, fixed_remote_p1d0,
+predictor, queue_gpu, full_c7_managed_background (Candidate K)
+```
+
+`full_c7_managed_background`는 Candidate K profile의 protected lane mode를 사용하고,
+나머지 arm은 같은 vLLM P/D·LMCache/NIXL·NCCL/Slingshot burst와 같은 offered
+population으로 실행한다. analyzer는 regime마다 fixed arm 중 p99가 가장 낮은
+strongest fixed를 동적으로 고른 뒤, Candidate K를 strongest fixed와 predictor
+각각에 비교한다. reject/failure는 completed-only metric에서 제거하지 않는다.
+
+구현 변경은 다음과 같다.
+
+- `run_tempo_go_c9_causal_burst_discovery_in_allocation.sh`: contract가 명시한 임의의
+  block 수를 실행하며, 기존 4-block contract도 그대로 지원한다.
+- `analyze_tempo_go_c9_causal_burst_discovery.py`: 기존 4-arm ABBA 분석은 유지하고,
+  4개가 아닌 population contract에는 fixed/predictor/queue-GPU/TEMPO aggregate와
+  strongest-fixed·predictor별 tail/SLO gate를 적용한다.
+- `build_tempo_go_c9_candidate_k_population_contract.py`: 과거 Candidate K v1을
+  수정하지 않고 현재 source-bound v2 contract를 생성한다.
+
+현재 artifact는
+`results/tempo_go_c9_candidate_k_protected_lane_v9/tempo_go_c9_candidate_k_population_contract.json`
+이며 contract SHA는
+`2935b6220c3f12af0fca1d5d8ccd26957215ca417fb19b9b7ce7410c897330ba`다. source
+inventory 6개 불일치는 0이고, C9 runner/analyzer/client 관련 regression은
+`98 passed`다. 이 contract 역시 아직 discovery-only이므로 native 결과가 생기기
+전에는 fixed/predictor 대비 성능 우위를 주장하지 않는다.
+
+### 74.43 Candidate K queue-promotion double-count bug 수정
+
+Candidate K의 CPU invariant 검증 중 protected lane을 이미 소유한 요청이
+`queued → promoted`될 때, promotion 경로가 기존 protected debt에 같은 요청의
+`destination_work`를 한 번 더 더하는 결함을 발견했다. 이중 계산은 실제 native
+부하가 아니라 queue bookkeeping 오류이며, protected capacity를 거짓으로 고갈시켜
+정상 요청을 잘못 거절할 수 있다.
+
+수정 위치는 `tempo/pd_global_orchestrator.py`의
+`_protected_service_lane_guard`다. `already_owned=True`이면 projection은 현재
+`before` debt를 그대로 사용하고, 아직 lease를 소유하지 않은 요청에 대해서만
+`destination_work`를 더한다. 이 규칙은 admission·promotion·release가 같은
+exactly-once lease를 공유하도록 한다. 회귀 테스트
+`test_protected_service_lane_queue_promotion_does_not_double_count_owned_request`
+가 mesh mode, scheduler telemetry, completion-credit lifecycle에서 promotion
+status와 decision receipt를 함께 확인한다.
+
+현재 확인 결과는 다음과 같다.
+
+- C9/C8/global-orchestrator source-bound suite: `98 passed`
+- Candidate K protected-lane focused tests: `3 passed`
+- 현재 source/profile/runner/analyzer compile 및 shell syntax: 통과
+- K population contract inventory: `6` entries, mismatch `0`
+
+추가로 기존 C9 runner가 P0–D0 한 쌍만 실제 co-job으로 자극하고 P1–D1을
+`not_collected`로 두던 observer coverage 결함을 수정했다. 이제 두 physical pair에
+각각 8-rank NCCL/4-source NIXL co-job을 붙이고, pair별 host list, observer,
+transport receipt, overload outcome을 별도로 기록한다. vLLM은
+`nccl_observer_pair-{pair}.json`에서 해당 pair의 실제 snapshot만 읽으며, pair1
+receipt가 없으면 analyzer가 fail-closed한다. 이 변경으로 `0.5` observer gate를
+낮추지 않고 full mesh coverage를 검증할 수 있다. 이 변화는 workload를 가볍게 만든
+것이 아니라 모든 population arm에 동일한 두-pair pressure를 추가한 것이므로,
+이전 v19/v27 결과와 섞지 않고 새 contract에서만 판정한다.
+
+이 수정 뒤 v9 population contract를 native에서 실행해야 한다. 남은
+`57708417` allocation에는 전체 7-arm campaign을 시작할 시간이 부족하므로 partial
+실행은 하지 않는다. 새 4-node `gpu_interactive`에서만 v9 contract를 one-campaign으로
+실행하고, 결과가 닫힌 뒤에 strongest fixed·predictor·background fairness와 함께
+성능 gate를 판정한다.
+
+### 74.46 Candidate L native attempt L8: 결과 경계와 outer-timeout bug
+
+Candidate L의 첫 v2 native population attempt는 승인된 4-node `gpu_interactive`
+allocation `57715910`에서 outer attach resource shape를 바로잡은 뒤 실행했다.
+outer step은 `--nodes=4 --ntasks=4 --ntasks-per-node=1 --gpus=0
+--cpus-per-task=128 --network=no_vni`였고, 실제 vLLM과 두 physical pair의
+8-rank official LMCache/NIXL co-job만 child step에서 GPU와 `job_vni`를 사용했다.
+이 resource shape는 과거 outer step이 GPU GRES를 선점해 nested co-job을 거부하던
+L4 문제를 고친 것이다.
+
+이번 attempt에서 확인된 launch/setup bug는 다음과 같다. 모두 별도 result root에
+보존했으며 기존 결과를 덮어쓰지 않았다.
+
+1. L4는 outer `--gpus-per-task=4` 때문에 parent step이 16 GPU GRES를
+   가져가 nested child가 `Requested node configuration is not available`로
+   끝났다. outer attach는 `--gpus=0`이어야 한다.
+2. L5는 승인 변수
+   `TEMPO_GO_C9_CAUSAL_BURST_APPROVED=YES`가 없어 즉시 종료했다.
+3. L6는 `TEMPO_GO_C9_CONTRACT`라는 잘못된 변수명을 사용해 지정한 source-bound
+   L contract를 읽지 못했다. runner가 요구하는 이름은
+   `TEMPO_GO_C9_CAUSAL_BURST_CONTRACT`다.
+4. L7은 runner가 생성해야 하는 result root를 미리 `mkdir -p`해서 stale-root
+   guard에 걸렸다. native one-shot root는 사전에 만들지 않는다.
+
+L8에서는 위 네 setup 문제를 제거했다. 실제로 첫 6개 arm
+(`00_fixed_local_d0`, `01_fixed_local_d1`, `02_fixed_remote_p0d1`,
+`03_fixed_remote_p1d0`, `04_predictor`, `05_queue_gpu`)에 대해 inference와
+두 pair observer/transport receipt가 닫혔다. 각 arm의 co-job은 block 19에서
+공식 LMCache/NIXL `batched_write exceeded 60.000s`로 종료됐고, producer state는
+`active`, observer sequence도 존재한다. 즉 이 부분은 이전의 NCCL connection/setup
+실패가 아니라 실제 incast overload pressure receipt다. 예를 들어 첫 arm의
+증거는 다음과 같다.
+
+- block receipt:
+  `results/tempo_go_c9_candidate_l_protected_reserve_v2/native_job_57715910_l8/00_fixed_local_d0/block_execution_receipt.json`
+- co-job failure:
+  같은 arm의 `cojob/cojob_failure.json`
+- rank stderr:
+  같은 arm의 `cojob/cojob-rank-0.stderr.log`
+- victim raw:
+  같은 arm의 `inference/tempo_go_c8_dual_regime/c8_dual_full_c7_managed_background_measured/00_control_a.raw.json`
+
+마지막 `06_candidate_l` arm도 vLLM inference 자체와 victim raw를 만들었고 raw
+validation은 `all_streams_valid=true`, `completed_count=30`,
+`terminal_failure_count=0`, `router_decisions_exact=true`였다. 그러나 L policy가
+co-job을 즉시 overload timeout으로 끝내지 않아 두 co-job이 최소 active duration
+계약을 계속 수행했고, 7개 arm을 순차 실행하는 outer step의 `--time=01:20:00`이
+마지막 arm 도중 만료됐다. Slurm receipt는 outer `57715910.47`의
+`TIMEOUT, ExitCode=1:0, Elapsed=01:20:03`이며 마지막 inference child도
+`CANCELLED by 0`이다. runner root에는 6개 `block_execution_receipt.json`만
+있고 `completed_attempt.json`/`analysis.json`이 없다.
+
+따라서 L8은 다음 두 가지를 증명한다.
+
+- source-bound v2 code와 native launch boundary는 이전 L4--L7 setup failure를
+  통과했다.
+- 두 pair official LMCache/NIXL pressure와 victim raw는 실제로 관측됐다.
+
+반대로 L8은 Candidate L이 fixed/predictor/K보다 빠르다는 것을 증명하지 않는다.
+7-arm one-shot closure와 final analyzer가 없으므로 성능·SLO·fairness claim은
+`performance_claim_allowed=false`로 유지한다. 다음 동일 contract의 native 실행은
+outer time을 최소 2시간 30분 이상으로 잡고, allocation 남은 시간과 arm별 worst-case
+`minimum_active_duration_s`를 사전 계산해야 한다. 이미 생성된
+`attempt.json`은 running 상태로 남은 partial receipt이므로 완료 receipt로
+수정하거나 재사용하지 않는다. 재실행 시에도 새 result root를 사용한다.
+
+이 L8 이후 runner 자체에도 같은 실수를 방지하는 preflight를 추가했다.
+`run_tempo_go_c9_causal_burst_discovery_in_allocation.sh`는 explicit outer
+step에서 `scontrol show step`의 `TimeLimit-Elapsed`를 읽고 contract의
+`execution.minimum_outer_time_s`와 비교한다. 부족하면 result root를 만들거나
+vLLM/NCCL child를 띄우기 전에 exit code 2로 종료한다. 기존 frozen contract에는
+하위 호환 기본값 9,000초를 적용하고, 새 Candidate L v8 contract에는 다음 값을
+명시적으로 고정했다.
+
+- contract:
+  `results/tempo_go_c9_candidate_l_protected_reserve_v8/tempo_go_c9_candidate_l_population_contract.json`
+- contract SHA-256: `63ec096d14d4ba97e50c397f2f5734ef30dd1bce4042f2d07ae88592b96a96ab`
+- `execution.minimum_outer_time_s`: `9000`
+- runner source SHA-256:
+  `226afc3bf4e7c7ff8af124382cf841b4c86576fccec495f40f29a28c96000f9c`
+
+따라서 다음 native attach는 최소 `--time=02:30:00` 이상이어야 하며, 실제
+allocation에 남은 시간이 그보다 작으면 시작하지 않는다. 이번 v8 preflight는
+실행 경계를 고친 것이지 성능 결과가 아니다. 새 campaign이 7개
+`block_execution_receipt.json`, `completed_attempt.json`, `analysis.json`을
+모두 생성하기 전까지 Candidate L의 latency/goodput/tail 개선은 여전히 미검증이다.
+
+이 preflight는 실제 살아 있는 allocation `57723315`에서 GPU를 할당하지 않는
+2분 control step으로도 검증했다. v8 runner는 `rc=2`로 즉시 종료했고 지정한
+`preflight_test_57723315c` result root는 생성되지 않았다. 따라서 짧은 outer
+step이 다시 vLLM/NCCL child를 띄우는지에 의존하지 않고, 첫 GPU workload 전에
+실행 시간을 차단한다.
+
+v3/v4 contract 파일은 runner source inventory가 갱신되기 전의 보존 artifact다.
+현재 runner와 hash가 일치하는 실행 후보는 v5뿐이며, v3/v4를 실행 contract로
+재사용하지 않는다.
+
+### §74.47 Candidate L v11: 첫 완주한 4-node native population의 결론과 다음 목표
+
+v10에서 마지막 Candidate L arm이 endpoint probe port 범위를 벗어나
+`ValueError: endpoint probe port is invalid`로 setup 전에 종료됐다. 원인은
+runner의 result-root hash offset `% 200`과 endpoint probe의 `30000 + slot`
+계산 조합이었다. frozen slot 최댓값은 2660이므로 offset이 108 이상이면
+32768 이상 port가 된다. v11에서는 offset을 `% 100`으로 수정했고,
+`test_c9_result_root_offset_keeps_all_endpoint_probe_ports_valid`를 추가했다.
+이 수정은 실행 경계 correctness fix이며 성능 향상이 아니다.
+
+v11은 승인된 Perlmutter 4-node/16-GPU interactive allocation `57723325`에서
+새 result root와 population contract로 완주했다.
+
+- population contract:
+  `results/tempo_go_c9_candidate_l_protected_reserve_v11/tempo_go_c9_candidate_l_population_contract.json`
+- population contract SHA-256:
+  `c85349fda9801d584cef10503ac0130542c2d51e95e7fcf95ac3d7ae92fd11aa`
+- native root:
+  `results/tempo_go_c9_candidate_l_protected_reserve_v11/native_job_57723325_l3_v11/`
+- terminal receipt: `completed_attempt.json`, `analysis.json`
+- analysis SHA-256:
+  `133e6321289c5e49375cfc5f5100907fb77ad1835e91225258481015a2510b03`
+
+일곱 arm의 victim aggregate는 다음과 같다.
+
+| arm | p50 (ms) | p99 (ms) | offered SLO | completed/offered |
+|---|---:|---:|---:|---:|
+| `fixed_local_d0` | 6044 | 33115 | 60.5% | 210/210 |
+| `fixed_local_d1` | 14424 | 68967 | 17.6% | 210/210 |
+| `fixed_remote_p0d1` | 9978 | 56401 | 43.3% | 210/210 |
+| `fixed_remote_p1d0` | 17448 | 78531 | 27.6% | 210/210 |
+| `predictor` | 7224 | 50929 | 61.9% | 210/210 |
+| `queue_gpu` | 7858 | 103480 | 53.3% | 210/210 |
+| `full_c7_managed_background` | 10562 | 23980 | 28.6% | 209/210 |
+
+이 결과는 “정상부하에서 차이가 작다”는 결과가 아니다. 실제 combined-hot 및
+dual-decoder-hot regime에서 fixed route의 p99가 크게 변했고, 각 pair의
+observer가 correctness-checked active window를 만든 뒤 official LMCache/NIXL
+`batched_write exceeded 60.000s`를 기록했다. Candidate L에서도 양쪽 pair가
+`overload_timeout`으로 종료됐다. 이는 setup failure가 아니라 native overload
+outcome이다. transport receipt는 NCCL `AWS Libfabric`, Slingshot/CXI endpoint
+telemetry, NIXL `UCX` backend를 기록한다.
+
+그러나 Candidate L은 아직 TEMPO 최종 우위가 아니다. analyzer gate는 다음과
+같이 닫혔다.
+
+```text
+correctness                              true
+native_transport                         true
+same_population                          true
+full_observer_supported                  true
+full_cross_layer_actuation               true
+baseline_cross_layer_blind               true
+stressed_p99_reduction_vs_best_fixed    false
+stressed_p99_reduction_vs_predictor     true
+stressed_slo_not_lower_vs_best_fixed    false
+stressed_slo_not_lower_vs_predictor     false
+normal_p50_regression_bounded            false
+performance_claim_allowed                false
+```
+
+Candidate L은 predictor 대비 stressed p99를 miss-hot에서 44.9%,
+remote-favorable에서 93.5% 줄였지만 miss-hot SLO가 `0/120`이었다. 반대로
+remote-favorable에서는 `30/30` SLO-good이었다. background는 `2748` offered
+중 `1724` complete, `1024` global reject였고 foreground는 `210` 중 `209`
+complete였다. 이 rejection을 성능 승리로 계산하면 안 된다.
+
+이번 v11로 확정되는 연구 결론은 다음과 같다.
+
+1. realistic contention 문제는 실존한다. burst/receiver-incast/decoder-hot을
+   동시에 걸면 local·remote 모두 tail이 붕괴하고 route별 최적점이 바뀐다.
+2. LMCache 내부 엔진만의 문제가 아니다. LMCache/NIXL timeout은 fabric과
+   receiver pressure가 실제로 발생했고 그 피해가 vLLM P/D route, decoder
+   queue, tenant SLO로 전파됐다는 증거다.
+3. fixed route, request predictor, queue-only 정책은 global 상태를 보지 못한다.
+   Candidate L은 cross-layer observer/actuation은 구현했지만 현재 admission
+   semantics가 remote-favorable 성능과 hot-local SLO 사이의 trade-off를
+   해결하지 못했다.
+4. TEMPO의 목표는 component microbenchmark가 아니라
+   `global decision → physical pair/edge reservation → P/D admission →
+   LMCache/NIXL transfer → fabric-aware release`를 하나의 bounded business
+   transaction으로 만드는 것이다.
+
+다음 실행 목표는 Candidate L을 다시 포장하는 것이 아니다. Candidate M에서
+아래 invariant를 CPU/source-bound test로 먼저 검증한 뒤 새 4-node interactive
+allocation에서 동일 7-arm native campaign을 수행한다.
+
+- hot decoder가 SLO 위험 상태이면 remote route는 receiver budget, fabric
+  freshness, endpoint uncertainty를 모두 만족할 때만 admission한다.
+- reserve/floor는 hard concurrency ceiling이 아니지만 SLO-critical lane의
+  최소 capacity는 background 또는 remote fallback이 잠식할 수 없다.
+- remote admission은 transfer p99 하나가 아니라 receiver queue, NIXL inflight,
+  NCCL/CXI signal, decoder queue delay를 공동 입력으로 사용한다.
+- tenant별 reject/delay/complete를 기록하고 foreground SLO를 지키면서
+  background goodput을 최대화한다. reject는 goodput 개선으로 숨기지 않는다.
+- 정상 control p50 regression은 3% 이내, stressed p99는 strongest fixed와
+  predictor 모두 대비 15% 이상 개선, stressed SLO는 두 baseline보다 낮지
+  않아야 `performance_claim_allowed=true`로 승격한다.
+- 동일 allocation의 단일 discovery는 independent validation이 아니다. 새
+  allocation, 새 result root, frozen source inventory와 terminal receipt를
+  사용한다.
+
+따라서 현재 상태는 “실험을 더 많이 하면 된다”가 아니라, v11이 드러낸 정확한
+failure mode인 **hot local SLO 보호와 remote/fabric externality의 공동 admission
+실패**를 Candidate M의 설계 target으로 삼는 것이다. v11 전후의 setup,
+lifecycle, port, contract, queue-promotion bug는 §74.35–§74.46과 각 native
+root의 receipt에서 추적 가능하며, 이전 artifact를 새 결과처럼 덮어쓰거나
+재사용하지 않는다.
+
+### §74.48 continuation audit: 문서에 있던 해결책과 실제 stale-test bug
+
+이번 continuation에서 확인한 핵심은 새 알고리즘이 없어서가 아니라, 이미 고정한
+해결책과 현재 검증 진입점이 서로 다른 세대였다는 점이다.
+
+- Candidate L v11 C8 계약의 33개 source hash와 C9 population 계약의 7개 source
+  hash는 현재 worktree와 모두 일치한다. 반면 회귀 테스트
+  `eval/sota_4node/test_tempo_go_c8_dual_regime.py`는 `v1` C8 계약을 가리키면서
+  현재 `require_perlmutter_4node_4h_interactive.sh`의 hash를 과거 값으로 요구했다.
+  이는 실행 코드/Perlmutter 문제가 아니라 immutable 과거 artifact를 “current”로
+  부른 테스트 참조 오류였다.
+- 테스트의 기준을 덮어쓰기 없이 v11 source-bound C8 계약으로 교정했다. 관련
+  global profile, protected-service assertions와 기존 raw 결과는 변경하지 않았다.
+  현재 orchestrator/C8/C9 endpoint 회귀 묶음은 **154 passed**다.
+- v10에서 발견한 route-symmetric business-lane mechanism을 7-arm population으로
+  다시 묶은 현재 source-bound 준비 계약도 생성했다:
+  `results/tempo_go_c9_dual_route_business_lane_v13/`. 이 계약은 fixed local/remote
+  4개, predictor, queue/GPU, dual-route TEMPO를 동일한 NCCL + official
+  LMCache/NIXL receiver-incast workload에서 비교하며, source inventory mismatch는
+  0개다. 계약 SHA는 C8
+  `6dfa4937e9cf00ce992eedc1acaf3c58f691564302bb794a168ba8b6531fcc5f`, C9
+  `989a09e0f005967ec5f1ff1ec17b9244b5dee0b5e39f04d0b479a8e5c1de8a69`다.
+
+v11 negative와 v10 discovery의 차이는 정책 이름이 아니라 실제 route 분포에서
+확인된다. v11 Candidate L의 `01_remote_cool_hot_d0`부터
+`04_combined_hot_d1`까지는 피해자 route가 사실상 모두
+`decoder_local_chunked_prefill`이었고, background global queue timeout은 각각
+129, 372, 149, 374건이었다. 같은 계열의 v10 dual-route arm에서는 두
+combined-hot block에서 official remote route가 각각 92건과 95건 사용됐고,
+remote-favorable p99 개선과 background minimum-service gate를 통과했다. 따라서
+v11 결과는 “remote가 쓸모없다” 또는 “interconnect contention이 없다”는 증거가
+아니며, protected-reserve 정책이 hot local service와 remote/fabric externality를
+동시에 처리하지 못했다는 negative evidence다. v13은 이 route-symmetric 정책을
+fixed/predictor/queue-GPU와 같은 7-arm population에서 다시 검증하도록 고정한다.
+
+이 계약은 아래 §74.51에서 native discovery receipt로 닫혔다. 당시 `gpu_interactive` allocation
+`57723325`와 `57723315`는 각각 이미 약 3시간을 사용하고 있어, 최소 9,000초
+(150분)인 일곱-arm outer step을 새로 시작하면 마지막 arm이 잘릴 수 있다. 따라서
+이번 continuation에서는 짧은 partial run을 성능 결과로 만들지 않고, 두 allocation을
+건드리지 않은 채 테스트·hash·계약 preflight만 닫았다. 다음 4-node interactive
+allocation에서는 v13 전용 SHA-bound wrapper를 통해 이 계약을 그대로 사용하고, 각 arm의
+`block_execution_receipt`, `completed_attempt.json`, `analysis.json`이 모두 생긴
+    경우에만 결과를 평가한다. 그 전까지 v10의 큰 p99 개선은 discovery evidence이고,
+v11 Candidate L의 negative gate와 함께 최종 claim으로 승격하지 않는다.
+
+### §74.49 scale/SOTA audit: 기존 기록으로 이미 닫힌 것과 남은 것
+
+v0~v600 및 paper artifact를 scale 기준으로 다시 분류하면 현재 증거는 다음과
+같다.
+
+| 범위 | 현재 증거 | 허용되는 해석 |
+|---|---|---|
+| 1 node | 동일 native vLLM P/D·LMCache·NCCL population 결과 없음 | 미측정 |
+| 2 node | `results/inference_interconnect_2node_job_56917751/`, `...56919018/` | NCCL/transport와 burst control-plane receipt; vLLM P/D 성능 비교 아님 |
+| 4 node | C8/C9/C10, v11 L, v13 native discovery | 실제 vLLM P/D·LMCache/NIXL·NCCL/Slingshot contention과 정책 비교; v13은 allocation `57730228`에서 negative gate |
+| NetKV/Kairos | C10 actual-system post-hoc; Kairos는 `X={512}` subset | same-allocation SOTA extension; fresh independent SOTA claim 아님 |
+| 1,024 pair | hierarchy receipt | CPU control-plane fan-in/overhead만 측정; native inference scale 아님 |
+
+따라서 기존 기록에 1/2/4-node 비교가 이미 있다고 해석하면 안 된다. 최종 목표를
+닫으려면 v13 4-node population을 먼저 fresh allocation에서 끝낸 뒤, 같은 workload
+identity·offered population·business SLO·observer contract를 유지한 1-node와
+2-node native rung을 추가해야 한다. 각 rung에서는 fixed local/remote, predictor,
+queue/GPU, TEMPO와 최소 NetKV 및 Kairos-compatible policy를 같은 분석기로
+집계한다. 1/2-node에서는 pair 수와 topology가 달라지는 사실을 숨기지 말고,
+capacity-normalized goodput과 offered-population SLO를 별도로 보고한다. 같은
+native lifecycle이 없는 Mooncake/Dynamo 결과는 component 또는 post-hoc 참고로만
+남긴다.
+
+### §74.50 fresh interactive allocation QOS gate
+
+v13 native 실행을 위해 다음 승인된 명령을 한 번 실행했지만 새 allocation은
+생성되지 않았다.
+
+```text
+/usr/bin/salloc --no-shell --nodes=4 --qos=interactive --time=04:00:00 \
+  --constraint=gpu --gpus=16 --account=m1248_g
+→ salloc: error: QOSMaxSubmitJobPerUserLimit
+→ salloc: error: Job submit/allocate failed: Job violates accounting/QOS policy
+```
+
+당시 기존 interactive allocation `57723325`, `57723315`가 모두 `RUNNING`이며
+각각 4 nodes/4 hours를 점유하고 있었다. `squeue`와 `sacct`에서 두 job 외에 이
+시도에 해당하는 새 job이 생성되지 않았음을 확인했으며, 기존 job·regular job·pending
+job은 취소하거나 변경하지 않았다. 이 receipt는 native performance나 overload
+결과가 아니고, 두 allocation이 자연 종료된 뒤 같은 v13 wrapper를 한 번 요청해야
+한다는 scheduler 실행 경계다. 동일 QOS 요청은 반복하지 않는다.
+
+### §74.51 v13 dual-route business-lane native discovery receipt
+
+승인된 4-node/16-A100 `gpu_interactive` allocation `57730228`에서 v13
+source-bound wrapper를 한 번 실행해 7-arm을 모두 완료했다. 첫 시도는 outer
+step 잔여 시간이 1초 부족해 workload 전 preflight에서 종료됐고, 같은 allocation
+안에서 60초 margin을 둔 재실행을 수행했다. 첫 시도에는 result root나 GPU
+workload가 없었으므로 성능 sample로 세지 않았다. 두 번째 실행은
+`completed_attempt.json`의 `one_campaign_no_retry=true`, `status=complete`로
+닫혔다.
+
+- native root: `results/tempo_go_c9_causal_burst_job_57730228/`
+- terminal analysis: `results/tempo_go_c9_causal_burst_job_57730228/analysis.json`
+- analysis SHA-256: `a07a5e6c592765adfb7059275c39ad323be8774738b156eef80d29969583134b`
+- topology: 4 nodes / 16 A100 GPUs, vLLM P/D, official LMCache/NIXL/UCX,
+  NCCL/Slingshot co-job, identical 210-victim population
+
+| arm | p50 (ms) | p99 (ms) | offered SLO | completed/offered |
+|---|---:|---:|---:|---:|
+| `fixed_local_d0` | 7942.5 | 32984.8 | 50.5% | 210/210 |
+| `fixed_local_d1` | 8924.5 | 55916.5 | 46.2% | 210/210 |
+| `fixed_remote_p0d1` | 8504.8 | 50272.5 | 47.1% | 210/210 |
+| `fixed_remote_p1d0` | 16902.3 | 76272.4 | 27.6% | 210/210 |
+| `predictor` | 5479.3 | 50454.1 | 60.5% | 210/210 |
+| `queue_gpu` | 7721.1 | 54298.9 | 55.7% | 210/210 |
+| `full_c7_managed_background` (TEMPO) | 9972.1 | 23917.0 | 32.9% | 210/210 |
+
+이번 receipt는 기존 MD의 mechanism/correctness/integration 결론을 확인했지만,
+아직 닫히지 않은 핵심 utility gate도 분명히 만들었다. 모든 arm에서 victim
+210/210과 native transport가 닫혔고 TEMPO는 local 178건·official remote
+32건을 선택했다. 실제 burst/receiver-incast/decoder-hot contention과
+local/remote route crossover는 재현됐다. 그러나 TEMPO의 cross-layer decision
+210건 중 observer-supported decision은 98건(46.7%)뿐이었다.
+
+```text
+correctness                              true
+native_transport                         true
+same_population                          true
+full_cross_layer_actuation               true
+full_observer_supported                  false
+stressed_p99_reduction_vs_best_fixed    false
+stressed_p99_reduction_vs_predictor     true
+stressed_slo_not_lower_vs_best_fixed    false
+stressed_slo_not_lower_vs_predictor     false
+normal_p50_regression_bounded            false
+performance_claim_allowed                false
+```
+
+따라서 이번 결과는 “기존 MD에서 이미 모든 것을 해결했는데 실험을 반복했다”가
+아니다. 기존 문서는 mechanism/correctness/integration을 해결했다고 기록했고,
+이번 run은 그 문서가 남겨 둔 native utility gate를 실제로 닫았다. 결과는
+positive가 아니라 **재현 가능한 policy negative**다. strongest fixed의 최선
+구간을 전체적으로 이기지 못했고 miss-hot에서 TEMPO offered SLO는 6.7%로
+떨어졌다. 반면 remote-favorable 구간에서는 SLO 100%, p99 3.214초로 크게
+개선됐다. 즉 interconnect/fabric contention이 없는 것이 아니라, 현재
+admission이 hot-local·remote/fabric·tenant utility를 한 frontier로 결합하지
+못한 것이다. reject를 성능 승리로 계산하지 않았다.
+
+이로써 v13은 `prepared/not run`이 아니라 `complete discovery, negative gate`가
+됐다. 다음 변경은 route threshold 미세조정이 아니다. observer coverage를
+1.0에 가깝게 만들면서 receiver/NIXL inflight·NCCL/CXI freshness·decoder service
+floor·tenant minimum service를 결합한 service-lane feasibility admission을
+설계하고, 같은 7-arm contract를 새 allocation에서 fresh validation해야 한다.
+
+### §74.52 Candidate M pressure-triggered global pair spill 준비
+
+v13 raw receipt의 hot D0 피해자에서 `higher_priority_clean_pair_available`가
+packed pair로의 spill을 막았고, 그 결과 TEMPO가 hot-local 구간에서 local route에
+과도하게 남았다. Candidate M은 이 문제를 단순 route score 조정으로 처리하지
+않는다. 낮은 pressure에서는 기존 business pair packing을 유지하고, 현재
+telemetry와 global-owned work로 계산한 clean-pair pressure가 frozen `0.5`
+이상이면 packed pair도 전체 score에 다시 넣는다. phase label, future arrival,
+physical-switch label, synthetic route quota는 입력으로 사용하지 않는다.
+
+준비 artifact는 다음과 같다.
+
+- profile: `results/tempo_go_c9_candidate_m_pressure_spill_v1/real_tempo_go_c9_candidate_m_pressure_spill_profile_v1.json`
+- C8 base: `results/tempo_go_c9_candidate_m_pressure_spill_v1/tempo_go_c8_candidate_m_pressure_spill_contract.json`
+- C9 population: `results/tempo_go_c9_candidate_m_pressure_spill_v1/tempo_go_c9_candidate_m_pressure_spill_population_contract.json`
+- profile fingerprint: `6cb92af6d40d28ac2fea67ca1311f0a745194825709f88a72e89bd0c0dc76718`
+- C9 contract SHA: `ef876c73dc5211e0952cd9f8335a988de34cdcb19d59e53a21dc3fe39626721c`
+- native entry: `eval/sota_4node/run_tempo_go_c9_candidate_m_pressure_spill_in_allocation.sh`
+
+profile round-trip, contract hash binding, wrapper `bash -n`, 그리고 M invariant와
+기존 pressure-spill invariant는 통과했다(`2 passed`). native 실행 결과는
+§74.56의 새 allocation `57732862`와 `analysis.json`에 고정되어 있다. M은
+remote-favorable 구간을 회복했지만 miss-hot SLO/tail, background completion,
+observer coverage gate를 통과하지 못했다. 따라서 threshold sweep을 반복하지
+않고, v13/M의 두 구조적 global candidate negative를 근거로 다음 공동 제어
+scheme을 설계한다.
+
+### §74.53 continuation: M 실행 전 stale-contract 회귀 닫기
+
+M native를 시작하기 전 현재 worktree와 실행 계약을 다시 대조했다. 기존 current
+C8 contract가 frontend/router/global orchestrator/profile의 과거 SHA를 가지고
+있어 source-bound 회귀검사 하나가 실패했으며, 이는 Perlmutter 실행 실패나
+성능 결과가 아니다. 과거 결과 JSON은 수정하지 않고 current contract의 네 source
+hash만 현재 파일의 SHA로 갱신했다.
+
+- 수정 대상: `results/tempo_go_c8_independent_validation_contract_v10_c8v49.json`
+- 확인 범위: global orchestrator/cross-layer/telemetry/M candidate/current
+  contract/dual-regime regression
+- 결과: `133 passed`, `git diff --check` 통과
+- M population contract source inventory: 7개 중 mismatch 0개
+- M wrapper `bash -n`: 통과
+- allocation `57732862`: 새 4-node/16-A100 `gpu_interactive`에서 M native
+  7-arm campaign을 완료했고, terminal receipt와 analyzer를 생성했다.
+
+이 receipt는 setup correctness closure였고, 실제 M 성능·fairness·observer
+coverage 판정은 §74.56의 immutable native result가 담당한다. 기존 결과와
+새 allocation 결과를 섞지 않는다.
+
+### §74.54 C9 current contract의 stale assertion closure
+
+후속 C9/C10 preflight에서 historical C9 artifact가 아니라 현재 실행 후보
+`results/tempo_go_c9_causal_burst_current_source.json`를 검사했다. current
+contract의 analyzer, LMCache co-job launcher, C9 launcher SHA가 worktree보다
+뒤처져 있어 세 hash를 갱신했고, 현재 runner의 두-pair 포트 식
+`index * 16 + pair_index * 8`을 과거의 단일-pair assertion이 요구하던 문제도
+수정했다. historical `v1`--`v27` contract와 native 결과는 변경하지 않았다.
+
+- C9 current contract source inventory: mismatch 0개
+- C9 current contract/C10 baseline/M preflight regression: `9 passed`
+- `git diff --check`: 통과
+- 판정: setup/source-bound correctness closure; native performance 결과 아님
+
+이제 stale contract/assertion을 다시 고치는 작업을 반복하지 않는다. 다음
+interactive 실행은 §74.56에서 정한 공동 admission/fairness·pair scaling·
+transfer-concurrency scheme의 source-bound contract가 준비된 뒤에만 수행한다.
+
+### §74.55 1/2/4-node topology contract 준비
+
+scale 단계에서 launcher 인자만 바꾸어 P/D 배치가 암묵적으로 달라지는 문제를
+막기 위해 `eval/sota_4node/tempo_go_scale_topology.py`를 추가했다. 현재 frozen
+초기 topology는 다음과 같다.
+
+| rung | P/D 구성 | TP | GPU partition | 해석 경계 |
+|---|---|---:|---|---|
+| 1 node | 같은 node의 local P/D 1쌍 | 2+2 | P `(0,1)`, D `(2,3)` | Slingshot contention rung 아님 |
+| 2 node | P node 0 → D node 1 1쌍 | 4+4 | 각 endpoint가 node 전체 4 GPU | inter-node single-pair |
+| 4 node | P0→D0, P1→D1 2쌍 | 4+4 per endpoint | 각 endpoint가 node 전체 4 GPU | current native C9 topology |
+
+GPU partition overlap, pair별 P/D 누락, 지원하지 않는 node count를 CPU에서
+fail-closed하며 관련 테스트는 `5 passed`다. 이것은 native vLLM/LMCache
+capacity나 성능 결과가 아니다. 각 rung의 capability receipt와 실제 vLLM
+node-entry/LMCache lifecycle을 연결하는 작업은 Candidate M native 결과 뒤에
+수행한다.
+
+### §74.56 Candidate M native discovery 결과와 다음 목표
+
+새 allocation `57732862`의 4-node/16-A100 `gpu_interactive`에서 Candidate M
+pressure-triggered pair spill을 7-arm one-shot으로 실행했다. v13과 동일한
+210-victim/2,748-background offered population을 유지했고, 실제 vLLM P/D,
+official LMCache/NIXL-UCX, NCCL/Slingshot co-job을 사용했다. 결과 root는
+`results/tempo_go_c9_causal_burst_job_57732862/`이며 최종 분석은
+`analysis.json`, 완료 receipt는 `completed_attempt.json`이다.
+
+| arm | normal SLO / p99 | miss-hot SLO / p99 | remote-favorable SLO / p99 |
+|---|---:|---:|---:|
+| fixed local d0 | 34/60 / 20.375 s | 82/120 / 10.693 s | 0/30 / 38.244 s |
+| fixed local d1 | 30/60 / 13.871 s | 17/120 / 65.437 s | 0/30 / 38.070 s |
+| fixed remote p0→d1 | 38/60 / 25.560 s | 30/120 / 49.741 s | 0/30 / 37.500 s |
+| fixed remote p1→d0 | 35/60 / 23.692 s | 20/120 / 99.120 s | 0/30 / 37.219 s |
+| predictor | 36/60 / 29.621 s | 94/120 / 39.308 s | 13/30 / 50.989 s |
+| queue-GPU | 30/60 / 31.059 s | 104/120 / 71.638 s | 10/30 / 53.967 s |
+| **Candidate M** | **30/60 / 10.246 s** | **30/120 / 31.785 s** | **30/30 / 3.195 s** |
+
+M이 증명한 것은 제한적이지만 중요하다. observed clean-pair pressure가 0.5에
+도달했을 때 packed pair를 global score에 다시 넣으면 remote-favorable 피해자는
+30/30 SLO-good, p99 3.195초로 회복된다. 즉 v13의 hot-pair isolation이 실제로
+한쪽 병목을 만들고 있었으며, interconnect/LMCache 경로는 유효한 회피 경로다.
+그러나 이 spill만으로는 전체 문제가 풀리지 않았다. miss-hot은 strongest fixed
+local-d0의 82/120보다 낮은 30/120이었고, 당시 parser는 M background의
+1,551/2,748을 valid terminal로 집계했다. §74.58의 fail-closed HTTP-200 재분석은
+이를 1,478 complete, 73 service failure, 1,197 global reject로 교정한다.
+observer-supported decision도 95/210
+(45.24%)에 그쳤다.
+
+co-job에서는 양쪽 physical pair가 rendezvous와 correctness를 통과한 뒤 official
+LMCache/NIXL `batched_write` timeout 또는 Slurm teardown receipt를 남겼다. 예를
+들어 remote/pair arm에서 60초 transfer timeout, UCX endpoint timeout, exit
+134/143이 관찰됐다. 이는 “부하가 없다”는 반증이 아니라 실제 shared transfer
+overload의 경계다. timeout 자체를 성능 승리나 전체 시스템 고장으로 일반화하지
+않고 native overload/failure containment 데이터로 분리한다.
+
+M analyzer gate는 다음과 같이 닫혔다.
+
+- true: `correctness`, `native_transport`, `same_population`,
+  `full_cross_layer_actuation`, fixed/predictor baseline presence
+- false: `full_observer_supported` (95/210), strongest-fixed 대비 stressed p99 및
+  SLO non-regression, predictor 대비 stressed SLO non-regression, normal p50
+  regression bound
+- claim: `causal_discovery_positive=false`, `performance_claim_allowed=false`,
+  `independent_validation_claim_allowed=false`
+
+따라서 Candidate M은 threshold sweep의 출발점이 아니라 구조적 negative다. 다음
+목표는 M보다 다른 숫자를 찾는 것이 아니다. TEMPO global orchestrator를 아래의
+공동 제어 문제로 다시 고정한다.
+
+1. **decoder admission/fairness:** foreground victim의 deadline/SLO와 background
+   offered work를 별도 분모로 보존하고, global reject·priority lane·decoder
+   service floor를 함께 결정한다.
+2. **pair scaling:** local GPU queue, P/D receiver capacity, pair isolation과
+   packed-pair spill을 pair-level lease로 관리한다. 한 pair를 살리기 위해
+   다른 pair나 background를 무제한 희생하지 않는다.
+3. **fabric/transfer concurrency:** NCCL collective p99, Slingshot/Cassini
+   endpoint/TC counter, LMCache/NIXL inflight·timeout·completion을 같은 epoch의
+   freshness/support envelope로 묶고, remote route와 transfer concurrency를
+   동시에 제한한다.
+4. **global business objective:** route 선택만 하지 말고 victim SLO-goodput,
+   output-token goodput, tenant fairness, background completion과 failure cost를
+   하나의 admission frontier로 계산한다.
+5. **measurement closure:** observer coverage가 낮은 결정을 성능 claim에 넣지
+   말고, 모든 global decision에 atomic observer receipt를 붙인다. 이후 1/2/4-node
+   native scale와 2–3개의 independent SOTA를 같은 offered workload로 비교한다.
+
+이 순서가 현재의 실행 목표다. M의 실패 뒤에 local-only/remote-only threshold를
+계속 만들지 않으며, 기존 v0–v600 artifact와 v13/M raw receipt는 모두 history로
+보존한다. 새 native 실행은 위 공동 제어 scheme과 frozen workload/claim gate가
+정해지고, 새 승인 4-node `gpu_interactive` allocation을 얻은 뒤에만 수행한다.
+
+### §74.57 Candidate N native global-frontier 결과와 analyzer closure
+
+Candidate M의 pressure-triggered pair spill 위에 지원되는 pair-scoped
+`cross_layer_local_receiver_price_ms = 0.10`을 추가한 Candidate N을 같은
+allocation `57732862`에서 7-arm native campaign으로 검증했다. receiver local-tail
+price 하나가 foreground victim과 background를 함께 보호하는지를 확인한 실험이며,
+결과는 명확한 negative다. 이 factor를 다시 threshold sweep하지 않는다.
+
+- profile: `results/tempo_go_c9_candidate_n_global_frontier_v2/real_tempo_go_c9_candidate_n_global_frontier_profile_v1.json`
+- C8 base: `results/tempo_go_c9_candidate_n_global_frontier_v2/tempo_go_c8_candidate_n_global_frontier_contract.json`
+- C9 population: `results/tempo_go_c9_candidate_n_global_frontier_v2/tempo_go_c9_candidate_n_global_frontier_population_contract.json`
+- profile fingerprint: `5608c8d4d63d1f9329e7d43acddc006e25ef1a64329fe9fdaa3d2613ff36c40c`
+- population contract SHA-256: `28d8bd6f206f39f55aaeedd867d10e68b5d8c610a657b0eccf973f3cfe26b637`
+- native result root: `results/tempo_go_c9_global_frontier_job_57732862/`
+- post-hoc analyzer output: `results/tempo_go_c9_global_frontier_job_57732862/analysis.json`
+
+모든 arm은 동일한 210-victim/2,748-background offered population과 실제 vLLM
+P/D, official LMCache/NIXL-UCX, NCCL/Slingshot co-job을 사용했다. fixed 4개,
+predictor, queue-GPU, Candidate N 모두 inference/block/transport terminal
+artifact를 생성했으며, co-job은 correctness 뒤 실제 LMCache/NIXL overload
+timeout 경계를 기록했다.
+
+| arm | normal SLO / p99 | miss-hot SLO / p99 | remote-favorable SLO / p99 |
+|---|---:|---:|---:|
+| fixed local d0 | 31/60 / 17.834 s | 92/120 / 9.774 s | 0/30 / 38.236 s |
+| fixed local d1 | 30/60 / 20.959 s | 25/120 / 63.524 s | 0/30 / 37.577 s |
+| fixed remote p0→d1 | 31/60 / 28.757 s | 78/120 / 18.395 s | 0/30 / 36.201 s |
+| fixed remote p1→d0 | 33/60 / 32.433 s | 22/120 / 79.048 s | 0/30 / 38.932 s |
+| predictor | 30/60 / 25.826 s | 75/120 / 58.197 s | 13/30 / 50.774 s |
+| queue-GPU | 30/60 / 20.742 s | 98/120 / 41.015 s | 11/30 / 52.024 s |
+| **Candidate N** | **0/60 / 31.344 s** | **0/120 / 18.187 s** | **0/30 / —** |
+
+Candidate N의 실제 route는 local 54건, remote 3건뿐이었고, edge는
+`local:d0=22`, `local:d1=32`, `remote:p1→d1=3`이었다. remote-favorable
+block에서는 완료 victim이 0건이어서 p50/p99를 정의할 수 없다. 이 경우를
+analyzer가 오류로 중단하면 negative evidence가 사라지므로 다음 closure를
+적용했다.
+
+- `offered > 0, completed = 0`인 regime의 latency metric은 JSON `null`로
+  보존한다.
+- null latency에 대한 p50/p99 효과는 null로 만들고 관련 성능 gate는
+  fail-closed한다.
+- raw result, GPU 실행, native receipt는 바꾸지 않고 analyzer와 regression
+  test만 수정했다.
+- C9 analyzer regression과 기존 controller/cross-layer 묶음은 `102 passed`이고
+  `py_compile`도 통과했다.
+
+campaign shell은 일곱 arm을 모두 끝냈지만 최초 analyzer가 위 빈-population
+case에서 종료됐기 때문에 top-level `completed_attempt.json`은 생성되지 않았다.
+이를 native runner complete로 사후 위조하지 않는다. 현재 `analysis.json`은 모든
+terminal raw artifact를 변경 없이 읽은 명시적 post-hoc reanalysis다.
+
+N gate에서 `correctness`, `native_transport`, `same_population`,
+`full_cross_layer_actuation`, fixed/predictor baseline presence만 true였다.
+`full_observer_supported`는 22/210(10.48%)이고, normal p50 regression bound와
+strongest-fixed/predictor 대비 stressed p99·SLO gate는 모두 false다.
+`causal_discovery_positive=false`, `performance_claim_allowed=false`다. 따라서
+receiver price를 추가하면 orchestrator가 좋아진다는 결론은 내리지 않는다.
+이 후보는 receiver를 business-aware하게 조절하지 못했고 spill/접근 가능성을
+줄여 foreground와 background를 함께 잃었다.
+
+현재 구현 순서는 scalar route-price 후보를 중단하고 다음으로 고정한다.
+
+1. 모든 global decision에 atomic observer receipt를 붙여 observer coverage를
+   1.0으로 올린다.
+2. decoder admission/fairness와 pair-level lease를 결합해 victim SLO,
+   background minimum service, global reject cost를 동시에 제어한다.
+3. NCCL/Slingshot/Cassini와 LMCache/NIXL의 freshness, inflight, timeout,
+   transfer concurrency를 source/edge/receiver 공동 feasibility로 묶는다.
+4. 같은 offered population으로 1/2/4-node native scale을 측정하고 2–3개 SOTA
+   policy와 실제 workload family를 동일 gate로 비교한다.
+
+Candidate N은 이 공동 제어 scheme 전의 마지막 scalar-factor negative receipt다.
+기존 v0–v600 결과와 N raw는 history로 보존하며, 다음 native 실행은 위 global
+policy와 frozen claim gate가 준비된 뒤 승인된 `gpu_interactive` allocation에서만
+수행한다.
+
+### §74.58 Candidate O route-liveness native 결과, terminal 의미 교정, 다음 전체 orchestrator
+
+#### 74.58.1 왜 이 실행은 과거 launch bug 반복이 아닌가
+
+Candidate O는 Candidate M의 business admission, pair spill, shared-fabric budget,
+P×D mesh receiver credit을 유지하고, telemetry delta에서 생긴 failure quarantine의
+scope만 `pair`에서 `route`로 좁혔다. 목적은 한 route의 endpoint failure가 healthy
+sibling route와 surviving pair를 함께 죽이던 liveness 문제를 분리하는 것이다.
+새 threshold sweep이나 LMCache component benchmark가 아니다.
+
+실행 전 §74.32–§74.48의 과거 문서와 result receipt를 다시 대조했다. 이미 확정된
+Perlmutter canonical boundary는 다음과 같다.
+
+```text
+4-node/16-GPU gpu_interactive allocation: Network=job_vni
+  └─ control outer: 4 tasks, --gpus=0 --gres=none, --network=no_vni
+       ├─ actual vLLM P/D child: explicit GPU shape, job_vni
+       └─ two physical-pair NCCL + official LMCache/NIXL co-jobs: job_vni
+```
+
+NERSC 문서도 interconnect를 쓰지 않는 control application에는
+`srun --network=no_vni`가 Slingshot network resource를 소비하지 않는다고 설명하고,
+동시 step에는 `--overlap`과 명시적 resource shape가 필요하다고 설명한다. 이번
+launcher는 outer에 `--wait`, `--kill-on-bad-exit`, `--time`, `--gpus-per-task`를
+넣지 않았다. 실제 GPU/VNI child만 interconnect를 소유한다. 이것은 과거에 이미
+문서화된 해결법을 그대로 적용한 것이며, root/UDI/container/system setting은 전혀
+사용하지 않았다.
+
+새 승인 allocation은 `57736076`, 4 nodes/16 A100, QOS `gpu_interactive`, allocation
+network `job_vni`였다. attempt 경계는 결과를 섞지 않고 다음처럼 보존했다.
+
+| attempt | result root | 판정 | 원인/수정 |
+|---|---|---|---|
+| r1 | `results/tempo_go_c9_route_liveness_job_57736076/` | setup-only | outer가 16 GPU를 선점해 child가 `Requested node configuration is not available`; outer를 `--gpus=0`으로 교정 |
+| r1b | 없음 | pre-step setup-only | inherited GRES를 명시적으로 지우지 않은 CPU outer가 `Insufficient GRES`; inherited GPU TRES unset과 `--gpus=0 --gres=none`으로 교정 |
+| r2 | `..._r2_outer_cpu_only/` | execution-only | outer `--wait=600`이 먼저 끝난 no-op ranks 때문에 rank 0을 종료; orphan child는 자연 종료, 수동 cancel 없음 |
+| r3 | `..._r3_canonical_outer/` | **complete discovery** | canonical no-VNI/zero-GPU outer, 일곱 arm terminal, retry 없음 |
+
+r1/r2는 Candidate O 성능 수치가 아니다. r3의 outer campaign은 exit 0으로
+완료됐고, 각 inference arm은 complete, 각 co-job은 correctness 뒤
+`overload_timeout`으로 분류된 terminal receipt를 남겼다. 각 arm에 inference
+result, 두 physical pair의 observer/transport, block execution receipt가 있다.
+completed receipt는
+`results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/completed_attempt.json`
+이며 `one_campaign_no_retry=true`, `discovery_only=true`다.
+
+#### 74.58.2 source-bound contract
+
+- profile:
+  `results/tempo_go_c9_candidate_o_route_liveness_v1/real_tempo_go_c9_candidate_o_route_liveness_profile_v1.json`
+- C8 base:
+  `results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c8_candidate_o_route_liveness_contract.json`
+- C9 population:
+  `results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c9_candidate_o_route_liveness_population_contract.json`
+- profile fingerprint:
+  `43bc32ce9d5eb581e1293a5da1964c518174f03af037c9e9cc455d9b028e53ab`
+- base SHA-256:
+  `3b7f82f29a8870157cb6d5bb6264edca550b88cc1027e430f8eeb1020315e585`
+- population SHA-256:
+  `9936a4a980d23250ce6604494d9fa545da189de8508b931d8ffb1952c35a8cc5`
+- native analysis SHA-256:
+  `1d5f9c5a785ffd0b3a35c9bc2709fbb13b45af86d099d869e9fef0da9341b9a5`
+- completed receipt SHA-256:
+  `a56da8013a6fdf69747c4c08ea68708d1a28ebb545f27c12e636b0fd6b4b96a9`
+- fail-closed business analysis:
+  `results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/analysis_failclosed_business_v2.json`
+- fail-closed business analysis SHA-256:
+  `850c2858a30473235fb9bbfaa0c8940abf94405e4243607db96e2e1935cd3590`
+- post-hoc semantics receipt SHA-256:
+  `f63c5869358c3f212bfd627f8d256a8b30136a35b6e4f5d04d16611317b9c607`
+- candidate-specific diagnosis:
+  `results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/candidate_o_diagnosis.json`
+- diagnosis SHA-256:
+  `1c8aa9c73d1491613459575d81c30b794322bd3a2801cb8f77dff36f252333bd`
+
+Candidate O contract는 실행 당시 analyzer/source hash를 고정한 immutable v1이다.
+아래 fail-closed business 분석은 native contract나 raw를 덮어쓰지 않는 별도 post-hoc
+분석이다. 향후 candidate는 current analyzer hash로 새 contract를 만들어야 하며,
+완료된 O v1을 current source인 것처럼 재실행하지 않는다.
+
+#### 74.58.3 동일 population 7-arm 결과
+
+모든 arm은 210 foreground victim과 2,748 background request, 같은 Qwen2.5-7B,
+TP4×4 actual vLLM P/D, official LMCacheConnectorV1/NIXL-UCX, 양쪽 physical pair의
+8-rank NCCL 및 4-source receiver-incast co-job을 사용했다.
+
+| arm | normal SLO / p99 | miss-hot SLO / p99 | remote-favorable SLO / p99 |
+|---|---:|---:|---:|
+| fixed local d0 | 30/60 / 19.123 s | 81/120 / 10.846 s | 0/30 / 37.378 s |
+| fixed local d1 | 30/60 / 10.862 s | 26/120 / 80.159 s | 0/30 / 38.054 s |
+| fixed remote p0→d1 | 33/60 / 24.343 s | 67/120 / 58.521 s | 0/30 / 37.430 s |
+| fixed remote p1→d0 | 33/60 / 26.688 s | 23/120 / 77.033 s | 0/30 / 38.848 s |
+| predictor | 33/60 / 11.035 s | 63/120 / 56.804 s | 13/30 / 50.888 s |
+| queue-GPU | 30/60 / 18.073 s | 62/120 / 88.184 s | 13/30 / 53.074 s |
+| **Candidate O** | **35/60 / 26.365 s** | **65/120 / 35.578 s** | **30/30 / 3.170 s** |
+
+O의 route는 local 160건, remote 47건이었다. edge는 `local:d0=120`,
+`local:d1=40`, `remote:p0→d0=7`, `p0→d1=13`, `p1→d0=9`, `p1→d1=18`이다.
+normal은 local 52/remote 8, miss-hot은 local 108/remote 9,
+remote-favorable는 remote 30이다. 따라서 controller가 항상 local로 고정됐거나
+remote path가 실행되지 않은 결과가 아니다.
+
+O는 predictor 대비 miss-hot/remote-favorable p99를 각각 37.37%/93.77% 줄이고
+SLO를 65 대 63, 30 대 13으로 높였다. 그러나 strongest fixed 대비 miss-hot p99는
+228.03% 길고 SLO는 65/120 대 81/120이다. normal p99도 best fixed보다 142.73%
+길다. remote 한 구간의 큰 회복을 전체 policy 승리로 확대할 수 없다.
+
+#### 74.58.4 `correctness=true`와 3 victim failure가 함께 보인 이유
+
+native C8 arm 집계는 O의 victim을 207 complete, 3 failure로 정확히 기록했다.
+세 failure는 `01_remote_cool_hot_d0`의 HTTP 503
+`endpoint_service_lane_preflight_unavailable`이고, `done_seen=false`, output token
+0/128이다. 그런데 C9 business 요약은 `terminal.valid is True`이면 모두
+completion으로 세었다. stream client의 `valid`는 application success가 아니라
+terminal receipt가 router ledger와 일치했다는 뜻이므로, receipted failure도
+`valid=true`일 수 있다. 기존 top-level `correctness=true`도 request success가
+아니라 terminal/sidecar receipt integrity를 의미했다.
+
+이를 다음처럼 교정했다.
+
+```text
+complete = HTTP 200
+           ∧ done_seen
+           ∧ terminal_kind ∈ {null, complete}
+           ∧ exact contracted output-token count
+global reject = terminal_kind == global_reject
+otherwise = failure, even when valid terminal receipt
+```
+
+원본 `analysis.json`과 completed receipt의 SHA는 바꾸지 않았다. 같은 raw SHA를
+다시 검증한 output은 M/N의 `analysis_failclosed_business_v3.json`과 O의
+`analysis_failclosed_business_v2.json`에 있다. 교정된 business 결과는 다음과 같다.
+
+| candidate | foreground complete / failure / reject | background complete / failure / reject | observer support |
+|---|---:|---:|---:|
+| M | 203 / 3 / 4 | 1,478 / 73 / 1,197 | 95/210 (45.24%) |
+| N | 57 / 3 / 150 | 1,363 / 56 / 1,329 | 22/210 (10.48%) |
+| **O** | **207 / 3 / 0** | **2,004 / 40 / 704** | **37/210 (17.62%)** |
+
+O는 별도 allocation의 M보다 foreground complete +4, background complete +526,
+background failure −33, queue reject −493을 기록했다. 그러나 이는 paired causal
+comparison이 아니다. candidate-specific raw diagnosis에서 1,614개 global decision의
+모든 `telemetry_provenance.route_failures` counter가 0이었고,
+`route_failure_quarantine` rejected candidate도 0건이었다. 즉 O가 M에서 바꾼
+`telemetry_failure_quarantine_scope: pair→route`는 이번 run에서 한 번도 발동하지
+않았다. 따라서 위 차이를 route-scoped liveness의 positive mechanism evidence라고
+부를 수 없다. O의 receipt integrity는 true이고 HTTP-200 business success는
+foreground 207/210, background 2,004/2,748이지만, observer/strongest-fixed gate가
+false이므로 `causal_discovery_positive=false`, `performance_claim_allowed=false`다.
+
+#### 74.58.5 실제 bottleneck evidence와 claim 경계
+
+r3의 모든 arm에서 두 physical pair co-job은 rendezvous, native transport와
+correctness를 통과한 뒤 official LMCache/NIXL `batched_write exceeded 60.000s`
+경계 또는 대응 overload receipt로 닫혔다. pair service time은 같은 arm에서도
+예를 들어 약 49.6초 대 6.2초처럼 비대칭이었다. 이것은 LMCache가 부하를 만들지
+못한 것이 아니라 실제 receiver/data-plane overload와 pair asymmetry가 생겼다는
+증거다.
+
+다만 Cassini endpoint counter와 timeout만으로 특정 Slingshot switch/link가
+wire-rate로 포화됐다고 주장하지 않는다. 현재 claim은 다음까지다.
+
+> Actual vLLM P/D, official LMCache/NIXL-UCX와 NCCL/Slingshot co-job의 shared
+> receiver/data plane에서 overload, timeout과 pair-asymmetric service를 재현했고,
+> local/remote/fixed/predictor의 regime별 우선순위가 크게 바뀌었다.
+
+MRC는 RoCE 계열 transport에서 per-packet multipath, congestion control, loss/path
+recovery를 제공하는 transport 설계다. 이 결과는 MRC 같은 transport-level 기능의
+가치를 부정하지 않는다. TEMPO-GO의 고유 target은 transport 위에서 vLLM decoder,
+LMCache semantic/inflight, NCCL/fabric, cache ownership, tenant SLO를 함께 예약하고
+route·admission·pair scaling을 결정하는 service-level global orchestration이다.
+Kairos도 urgency-based prefill scheduling과 slack-guided decode batching으로 request
+imbalance를 다루지만, TEMPO의 target인 cross-layer fabric/receiver lease 전체와
+동일하지 않다. 따라서 component overlap을 contribution 차감식으로 세지 않는다.
+
+#### 74.58.6 왜 아직 strongest fixed를 못 이겼는가
+
+문제가 없거나 LMCache가 너무 약해서가 아니다. 이번 결과가 보여준 직접 원인은
+다음 네 가지다.
+
+1. **observer producer lifetime 결합:** O의 global decision 210개 모두 telemetry
+   field는 존재했지만, 현재 co-job epoch가 실제 decision을 support하고 action까지
+   연결한 것은 첫 두 block의 37개뿐이고 뒤 5개 block은 0/150이었다. load generator와
+   observer publisher가 같은 co-job process라 official LMCache/NIXL timeout이 data
+   plane과 state plane을 함께 종료했다. 나머지는 stale/unsupported signal을 0으로
+   위조하지 않았지만 controller는 stale-feedback fallback으로 route를 결정했다.
+2. **atomic residual reservation 부재:** decoder lane, local-prefill GPU cost,
+   remote source/edge/receiver bytes·ops, NCCL/fabric concurrency가 한 transaction으로
+   차감되지 않는다. 한 resource를 피한 선택이 다른 resource의 tail을 만들 수 있다.
+3. **business queue와 data-plane feasibility 분리:** background wait/reject와 victim
+   SLO를 조정하지만, 그 선택이 실제 endpoint service capacity와 같은 lease를
+   소유하지 않는다. 그래서 O는 M보다 background를 살리면서도 40 failure와 704
+   queue reject를 남겼다.
+4. **fast admission과 slow pair scaling의 분리 미완성:** request route는 바뀌지만
+   hot pair의 decoder/receiver capacity, concurrency cap, pair activation을 같은
+   feedback epoch에서 재배치하지 못한다. O의 current bundle은 remote-favorable를
+   살렸지만 normal/miss-hot tail을 함께 보호하지 못했고, route-scope 변경 자체는
+   비활성이어서 별도 인과효과도 확인되지 않았다.
+
+즉 workload 다각화가 없어서 차이가 안 난 것이 아니다. fixed arm의 miss-hot p99가
+10.846–80.159초, remote-favorable가 37–53초로 벌어졌고 O는 remote-favorable를
+3.170초로 만들었다. 차이는 충분히 크다. 현재 실패는 **올바른 global feasible
+frontier를 구현하지 못한 policy failure**다.
+
+#### 74.58.7 다음 목표: 하나의 atomic global service frontier
+
+다음 candidate를 작은 component patch로 만들지 않는다. 구현 단위는 다음의 전체
+global transaction이다.
+
+```text
+fresh epoch quorum
+  {vLLM running/waiting/service rate,
+   cache ownership and reusable prefix,
+   LMCache source/receiver ops + bytes + completion tail,
+   NCCL collective/arrival tail,
+   Cassini endpoint retry/pause/timeout,
+   tenant deadline, deficit, minimum service}
+        ↓
+global residual ledger
+  decoder-compute tokens × pair
+  local-prefill GPU tokens × decoder
+  remote source/edge/receiver credits × P×D edge
+  fabric concurrency tokens × physical failure domain
+  foreground SLO debt + background minimum-service debt
+        ↓
+atomic feasibility and utility frontier
+        ↓
+one commit
+  admission + pair activation/scaling + route + service lane
+  + transfer concurrency + bounded wait/reject
+        ↓
+exact completion/failure release and debt update
+```
+
+핵심 invariant는 다음과 같다.
+
+- observer-supported fresh epoch가 없으면 performance candidate를 blind admit하지
+  않고 bounded safe lane으로 보낸다. coverage denominator를 줄이지 않는다.
+- 한 request의 global commit은 decoder, pair/edge, receiver와 fabric credit을 모두
+  얻거나 아무것도 얻지 않는 원자적 lease다.
+- explicit endpoint failure는 route-scoped deny-until-probe로 격리하되, aggregate
+  receiver/fabric failure는 실제 failure-domain graph 범위로만 확대한다.
+- foreground SLO를 위해 background를 무제한 reject하지 않는다. tenant deficit과
+  minimum service가 candidate utility에 직접 들어간다.
+- fast path는 request admission/route, slow path는 pair activation·decoder allotment·
+  transfer concurrency를 조정하지만 같은 residual ledger와 epoch를 공유한다.
+- local/remote는 목표가 아니라 feasible frontier의 action이다. 둘 중 하나를
+  항상 우선하는 fallback을 두지 않는다.
+
+다음 native campaign의 gate는 사후 완화하지 않는다.
+
+1. terminal receipt integrity true, HTTP-200/exact-output business outcome을 별도
+   집계하며 foreground service failure와 terminal queue timeout 0; background는
+   preregistered minimum-service/goodput gate를 통과한다.
+2. 모든 global victim decision의 fresh observer support 100%, mixed/stale identity 0.
+3. normal p50 regression ≤3%.
+4. miss-hot과 remote-favorable **각각** strongest fixed와 predictor 대비 p99 ≥15%
+   감소, offered SLO non-regression.
+5. background completion/output-token goodput은 strongest fixed 대비 non-regression,
+   starvation 0; 전체 goodput은 original goal의 ≥5% 개선 gate 유지.
+6. 같은 population/trace/cache namespace/topology에서 one-campaign/no-retry.
+7. 4-node discovery가 모두 통과한 뒤에만 held-out fresh allocation과
+   capacity-normalized 1/2/4-node rung, full Kairos-compatible/NetKV/queue/predictor/
+   fixed 비교로 승격.
+
+SC26 artifact 구조에 맞춰 contribution `C1...Cn`, artifact `A1...Am`, setup,
+execution, analysis, graph regeneration을 분리하고, principal 4-node result를 CPU
+downscale로 대체하지 않는다. current evidence manifest와 renderer가 M/N/O의 raw,
+post-hoc semantics, 그래프 SHA를 연결한다.
+
+Candidate P bounded-observer contract도 preregistered diagnostic으로 보존한다.
+P는 O의 controller/policy를 전혀 바꾸지 않고, 과거 v9/v10의 bounded-resident
+dual-pair load를 사용해 2 GiB timeout-shaped co-load와 observer process lifetime의
+결합만 분리한다. contract SHA는
+`4f76efac34eb930da1ef61e4fe883e1d5fd557fb2d976008e285b000df3d1828`이다.
+아직 native result는 없고 performance claim도 없다. P가 실행되더라도 realistic
+overload를 대체하거나 완성된 solution이 되는 것이 아니라 state-plane coupling을
+확인하는 진단일 뿐이며, durable observer sidecar와 atomic service lease 구현 gate는
+그대로 남는다.
+
+따라서 현재 최종 답은 다음과 같다. **문제는 실존하고 global orchestrator는
+필요하다. Candidate O는 높은 business completion을 기록했지만 바꾼 route-liveness
+mechanism은 발동하지 않았고 완성된 orchestrator도 아니다. 다음 작업은 LMCache나 launcher를 다시 괴롭히는 것이
+아니라 위 atomic global service frontier를 한 번에 구현하고 같은 강한 workload에서
+검증하는 것이다.**
+
+참고 원문:
+
+- [NERSC Example Jobs: concurrent `srun`, `--overlap`, `--network=no_vni`](https://docs.nersc.gov/jobs/examples/)
+- [NERSC Basics of Running Jobs: allocation과 child `srun` resource inheritance](https://docs.nersc.gov/jobs/)
+- [MRC transport](https://arxiv.org/abs/2606.18170)
+- [Kairos: SLO-aware scheduling for disaggregated LLM inference](https://arxiv.org/abs/2605.02329)
+- [SC26 AD/AE process and contribution↔artifact mapping](https://sc26.supercomputing.org/program/papers/reproducibility-appendices-badges/)

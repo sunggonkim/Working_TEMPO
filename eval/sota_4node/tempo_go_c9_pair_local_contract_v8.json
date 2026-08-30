@@ -1,0 +1,117 @@
+{
+  "burst": {
+    "block_delay_s": 0.1,
+    "cojob_time_limit": "00:29:00",
+    "cojob_timeout_s": 1740,
+    "foreground_mib": 16,
+    "interpretation": "Each block is a bounded NCCL collective plus 128 MiB aggregate receiver-incast KV burst; producer lease exceeds victim finalization and is stopped only by the C9 launcher after inference completion.",
+    "kv_mib_per_request": 32,
+    "maximum_blocks": 2048,
+    "minimum_active_duration_s": 1500,
+    "minimum_blocks": 1,
+    "nixl_transfer_timeout_s": 60,
+    "observer_max_age_ms": 60000,
+    "process_group_timeout_s": 120,
+    "requests_per_source": 1,
+    "start_delay_s": 0,
+    "token_iters": 512,
+    "traffic_pattern": "incast_4to1",
+    "transport": {
+      "lmcache": "official NixlChannel with UCX",
+      "nccl": "AWS Libfabric over Slingshot/CXI",
+      "socket_fallback_forbidden": true
+    }
+  },
+  "claim_boundary": {
+    "discovery_only": true,
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "reason": "same-allocation observer-live pair-local telemetry/controller validation"
+  },
+  "execution": {
+    "cojob_readiness_timeout_s": 240,
+    "cooldown_s": 30,
+    "inference_timeout_s": 1800,
+    "one_campaign_no_retry": true,
+    "order": [
+      {
+        "arm": "app_global_only",
+        "name": "00_app_global_only_a",
+        "port_slot": 2600
+      },
+      {
+        "arm": "full_c7_managed_background",
+        "name": "01_full_business_lane_a",
+        "port_slot": 2640
+      },
+      {
+        "arm": "full_c7_managed_background",
+        "name": "02_full_business_lane_b",
+        "port_slot": 2680
+      },
+      {
+        "arm": "app_global_only",
+        "name": "03_app_global_only_b",
+        "port_slot": 2720
+      }
+    ],
+    "paired_indices": [
+      [
+        0,
+        1
+      ],
+      [
+        3,
+        2
+      ]
+    ]
+  },
+  "gates": {
+    "correctness_required": true,
+    "maximum_normal_p50_regression_fraction": 0.03,
+    "minimum_full_supported_observer_fraction": 0.75,
+    "minimum_remote_background_completion_fraction": 0.99,
+    "minimum_remote_background_completion_ratio_to_blind": 0.99,
+    "minimum_stressed_p99_reduction_fraction": 0.15,
+    "minimum_stressed_slo_good_ratio": 1.0,
+    "observer_support_scope": "remote_favorable_victim_global_decisions",
+    "require_ablation_cross_layer_blind": true,
+    "require_full_cross_layer_actuation": true,
+    "require_native_transport_receipt": true
+  },
+  "mechanism": {
+    "bootstrap_policy": "cojob_bootstrap_then_active_snapshot_until_victim_finalization",
+    "cojob_pair": 0,
+    "local_receiver_price_ms_per_observed_ms": 0.1,
+    "observer_gate": "active_correct_sequence_at_least_one_before_victim_release",
+    "oracle_input": false,
+    "pair_local_observer_path": "nccl_observer_pair-{pair}.json",
+    "schema": "tempo-go-c9-pair-local-observer-live-mechanism-v3",
+    "transport_changed": false,
+    "unobserved_pair_policy": "not_collected_no_synthetic_pressure",
+    "workload_changed": false
+  },
+  "purpose": "Observer-live ABBA C9 validation with a producer lease that remains active until the victim inference lifecycle requests shutdown.",
+  "schema": "tempo-go-c9-causal-burst-discovery-v1",
+  "source_inventory": {
+    "eval/sota_4node/analyze_tempo_go_c9_causal_burst_discovery.py": "fe6fc1920fe9bb2ed02beddd4bdda406bfa6018c412f7c700c32674f98e65e40",
+    "eval/sota_4node/build_tempo_go_c8_dual_regime_contract.py": "92739012122b0bb10b6e2014462eb278aff24158a1eeb7d1a805f269b71a911e",
+    "eval/sota_4node/build_tempo_go_c8_priority_service_lane_profile.py": "9c96f48e8e3ed78558763d497d8b708756c9ac5fbe54a32026b143fc30faffcd",
+    "eval/sota_4node/build_tempo_go_c9_business_lane_followup_contract.py": "ec3e70c36bff19578fb434dd6cc15937c85f144372f6d4ac303d3aa5b5a6b9ca",
+    "eval/sota_4node/c8_dual_regime_node_entry.sh": "737ac0c0839b7223ad1f28c66b6c9ae5ebf69d871698ab37ece75363b97d631f",
+    "eval/sota_4node/c9_gate_node_entry.sh": "f6d46d07f5e8bea93d79a407164aed961d11c3a0ab9ed4f67b4155cbaba0d1b1",
+    "eval/sota_4node/run_tempo_go_c9_causal_burst_discovery_in_allocation.sh": "e94d0389e86c2f7ae8ff9c8db23018e0d0f5095355e0e98818787d1de34ceba7",
+    "eval/sota_4node/tempo_pd_elastic_router.py": "5c92060610c3e897badf29b37775ad901f7b4c95f3e8378e515c43cff3ab66ea",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c8_dual_regime_node.py": "3676d6033aaf3ac542a39f745a828b11c2a03f5a2950be384c96fb73db64196d",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c9_gate_node.py": "ac0da22a419a4abd4725f47020e7d82539de5014d1d23c87600eb56b24e5bc7c",
+    "tempo/pd_global_orchestrator.py": "214cc44d6cb56fcef8ecb15d1f9f226d22e299f312452f1fdbbe3b417579e45f"
+  },
+  "system_under_test": {
+    "base_contract": "eval/sota_4node/tempo_go_c9_pair_local_base_contract_v8.json",
+    "base_contract_sha256": "270254918d780a80827420f1aa93e3e68a9f6ae038f9836739c17a35a94ba2d0",
+    "node_entry": "eval/sota_4node/c9_gate_node_entry.sh",
+    "observer_scope": "pair-scoped P0-D0 co-job observer; pair 1 remains not_collected; victim release waits for the first active snapshot",
+    "source_policy": "source_bound_dual_route_business_lane_v1",
+    "topology": "P0-D0-P1-D1, Qwen2.5-7B-Instruct, TP4 per node, official LMCacheConnectorV1 NIXL-UCX"
+  }
+}

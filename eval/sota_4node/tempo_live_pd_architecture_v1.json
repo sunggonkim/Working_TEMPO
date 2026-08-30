@@ -1,0 +1,83 @@
+{
+  "schema": "tempo-live-pd-architecture-contract-1",
+  "status": "frozen_before_next_gpu_experiment",
+  "system": "TEMPO-PD",
+  "claim": "correctness-gated request admission for live vLLM prefill/decode KV routing",
+  "not_claimed": [
+    "a new KV transport",
+    "a faster LMCache or NIXL implementation",
+    "a validated Mooncake comparison",
+    "a production-ready online predictor",
+    "a remote-route crossover win"
+  ],
+  "placement": {
+    "owner": "request router before remote prefill or remote KV allocation",
+    "policy_module": "tempo.pd_admission",
+    "transport_adapters": [
+      "official_lmcache_pd",
+      "official_mooncake_pd_when_available"
+    ],
+    "local_action": "decoder_local_recompute_or_cache",
+    "remote_action": "remote_prefill_live_kv"
+  },
+  "workload_class_fields": [
+    "model_id",
+    "model_revision",
+    "topology_id",
+    "remote_backend",
+    "prompt_bucket",
+    "output_bucket",
+    "decoder_load_bucket",
+    "kv_bytes_bucket"
+  ],
+  "remote_admission": {
+    "benefit_lower_bound": "local_latency_lower_bound_ms - remote_latency_upper_bound_ms",
+    "minimum_benefit_ms": 5.0,
+    "production_minimum_samples_per_route": 3,
+    "production_requires_independent_replication": true,
+    "requires_exact_output_equivalence": true,
+    "requires_zero_remote_transfer_failures": true,
+    "requires_profile_epoch_match": true,
+    "requires_remote_deadline_feasibility": true
+  },
+  "fail_closed_order": [
+    "exact workload profile exists",
+    "remote backend is available",
+    "evidence level is independently replicated",
+    "sample count is sufficient",
+    "remote and local outputs are equivalent",
+    "remote profile has zero transfer failures",
+    "profile epoch is valid",
+    "remote benefit lower bound meets margin",
+    "remote latency upper bound fits the request budget"
+  ],
+  "request_state_machine": [
+    "local_selected -> decode_started -> complete|failed",
+    "remote_selected -> remote_started -> decode_started -> complete|failed",
+    "remote_selected -> local_selected only on a failure before remote_started"
+  ],
+  "immutability": {
+    "validation_requests_update_policy": false,
+    "profile_changes_require_new_epoch": true,
+    "decision_is_committed_before_remote_prefill": true,
+    "transport_may_override_route": false
+  },
+  "current_evidence": {
+    "artifact": "results/live_pd_paper_evidence_all_job_57002489.json",
+    "evidence_level": "single_allocation_mechanism_screen",
+    "paired_validations": 24,
+    "e2e_wins": 24,
+    "observed_remote_selections": 0,
+    "validated_branch": "harmful_remote_handoff_rejection",
+    "production_promotable": false
+  },
+  "next_experiment_entry_requirements": [
+    "router adapter calls tempo.pd_admission before remote allocation",
+    "classifier and profile epoch are serialized in every result",
+    "local and remote use identical model, request, KV bytes, topology, and GPU budget",
+    "policy is frozen before validation",
+    "exact output equality and transfer-error gates remain fail closed",
+    "throughput, SLO goodput, TTFT, TPOT, E2E, and route counts are reported",
+    "an independent allocation is used for promotion"
+  ]
+}

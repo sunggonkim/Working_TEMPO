@@ -1,0 +1,1107 @@
+diff --git a/examples/disagg_prefill/disagg_proxy_server.py b/examples/disagg_prefill/disagg_proxy_server.py
+index 0aa035e..3b5de7d 100644
+--- a/examples/disagg_prefill/disagg_proxy_server.py
++++ b/examples/disagg_prefill/disagg_proxy_server.py
+@@ -27,6 +27,10 @@ from lmcache.v1.storage_backend.pd_backend import (
+     PDMsg,
+     ProxyNotif,
+ )
++from eval.sota_4node.tempo_pd_proxy_cache_control import (
++    apply_decoder_cache_read_control,
++    extract_decoder_cache_read_control,
++)
+
+ logger = init_logger(__name__)
+
+@@ -175,6 +179,7 @@ async def lifespan(app: FastAPI):
+
+     global pd_buffer_semaphore
+     kv_bytes_per_token = compute_kv_bytes_per_token(global_args.model)
++    app.state.kv_bytes_per_token = kv_bytes_per_token
+     capacity_slots = global_args.pd_buffer_size // (
+         kv_bytes_per_token * global_args.chunk_size
+     )
+@@ -193,9 +198,9 @@ async def lifespan(app: FastAPI):
+
+     # Shutdown: Close clients
+     for client in app.state.prefill_clients:
+-        await client.aclose()
++        await client.client.aclose()
+     for client in app.state.decode_clients:
+-        await client.aclose()
++        await client.client.aclose()
+
+     global run_proxy
+     run_proxy = False
+@@ -397,25 +402,37 @@ async def zmq_pull_server():
+
+
+ async def send_request_to_service(
+-    client: httpx.AsyncClient, endpoint: str, req_data: dict
++    client: httpx.AsyncClient,
++    endpoint: str,
++    req_data: dict,
++    *,
++    request_id: str | None = None,
+ ):
+     """
+     Send a request to a service using a persistent client.
+     """
+
+     headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"}
++    if request_id:
++        headers["X-Request-Id"] = request_id
+     response = await client.post(endpoint, json=req_data, headers=headers)
+     response.raise_for_status()
+     return response
+
+
+ async def stream_service_response(
+-    client: httpx.AsyncClient, endpoint: str, req_data: dict
++    client: httpx.AsyncClient,
++    endpoint: str,
++    req_data: dict,
++    *,
++    request_id: str | None = None,
+ ):
+     """
+     Asynchronously stream the response from a service using a persistent client.
+     """
+     headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"}
++    if request_id:
++        headers["X-Request-Id"] = request_id
+     async with client.stream(
+         "POST", endpoint, json=req_data, headers=headers
+     ) as response:
+@@ -463,12 +480,32 @@ BOUND_CLIENT = os.getenv("CLIENT_BOUND", "false").lower() == "true"
+ CLIENT_BOUND_KEY = os.getenv("CLIENT_BOUND_KEY", "session-id")
+
+
++TOKENIZER_PLACEMENT_ENV = "TEMPO_PD_PROXY_TOKENIZER_PLACEMENT"
++TOKENIZER_PLACEMENT = os.getenv(
++    TOKENIZER_PLACEMENT_ENV, "round_robin").lower()
++if TOKENIZER_PLACEMENT not in {"round_robin", "prefiller"}:
++    raise ValueError(
++        f"{TOKENIZER_PLACEMENT_ENV} must be round_robin or prefiller")
++
++
++KV_CONTROL_OVERLAP_ENV = "TEMPO_PD_PROXY_KV_CONTROL_OVERLAP"
++raw_kv_control_overlap = os.getenv(KV_CONTROL_OVERLAP_ENV, "0")
++if raw_kv_control_overlap not in {"0", "1"}:
++    raise ValueError(f"{KV_CONTROL_OVERLAP_ENV} must be 0 or 1")
++KV_CONTROL_OVERLAP = raw_kv_control_overlap == "1"
++
++
+ def pick_up_clients(request: Request) -> tuple[ClientInfo, ClientInfo, ClientInfo]:
+     bound_client_id = request.headers.get(CLIENT_BOUND_KEY) if BOUND_CLIENT else None
+     if bound_client_id:
+         # Use or create a persistent set of clients for the session.
+-        return pick_up_bound_clients(bound_client_id)
+-    return round_robin_pick_clients()
++        clients = pick_up_bound_clients(bound_client_id)
++    else:
++        clients = round_robin_pick_clients()
++    _tokenization_client, prefill_client, decode_client = clients
++    if TOKENIZER_PLACEMENT == "prefiller":
++        return prefill_client, prefill_client, decode_client
++    return clients
+
+
+ @app.post("/v1/completions")
+@@ -482,14 +519,37 @@ async def handle_completions(request: Request):
+     acquired = False
+     try:
+         req_data = await request.json()
++        # This control is decoder-only.  Consume it before tokenization and
++        # producer prefill, then inject the corresponding vLLM xarg only after
++        # the official LMCache P/D transfer has completed.
++        decoder_cache_read_control = extract_decoder_cache_read_control(
++            req_data)
++        trace_request_id = (
++            request.headers.get("X-Request-Id")
++            or request.headers.get("X-Tempo-PD-Request-Id")
++            or request.headers.get("X-Tempo-Request-Id")
++            or f"tempo-proxy-{req_id}"
++        )
+
+         # Pick tokenization, prefill and decode client
+         tokenization_client, prefill_client, decode_client = pick_up_clients(request)
+
+-        tokenize_output = await send_request_to_service(
+-            tokenization_client.client, "/tokenize", {"prompt": req_data["prompt"]}
+-        )
+-        tokenize_output = tokenize_output.json()
++        supplied_prompt = req_data.get("prompt")
++        if (
++            isinstance(supplied_prompt, list)
++            and supplied_prompt
++            and all(type(value) is int for value in supplied_prompt)
++        ):
++            tokenize_output = {"tokens": list(supplied_prompt)}
++            tokenizer_placement = "upstream_token_ids"
++        else:
++            tokenize_response = await send_request_to_service(
++                tokenization_client.client, "/tokenize",
++                {"prompt": supplied_prompt},
++                request_id=trace_request_id,
++            )
++            tokenize_output = tokenize_response.json()
++            tokenizer_placement = TOKENIZER_PLACEMENT
+
+         org_max_tokens = req_data["max_tokens"]
+         req_data["prompt"] = tokenize_output["tokens"]
+@@ -519,11 +579,26 @@ async def handle_completions(request: Request):
+
+         # Send request to prefill service, ignore the response
+         prefill_output = await send_request_to_service(
+-            prefill_client.client, "/v1/completions", req_data
++            prefill_client.client, "/v1/completions", req_data,
++            request_id=trace_request_id,
+         )
+
+         prefill_output = prefill_output.json()
+
++        transfer_params = prefill_output.get("kv_transfer_params")
++        if not isinstance(transfer_params, dict):
++            raise RuntimeError("prefill response omitted kv_transfer_params")
++        cached_tokens = transfer_params.get("num_lmcache_cached_tokens")
++        if type(cached_tokens) is not int:
++            raise RuntimeError(
++                "prefill response omitted integer num_lmcache_cached_tokens"
++            )
++        if not 0 <= cached_tokens <= len(tokenize_output["tokens"]):
++            raise RuntimeError(
++                "prefill source-cache token count is outside prompt geometry: "
++                f"cached={cached_tokens} prompt={len(tokenize_output['tokens'])}"
++            )
++
+         et = time.time()
+         stats_calculator.add(et - st)
+
+@@ -533,6 +608,30 @@ async def handle_completions(request: Request):
+         req_data["stream"] = True
+         if stream_options is not None:
+             req_data["stream_options"] = stream_options
++        apply_decoder_cache_read_control(
++            req_data, decoder_cache_read_control)
++
++        transfer_task = None
++        if KV_CONTROL_OVERLAP:
++            async def complete_transfer():
++                nonlocal acquired
++                try:
++                    await wait_decode_kv_ready(req_id, num_tp_rank)
++                finally:
++                    if pd_buffer_semaphore is not None and acquired:
++                        await pd_buffer_semaphore.release(slots)
++                        acquired = False
++
++            # Establish the upstream stream while KV is in flight. The real
++            # prefiller token can traverse the HTTP control plane now; the
++            # decoder request below remains strictly gated on ProxyNotif from
++            # every TP rank, so a partial transfer cannot trigger recompute.
++            transfer_task = asyncio.create_task(complete_transfer())
++        else:
++            await wait_decode_kv_ready(req_id, num_tp_rank)
++            if pd_buffer_semaphore is not None:
++                await pd_buffer_semaphore.release(slots)
++                acquired = False
+
+         # Stream response from decode service
+         async def generate_stream():
+@@ -557,17 +656,39 @@ async def handle_completions(request: Request):
+             ).encode()
+
+             try:
+-                await wait_decode_kv_ready(req_id, num_tp_rank)
++                if transfer_task is not None:
++                    await transfer_task
++                async for chunk in stream_service_response(
++                    decode_client.client, "/v1/completions", req_data,
++                    request_id=trace_request_id,
++                ):
++                    yield chunk
+             finally:
+-                if pd_buffer_semaphore is not None:
+-                    await pd_buffer_semaphore.release(slots)
+-
+-            async for chunk in stream_service_response(
+-                decode_client.client, "/v1/completions", req_data
+-            ):
+-                yield chunk
++                if transfer_task is not None and not transfer_task.done():
++                    transfer_task.cancel()
++                    try:
++                        await transfer_task
++                    except asyncio.CancelledError:
++                        pass
+
+-        return StreamingResponse(generate_stream(), media_type="application/json")
++        transfer_kv_bytes = (
++            len(tokenize_output["tokens"])
++            * app.state.kv_bytes_per_token
++        )
++        return StreamingResponse(
++            generate_stream(), media_type="application/json",
++            headers={
++                "X-Tempo-LMCache-PD-Transfer": (
++                    "eof_complete_after_control_overlap"
++                    if KV_CONTROL_OVERLAP else "complete"),
++                "X-Tempo-LMCache-PD-Prompt-Tokens": str(len(tokenize_output["tokens"])),
++                "X-Tempo-LMCache-PD-Cached-Tokens": str(cached_tokens),
++                "X-Tempo-LMCache-PD-KV-Bytes": str(transfer_kv_bytes),
++                "X-Tempo-LMCache-PD-Request-Id": trace_request_id,
++                "X-Tempo-LMCache-PD-Tokenizer-Placement": (
++                    tokenizer_placement),
++            },
++        )
+
+     except Exception as e:
+         if pd_buffer_semaphore is not None and acquired:
+diff --git a/lmcache/integration/vllm/vllm_v1_adapter.py b/lmcache/integration/vllm/vllm_v1_adapter.py
+index 985ef9a..463feab 100644
+--- a/lmcache/integration/vllm/vllm_v1_adapter.py
++++ b/lmcache/integration/vllm/vllm_v1_adapter.py
+@@ -558,6 +558,8 @@ class LMCacheConnectorV1Impl:
+         self.load_specs: dict[str, LoadSpec] = {}
+         self.kv_cache_manager: Optional["KVCacheManager"] = None
+         self._request_trackers: dict[str, RequestTracker] = {}
++        self._completed_request_cache_tokens: dict[str, int] = {}
++        self._reported_request_cache_tokens: set[str] = set()
+
+         self._discard_partial_chunks = (
+             vllm_config.kv_transfer_config.get_from_extra_config(
+@@ -1632,7 +1634,16 @@ class LMCacheConnectorV1Impl:
+         meta = LMCacheConnectorMetadata()
+
+         for finished_req_id in scheduler_output.finished_req_ids:
+-            self._request_trackers.pop(finished_req_id, None)
++            tracker = self._request_trackers.pop(finished_req_id, None)
++            if self.config.get_extra_config_value(
++                "enable_cache_usage_details_in_response", False
++            ):
++                if finished_req_id in self._reported_request_cache_tokens:
++                    self._reported_request_cache_tokens.remove(finished_req_id)
++                elif tracker is not None:
++                    self._completed_request_cache_tokens[finished_req_id] = (
++                        tracker.num_lmcache_cached_tokens
++                    )
+             self._unfinished_requests.pop(finished_req_id, None)
+
+         # We should load KV for:
+@@ -1927,11 +1938,17 @@ class LMCacheConnectorV1Impl:
+             "enable_cache_usage_details_in_response", False
+         ):
+             request_tracker = self._request_trackers.get(request.request_id)
+-            if request_tracker:
+-                return_params = return_params or {}
+-                return_params["num_lmcache_cached_tokens"] = (
+-                    request_tracker.num_lmcache_cached_tokens
++            cached_tokens: int | None
++            if request_tracker is not None:
++                cached_tokens = request_tracker.num_lmcache_cached_tokens
++                self._reported_request_cache_tokens.add(request.request_id)
++            else:
++                cached_tokens = self._completed_request_cache_tokens.pop(
++                    request.request_id, None
+                 )
++            if cached_tokens is not None:
++                return_params = return_params or {}
++                return_params["num_lmcache_cached_tokens"] = cached_tokens
+
+         return False, return_params
+
+diff --git a/lmcache/v1/cache_engine.py b/lmcache/v1/cache_engine.py
+index dd6e2e5..5b1a88a 100644
+--- a/lmcache/v1/cache_engine.py
++++ b/lmcache/v1/cache_engine.py
+@@ -815,6 +815,11 @@ class LMCacheEngine:
+
+         # Get req_id for logging
+         req_id = self._get_req_id(kwargs)
++        lookup_owned_pins = {
++            key
++            for keys in self.lookup_pins.get(req_id, {}).values()
++            for key in keys
++        }
+
+         tot_kv_size = 0
+
+@@ -932,7 +937,10 @@ class LMCacheEngine:
+                 if self._is_sync_pd_backend():
+                     memory_obj.ref_count_down()
+             else:
+-                if memory_obj.is_pinned:
++                # A lookup pin belongs to the request lifecycle and is released by
++                # lookup_unpin(req_id) in the serving-engine adapter. Only release
++                # pins acquired independently by the retrieve path here.
++                if key not in lookup_owned_pins and memory_obj.is_pinned:
+                     memory_obj.unpin()
+                 memory_obj.ref_count_down()
+
+diff --git a/lmcache/v1/storage_backend/pd_backend_async.py b/lmcache/v1/storage_backend/pd_backend_async.py
+index f7fe34c..d4cd8e6 100644
+--- a/lmcache/v1/storage_backend/pd_backend_async.py
++++ b/lmcache/v1/storage_backend/pd_backend_async.py
+@@ -1,9 +1,11 @@
+ # SPDX-License-Identifier: Apache-2.0
+
+ # Standard
++from contextlib import contextmanager
+ from dataclasses import dataclass
+ from typing import Any, Callable, List, Optional, Sequence, Union
+ import asyncio
++import fcntl
+ import os
+ import threading
+ import time
+@@ -41,6 +43,52 @@ from lmcache.v1.transfer_channel.transfer_utils import get_correct_device
+
+ logger = init_logger(__name__)
+
++_NIXL_CXI_INIT_LOCK_PATH_ENV = "LMCACHE_NIXL_CXI_INIT_LOCK_PATH"
++
++
++def _uses_nixl_libfabric_cxi(config: LMCacheEngineConfig) -> bool:
++    """Return whether transfer-channel initialization uses CXI via NIXL."""
++    if str(config.transfer_channel).strip().lower() != "nixl":
++        return False
++    backends = config.nixl_backends or []
++    if isinstance(backends, str):
++        backends = [backends]
++    if "LIBFABRIC" not in {str(backend).strip().upper() for backend in backends}:
++        return False
++    return os.getenv("FI_PROVIDER", "").strip().lower() == "cxi"
++
++
++@contextmanager
++def _serialize_nixl_libfabric_cxi_initialization(config: LMCacheEngineConfig):
++    """Serialize node-local CXI setup across tensor-parallel workers.
++
++    Cray libfabric can stall in CUDA memory registration when several worker
++    processes concurrently create CXI rails, progress threads, and memory
++    regions. The lock deliberately covers the complete transfer-channel
++    constructor, not only ``fi_mr_reg``. It is released before serving any
++    request, so the data-transfer hot path is unaffected.
++    """
++    if not _uses_nixl_libfabric_cxi(config):
++        yield
++        return
++
++    lock_path = os.getenv(
++        _NIXL_CXI_INIT_LOCK_PATH_ENV,
++        f"/tmp/lmcache-nixl-libfabric-cxi-init-{os.getuid()}.lock",
++    )
++    lock_fd = os.open(lock_path, os.O_CREAT | os.O_CLOEXEC | os.O_RDWR, 0o600)
++    locked = False
++    try:
++        logger.info("Waiting for node-local NIXL LIBFABRIC/CXI initialization lock")
++        fcntl.flock(lock_fd, fcntl.LOCK_EX)
++        locked = True
++        logger.info("Acquired node-local NIXL LIBFABRIC/CXI initialization lock")
++        yield
++    finally:
++        if locked:
++            fcntl.flock(lock_fd, fcntl.LOCK_UN)
++        os.close(lock_fd)
++
+
+ class PDMsgBase(msgspec.Struct, tag=True):
+     """Base class for all PD-related messages"""
+@@ -374,19 +422,20 @@ class PDBackendAsync(AllocatorBackendInterface):
+             if self.corrected_device == "cpu"
+             else self.memory_allocator.gpu_allocator
+         )
+-        self.transfer_channel = CreateTransferChannel(
+-            async_mode=True,
+-            channel_type=config.transfer_channel,
+-            role=self.pd_config.role,
+-            buffer_ptr=allocator.buffer_ptr,
+-            buffer_size=allocator.buffer_size,
+-            align_bytes=allocator.align_bytes,
+-            tp_rank=self.tp_rank,
+-            peer_init_url=peer_init_url,
+-            backends=config.nixl_backends,
+-            device=self.corrected_device,
+-            event_loop=event_loop,
+-        )
++        with _serialize_nixl_libfabric_cxi_initialization(config):
++            self.transfer_channel = CreateTransferChannel(
++                async_mode=True,
++                channel_type=config.transfer_channel,
++                role=self.pd_config.role,
++                buffer_ptr=allocator.buffer_ptr,
++                buffer_size=allocator.buffer_size,
++                align_bytes=allocator.align_bytes,
++                tp_rank=self.tp_rank,
++                peer_init_url=peer_init_url,
++                backends=config.nixl_backends,
++                device=self.corrected_device,
++                event_loop=event_loop,
++            )
+
+         if self.pd_config.role == "sender":
+             self.initialized_peers: set[str] = set()
+diff --git a/lmcache/v1/transfer_channel/nixl_channel.py b/lmcache/v1/transfer_channel/nixl_channel.py
+index 275b64c..18308c5 100644
+--- a/lmcache/v1/transfer_channel/nixl_channel.py
++++ b/lmcache/v1/transfer_channel/nixl_channel.py
+@@ -9,6 +9,7 @@ import uuid
+
+ # Third Party
+ import msgspec
++import numpy as np
+ import zmq
+
+ # First Party
+@@ -371,7 +372,29 @@ class NixlChannel(BaseTransferChannel):
+         if isinstance(objects[0], MemoryObj):
+             for mem_obj in objects:
+                 assert isinstance(mem_obj, MemoryObj)
+-                local_indices.append(mem_obj.meta.address)
++                # PagedTensorMemoryAllocator stores a page index in
++                # ``meta.address`` for allocator bookkeeping.  NIXL needs
++                # the physical pointer of the current TensorMemoryObj;
++                # using the metadata index works in a small hand-built
++                # harness but corrupts the descriptor lookup in actual
++                # vLLM PD buffers.
++                address = int(mem_obj.data_ptr)
++                offset = address - self.nixl_wrapper.buffer_ptr
++                if (
++                    offset < 0
++                    or offset % self.nixl_wrapper.page_size != 0
++                    or int(mem_obj.get_physical_size())
++                    != self.nixl_wrapper.page_size
++                ):
++                    raise ValueError(
++                        "NIXL MemoryObj must be one registered, page-aligned "
++                        "descriptor; object address/size does not match the "
++                        "current channel buffer"
++                    )
++                index = offset // self.nixl_wrapper.page_size
++                if index >= self.nixl_wrapper.descriptor_count:
++                    raise ValueError("NIXL MemoryObj is outside the channel buffer")
++                local_indices.append(index)
+         elif isinstance(objects[0], bytes):
+             raise NotImplementedError(
+                 "Sending raw bytes is not supported in NIXL channel"
+@@ -434,9 +457,9 @@ class NixlChannel(BaseTransferChannel):
+         handle = self.nixl_agent.make_prepped_xfer(
+             "WRITE",
+             self.nixl_wrapper.xfer_handler,
+-            self.get_local_mem_indices(objects),
++            np.asarray(self.get_local_mem_indices(objects), dtype=np.uint64),
+             self.remote_xfer_handlers_dict[transfer_spec["receiver_id"]],
+-            transfer_spec["remote_indexes"],
++            np.asarray(transfer_spec["remote_indexes"], dtype=np.uint64),
+         )
+
+         self.nixl_agent.transfer(handle)
+@@ -480,9 +503,9 @@ class NixlChannel(BaseTransferChannel):
+         handle = self.nixl_agent.make_prepped_xfer(
+             "READ",
+             self.nixl_wrapper.xfer_handler,
+-            self.get_local_mem_indices(buffers),
++            np.asarray(self.get_local_mem_indices(buffers), dtype=np.uint64),
+             self.remote_xfer_handlers_dict[transfer_spec["sender_id"]],
+-            transfer_spec["remote_indexes"],
++            np.asarray(transfer_spec["remote_indexes"], dtype=np.uint64),
+         )
+
+         self.nixl_agent.transfer(handle)
+@@ -524,9 +547,9 @@ class NixlChannel(BaseTransferChannel):
+         handle = self.nixl_agent.make_prepped_xfer(
+             "WRITE",
+             self.nixl_wrapper.xfer_handler,
+-            self.get_local_mem_indices(objects),
++            np.asarray(self.get_local_mem_indices(objects), dtype=np.uint64),
+             self.remote_xfer_handlers_dict[transfer_spec["receiver_id"]],
+-            transfer_spec["remote_indexes"],
++            np.asarray(transfer_spec["remote_indexes"], dtype=np.uint64),
+         )
+         self.nixl_agent.transfer(handle)
+
+@@ -566,9 +589,9 @@ class NixlChannel(BaseTransferChannel):
+         handle = self.nixl_agent.make_prepped_xfer(
+             "READ",
+             self.nixl_wrapper.xfer_handler,
+-            self.get_local_mem_indices(buffers),
++            np.asarray(self.get_local_mem_indices(buffers), dtype=np.uint64),
+             self.remote_xfer_handlers_dict[transfer_spec["sender_id"]],
+-            transfer_spec["remote_indexes"],
++            np.asarray(transfer_spec["remote_indexes"], dtype=np.uint64),
+         )
+         self.nixl_agent.transfer(handle)
+
+@@ -611,6 +634,10 @@ class NixlAgentWrapper:
+     reg_descs: Any
+     xfer_descs: Any
+     xfer_handler: Any
++    buffer_ptr: int
++    buffer_size: int
++    page_size: int
++    descriptor_count: int
+
+     def __init__(
+         self,
+@@ -686,3 +713,7 @@ class NixlAgentWrapper:
+         self.reg_descs = reg_descs
+         self.xfer_descs = xfer_descs
+         self.xfer_handler = xfer_handler
++        self.buffer_ptr = int(buffer_ptr)
++        self.buffer_size = int(buffer_size)
++        self.page_size = int(page_size)
++        self.descriptor_count = len(xfer_desc)
+diff --git a/tests/v1/storage_backend/test_pd_backend_async.py b/tests/v1/storage_backend/test_pd_backend_async.py
+index c2d5a29..e98e195 100644
+--- a/tests/v1/storage_backend/test_pd_backend_async.py
++++ b/tests/v1/storage_backend/test_pd_backend_async.py
+@@ -13,6 +13,7 @@ from contextlib import contextmanager
+ from types import SimpleNamespace
+ from unittest.mock import AsyncMock, MagicMock, patch
+ import asyncio
++import fcntl
+ import itertools
+ import threading
+ import time
+@@ -37,6 +38,7 @@ from lmcache.v1.storage_backend.pd_backend_async import (
+ from lmcache.v1.storage_backend.pd_backend_async import (
+     CancelNotif,
+     PDBackendAsync,
++    _serialize_nixl_libfabric_cxi_initialization,
+ )
+ from lmcache.v1.storage_backend.pd_backend_async import PDMsg as AsyncPDMsg
+ from lmcache.v1.storage_backend.pd_backend_async import (
+@@ -49,6 +51,50 @@ CI_SERIAL_TIMEOUT_MARGIN = 3
+ _DEFAULT_SHAPE = [4, 2, 16, 8, 128]
+
+
++def test_nixl_libfabric_cxi_initialization_uses_node_lock(monkeypatch, tmp_path):
++    config = SimpleNamespace(
++        transfer_channel="nixl",
++        nixl_backends=["LIBFABRIC"],
++    )
++    lock_path = tmp_path / "cxi-init.lock"
++    monkeypatch.setenv("FI_PROVIDER", "cxi")
++    monkeypatch.setenv("LMCACHE_NIXL_CXI_INIT_LOCK_PATH", str(lock_path))
++
++    with patch(
++        "lmcache.v1.storage_backend.pd_backend_async.fcntl.flock"
++    ) as mock_flock:
++        with _serialize_nixl_libfabric_cxi_initialization(config):
++            assert lock_path.exists()
++
++    assert [call.args[1] for call in mock_flock.call_args_list] == [
++        fcntl.LOCK_EX,
++        fcntl.LOCK_UN,
++    ]
++
++
++@pytest.mark.parametrize(
++    ("channel", "backends", "provider"),
++    [
++        ("nixl", ["UCX"], "cxi"),
++        ("nixl", ["LIBFABRIC"], "tcp"),
++        ("mooncake", ["LIBFABRIC"], "cxi"),
++    ],
++)
++def test_non_cxi_nixl_initialization_does_not_use_node_lock(
++    monkeypatch, channel, backends, provider
++):
++    config = SimpleNamespace(transfer_channel=channel, nixl_backends=backends)
++    monkeypatch.setenv("FI_PROVIDER", provider)
++
++    with patch(
++        "lmcache.v1.storage_backend.pd_backend_async.os.open"
++    ) as mock_open:
++        with _serialize_nixl_libfabric_cxi_initialization(config):
++            pass
++
++    mock_open.assert_not_called()
++
++
+ def _make_key(i: int) -> CacheEngineKey:
+     return CacheEngineKey(
+         model_name="test",
+diff --git a/tests/v1/test_cache_engine.py b/tests/v1/test_cache_engine.py
+index 63333c5..c2cfbeb 100644
+--- a/tests/v1/test_cache_engine.py
++++ b/tests/v1/test_cache_engine.py
+@@ -2025,6 +2025,7 @@ def test_retrieve_cleanup_ref_count_and_unpin() -> None:
+     engine._is_passive.return_value = False
+     engine.save_only_first_rank = False
+     engine._get_req_id.return_value = "req_123"
++    engine.lookup_pins = {}
+
+     # We want retrieve to process chunks
+     k0 = _make_key(0)
+@@ -2065,3 +2066,60 @@ def test_retrieve_cleanup_ref_count_and_unpin() -> None:
+
+     mem_obj_not_pinned.ref_count_down.assert_called_once()
+     mem_obj_not_pinned.unpin.assert_not_called()
++
++
++def test_retrieve_defers_lookup_owned_pin_to_lookup_unpin() -> None:
++    """The adapter, not retrieve cleanup, releases lookup-owned pins."""
++    lookup_owned_obj = MagicMock()
++    lookup_owned_obj.is_pinned = True
++
++    retrieve_owned_obj = MagicMock()
++    retrieve_owned_obj.is_pinned = True
++
++    engine = MagicMock(spec=LMCacheEngine)
++    engine.is_healthy.return_value = True
++    engine.remove_after_retrieve = False
++    engine._is_passive.return_value = False
++    engine.save_only_first_rank = False
++    engine._get_req_id.return_value = "req_123"
++
++    lookup_key = _make_key(0)
++    retrieve_key = _make_key(1)
++    engine.lookup_pins = {
++        "req_123": {"LocalCPUBackend": [lookup_key]},
++    }
++    reordered_chunks = [
++        (lookup_key, lookup_owned_obj, 0, 10),
++        (retrieve_key, retrieve_owned_obj, 10, 20),
++    ]
++
++    engine.async_loading = False
++    engine._process_tokens_internal.return_value = (reordered_chunks, 1024)
++    engine._is_sync_pd_backend.return_value = False
++
++    engine.stats_monitor = MagicMock()
++    mock_stats = MagicMock()
++    mock_stats.time_to_retrieve.return_value = 1.0
++    engine.stats_monitor.on_retrieve_request.return_value = mock_stats
++    engine.gpu_connector = MagicMock()
++    engine.storage_manager = MagicMock()
++
++    tokens = torch.zeros(20, dtype=torch.long)
++    LMCacheEngine.retrieve(
++        engine,
++        tokens=tokens,
++        kvcaches=torch.zeros(20),
++        slot_mapping=torch.zeros(20, dtype=torch.long),
++    )
++
++    lookup_owned_obj.ref_count_down.assert_called_once()
++    lookup_owned_obj.unpin.assert_not_called()
++    retrieve_owned_obj.ref_count_down.assert_called_once()
++    retrieve_owned_obj.unpin.assert_called_once()
++
++    LMCacheEngine.lookup_unpin(engine, "req_123")
++
++    engine.storage_manager.batched_unpin.assert_called_once_with(
++        [lookup_key], ["LocalCPUBackend"]
++    )
++    assert "req_123" not in engine.lookup_pins
+diff --git a/tests/v1/test_v1_adapter_request_finished_scheduler_role.py b/tests/v1/test_v1_adapter_request_finished_scheduler_role.py
+index beee8ad..864bb13 100644
+--- a/tests/v1/test_v1_adapter_request_finished_scheduler_role.py
++++ b/tests/v1/test_v1_adapter_request_finished_scheduler_role.py
+@@ -142,6 +142,8 @@ def _make_connector(
+         get_extra_config_value=lambda key, default: default
+     )
+     connector._request_trackers = {}
++    connector._completed_request_cache_tokens = {}
++    connector._reported_request_cache_tokens = set()
+     return connector
+
+
+@@ -249,3 +251,34 @@ def test_request_finished_async_loading_without_lookup_client_skips_cancel() ->
+         "Expected a warning naming the request id and lookup_client; "
+         f"got {[r.getMessage() for r in warnings]}"
+     )
++
++
++def test_request_finished_reports_cached_tokens_after_tracker_cleanup() -> None:
++    """Cache telemetry survives Scheduler cleanup before response assembly."""
++    connector = _make_connector(
++        engine=None, lookup_client=None, async_loading=False
++    )
++    connector.config = SimpleNamespace(
++        get_extra_config_value=lambda key, default: (
++            True
++            if key == "enable_cache_usage_details_in_response"
++            else default
++        )
++    )
++    req_id = "req-cache-hit-after-cleanup"
++    connector._completed_request_cache_tokens[req_id] = 512
++    request = SimpleNamespace(
++        request_id=req_id,
++        status=RequestStatus.FINISHED_LENGTH_CAPPED,
++        kv_transfer_params={"ret_first_tok": True},
++        _output_token_ids=[7],
++    )
++
++    delay_free, return_params = connector.request_finished(request, [0, 1])
++
++    assert delay_free is False
++    assert return_params == {
++        "first_tok": 7,
++        "num_lmcache_cached_tokens": 512,
++    }
++    assert req_id not in connector._completed_request_cache_tokens
+
+diff --git a/lmcache/v1/transfer_channel/tempo_nixl_hotpath.py b/lmcache/v1/transfer_channel/tempo_nixl_hotpath.py
+new file mode 100644
+index 0000000..91ffd8a
+--- /dev/null
++++ b/lmcache/v1/transfer_channel/tempo_nixl_hotpath.py
+@@ -0,0 +1,245 @@
++"""Opt-in TEMPO hot path for LMCache's asynchronous NIXL writes.
++
++Prepared handles are reused only after DONE and only for an exact descriptor
++signature. Stock LMCache remains unchanged unless explicitly enabled.
++"""
++
++from __future__ import annotations
++
++import asyncio
++from collections import defaultdict
++from dataclasses import asdict, dataclass, field
++import hashlib
++import inspect
++import json
++import os
++from pathlib import Path
++import threading
++import time
++from typing import Any
++
++
++SCHEMA = "tempo-lmcache-nixl-hotpath-1"
++EXPECTED_ASYNC_WRITE_SHA256 = "c45d2e35e340422a2c0241baf58d50c5c395e1103a42d60ca5cce848dd785b3e"
++EXPECTED_CLOSE_SHA256 = "a4b7e0a90f2df83b5910665a28a2b7aa08d8288c9c4f97e267e1e925bf0b996c"
++
++
++@dataclass
++class _Stats:
++    make_count: int = 0
++    reuse_count: int = 0
++    release_count: int = 0
++    error_count: int = 0
++    transfer_count: int = 0
++    object_count: int = 0
++    yield_poll_count: int = 0
++    sleep_poll_count: int = 0
++    immediate_done_count: int = 0
++    cache_high_watermark: int = 0
++    elapsed_ns: list[int] = field(default_factory=list)
++
++
++class _ChannelState:
++    def __init__(self) -> None:
++        self.lock = threading.Lock()
++        self.idle: dict[tuple[Any, ...], list[Any]] = defaultdict(list)
++        self.idle_count = 0
++        self.inflight: dict[int, Any] = {}
++        self.stats = _Stats()
++        self.closed = False
++
++
++def _strict_int_env(name: str, default: int, minimum: int, maximum: int) -> int:
++    raw = os.environ.get(name, str(default))
++    try:
++        value = int(raw)
++    except ValueError as error:
++        raise RuntimeError(f"{name} must be an integer") from error
++    if not minimum <= value <= maximum:
++        raise RuntimeError(f"{name} must be in [{minimum}, {maximum}]")
++    return value
++
++
++def _state(channel: Any) -> _ChannelState:
++    state = getattr(channel, "_tempo_nixl_hotpath_state", None)
++    if state is None:
++        state = _ChannelState()
++        channel._tempo_nixl_hotpath_state = state
++    return state
++
++
++def _key(channel: Any, objects: list[Any], transfer_spec: dict[str, Any]) -> tuple[Any, ...]:
++    receiver_id = transfer_spec.get("receiver_id")
++    remote_indexes = transfer_spec.get("remote_indexes")
++    if not isinstance(receiver_id, str) or not receiver_id:
++        raise RuntimeError("TEMPO NIXL write requires a nonempty receiver_id")
++    if not isinstance(remote_indexes, list) or not remote_indexes:
++        raise RuntimeError("TEMPO NIXL write requires nonempty remote_indexes")
++    if any(type(index) is not int or index < 0 for index in remote_indexes):
++        raise RuntimeError("TEMPO NIXL remote indexes must be nonnegative integers")
++    local = channel.get_local_mem_indices(objects)
++    if len(local) != len(remote_indexes):
++        raise RuntimeError("TEMPO NIXL local/remote descriptor count mismatch")
++    remote_handler = channel.remote_xfer_handlers_dict[receiver_id]
++    return (
++        receiver_id,
++        id(channel.nixl_wrapper.xfer_handler),
++        id(remote_handler),
++        tuple(local),
++        tuple(remote_indexes),
++    )
++
++
++def _take_handle(channel: Any, state: _ChannelState, key: tuple[Any, ...]) -> Any:
++    with state.lock:
++        if state.closed:
++            raise RuntimeError("TEMPO NIXL channel is closed")
++        bucket = state.idle.get(key)
++        if bucket:
++            handle = bucket.pop()
++            state.idle_count -= 1
++            if not bucket:
++                state.idle.pop(key, None)
++            state.stats.reuse_count += 1
++        else:
++            receiver_id, _, _, local, remote = key
++            handle = channel.nixl_agent.make_prepped_xfer(
++                "WRITE",
++                channel.nixl_wrapper.xfer_handler,
++                list(local),
++                channel.remote_xfer_handlers_dict[receiver_id],
++                list(remote),
++            )
++            state.stats.make_count += 1
++        state.inflight[id(handle)] = handle
++        return handle
++
++
++def _finish_handle(channel: Any, state: _ChannelState, key: tuple[Any, ...], handle: Any, *, reusable: bool) -> None:
++    capacity = _strict_int_env("TEMPO_NIXL_CACHE_CAPACITY", 128, 0, 4096)
++    release = False
++    with state.lock:
++        state.inflight.pop(id(handle), None)
++        if reusable and not state.closed and state.idle_count < capacity:
++            state.idle[key].append(handle)
++            state.idle_count += 1
++            state.stats.cache_high_watermark = max(state.stats.cache_high_watermark, state.idle_count)
++        else:
++            release = True
++    if release:
++        channel.nixl_agent.release_xfer_handle(handle)
++        with state.lock:
++            state.stats.release_count += 1
++
++
++async def async_batched_write(channel: Any, objects: list[Any], transfer_spec: dict[str, Any] | None = None) -> int:
++    if not objects:
++        raise RuntimeError("TEMPO NIXL write requires at least one object")
++    if not isinstance(transfer_spec, dict):
++        raise RuntimeError("TEMPO NIXL write requires a transfer specification")
++    state = _state(channel)
++    key = _key(channel, objects, transfer_spec)
++    handle = _take_handle(channel, state, key)
++    yield_budget = _strict_int_env("TEMPO_NIXL_YIELD_POLLS", 16, 0, 4096)
++    sleep_us = _strict_int_env("TEMPO_NIXL_SLEEP_US", 100, 1, 1000000)
++    started_ns = time.perf_counter_ns()
++    reusable = False
++    polls = 0
++    try:
++        channel.nixl_agent.transfer(handle)
++        while True:
++            status = channel.nixl_agent.check_xfer_state(handle)
++            if status == "DONE":
++                reusable = True
++                break
++            if status == "ERR":
++                with state.lock:
++                    state.stats.error_count += 1
++                raise RuntimeError("Failed to send objects to remote peer")
++            if status != "PROC":
++                raise RuntimeError(f"Unexpected NIXL transfer status: {status!r}")
++            if polls < yield_budget:
++                with state.lock:
++                    state.stats.yield_poll_count += 1
++                await asyncio.sleep(0)
++            else:
++                with state.lock:
++                    state.stats.sleep_poll_count += 1
++                await asyncio.sleep(sleep_us / 1_000_000.0)
++            polls += 1
++    finally:
++        elapsed_ns = time.perf_counter_ns() - started_ns
++        with state.lock:
++            state.stats.transfer_count += 1
++            state.stats.object_count += len(objects)
++            if polls == 0 and reusable:
++                state.stats.immediate_done_count += 1
++            if len(state.stats.elapsed_ns) < 4096:
++                state.stats.elapsed_ns.append(elapsed_ns)
++        _finish_handle(channel, state, key, handle, reusable=reusable)
++    return len(objects)
++
++
++def _write_stats(state: _ChannelState) -> None:
++    directory = os.environ.get("TEMPO_LMCACHE_NIXL_STATS_DIR")
++    if not directory:
++        return
++    root = Path(directory)
++    root.mkdir(parents=True, exist_ok=True)
++    payload = {
++        "schema": SCHEMA,
++        "pid": os.getpid(),
++        "implementation": "exact-signature-prepared-cache-adaptive-progress",
++        "configuration": {
++            "cache_capacity": _strict_int_env("TEMPO_NIXL_CACHE_CAPACITY", 128, 0, 4096),
++            "yield_polls": _strict_int_env("TEMPO_NIXL_YIELD_POLLS", 16, 0, 4096),
++            "sleep_us": _strict_int_env("TEMPO_NIXL_SLEEP_US", 100, 1, 1000000),
++        },
++        "stats": asdict(state.stats),
++        "idle_handles_at_close": state.idle_count,
++        "inflight_handles_at_close": len(state.inflight),
++        "source": {
++            "stock_async_batched_write_sha256": EXPECTED_ASYNC_WRITE_SHA256,
++            "stock_close_sha256": EXPECTED_CLOSE_SHA256,
++        },
++    }
++    path = root / f"nixl-hotpath-{os.getpid()}.json"
++    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
++    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
++        json.dump(payload, handle, sort_keys=True, separators=(",", ":"))
++        handle.write("\n")
++
++
++def install(channel_class: type[Any]) -> None:
++    if getattr(channel_class, "_tempo_nixl_hotpath_installed", False):
++        return
++    original_async = channel_class.async_batched_write
++    original_close = channel_class.close
++    async_hash = hashlib.sha256(inspect.getsource(original_async).encode()).hexdigest()
++    close_hash = hashlib.sha256(inspect.getsource(original_close).encode()).hexdigest()
++    if async_hash != EXPECTED_ASYNC_WRITE_SHA256 or close_hash != EXPECTED_CLOSE_SHA256:
++        raise RuntimeError("LMCache NixlChannel source drifted; refusing TEMPO hot-path installation")
++
++    async def patched_async(self: Any, objects: list[Any], transfer_spec=None) -> int:
++        return await async_batched_write(self, objects, transfer_spec)
++
++    def patched_close(self: Any) -> None:
++        state = getattr(self, "_tempo_nixl_hotpath_state", None)
++        if state is not None:
++            with state.lock:
++                state.closed = True
++                idle = [item for bucket in state.idle.values() for item in bucket]
++                state.idle.clear()
++                state.idle_count = 0
++            for handle in idle:
++                self.nixl_agent.release_xfer_handle(handle)
++                with state.lock:
++                    state.stats.release_count += 1
++            _write_stats(state)
++        original_close(self)
++
++    channel_class.async_batched_write = patched_async
++    channel_class.close = patched_close
++    channel_class._tempo_nixl_hotpath_installed = True
++    channel_class._tempo_nixl_hotpath_original_async = original_async
++    channel_class._tempo_nixl_hotpath_original_close = original_close
+
+diff --git a/lmcache/v1/transfer_channel/tempo_nixl_hotpath_v2.py b/lmcache/v1/transfer_channel/tempo_nixl_hotpath_v2.py
+new file mode 100644
+index 0000000..6030b72
+--- /dev/null
++++ b/lmcache/v1/transfer_channel/tempo_nixl_hotpath_v2.py
+@@ -0,0 +1,102 @@
++"""Snapshotting revision of the exact-signature TEMPO NIXL hot path."""
++
++from __future__ import annotations
++
++from dataclasses import asdict
++import hashlib
++import inspect
++import json
++import os
++from pathlib import Path
++import threading
++import time
++from typing import Any
++
++from lmcache.v1.transfer_channel import tempo_nixl_hotpath as v1
++
++
++SCHEMA = "tempo-lmcache-nixl-hotpath-2"
++
++
++def _payload(state: Any) -> dict[str, Any]:
++    with state.lock:
++        return {
++            "schema": SCHEMA,
++            "pid": os.getpid(),
++            "implementation": "exact-signature-prepared-cache-adaptive-progress-snapshot",
++            "configuration": {
++                "cache_capacity": v1._strict_int_env("TEMPO_NIXL_CACHE_CAPACITY", 128, 0, 4096),
++                "yield_polls": v1._strict_int_env("TEMPO_NIXL_YIELD_POLLS", 16, 0, 4096),
++                "sleep_us": v1._strict_int_env("TEMPO_NIXL_SLEEP_US", 100, 1, 1000000),
++            },
++            "stats": asdict(state.stats),
++            "idle_handles_at_snapshot": state.idle_count,
++            "inflight_handles_at_snapshot": len(state.inflight),
++            "closed_at_snapshot": state.closed,
++            "source": {
++                "stock_async_batched_write_sha256": v1.EXPECTED_ASYNC_WRITE_SHA256,
++                "stock_close_sha256": v1.EXPECTED_CLOSE_SHA256,
++            },
++        }
++
++
++def _snapshot(state: Any) -> None:
++    directory = os.environ.get("TEMPO_LMCACHE_NIXL_STATS_DIR")
++    if not directory:
++        return
++    root = Path(directory)
++    root.mkdir(parents=True, exist_ok=True)
++    target = root / f"nixl-hotpath-{os.getpid()}-{id(state):x}.json"
++    temporary = root / (
++        f".{target.name}.{threading.get_ident()}.{time.perf_counter_ns()}.tmp"
++    )
++    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
++    try:
++        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
++            json.dump(_payload(state), handle, sort_keys=True, separators=(",", ":"))
++            handle.write("\n")
++        os.replace(temporary, target)
++    finally:
++        if temporary.exists():
++            temporary.unlink()
++
++
++def install(channel_class: type[Any]) -> None:
++    if getattr(channel_class, "_tempo_nixl_hotpath_v2_installed", False):
++        return
++    original_async = channel_class.async_batched_write
++    original_close = channel_class.close
++    async_hash = hashlib.sha256(inspect.getsource(original_async).encode()).hexdigest()
++    close_hash = hashlib.sha256(inspect.getsource(original_close).encode()).hexdigest()
++    if async_hash != v1.EXPECTED_ASYNC_WRITE_SHA256 or close_hash != v1.EXPECTED_CLOSE_SHA256:
++        raise RuntimeError("LMCache NixlChannel source drifted; refusing TEMPO v2 installation")
++
++    async def patched_async(self: Any, objects: list[Any], transfer_spec=None) -> int:
++        try:
++            return await v1.async_batched_write(self, objects, transfer_spec)
++        finally:
++            state = getattr(self, "_tempo_nixl_hotpath_state", None)
++            if state is not None:
++                _snapshot(state)
++
++    def patched_close(self: Any) -> None:
++        state = getattr(self, "_tempo_nixl_hotpath_state", None)
++        if state is not None:
++            with state.lock:
++                state.closed = True
++                idle = [item for bucket in state.idle.values() for item in bucket]
++                state.idle.clear()
++                state.idle_count = 0
++            for handle in idle:
++                self.nixl_agent.release_xfer_handle(handle)
++                with state.lock:
++                    state.stats.release_count += 1
++            _snapshot(state)
++        original_close(self)
++
++    channel_class.async_batched_write = patched_async
++    channel_class.close = patched_close
++    channel_class._tempo_nixl_hotpath_v2_installed = True
++    channel_class._tempo_nixl_hotpath_original_async = original_async
++    channel_class._tempo_nixl_hotpath_original_close = original_close
++

@@ -1,0 +1,40 @@
+{
+  "algorithm": {
+    "admission_to_response_includes_transfer": true,
+    "boost_enabled": false,
+    "candidate_mode": "tempo_predecode_phase_separated",
+    "decode_progress_sleep_ms": 1.0,
+    "hook_events_per_measured_candidate": 0,
+    "phase_order": ["remote_kv_transfer", "receiver_verify", "tp16_decode"],
+    "transfer_decode_overlap": false
+  },
+  "campaign": {
+    "blocks": 9,
+    "candidate_gates": {
+      "all_transfers_complete_before_decode": true,
+      "exact_correctness": true,
+      "meaningful_service_wins": 2,
+      "paired_service_delta_median_le_ms": -5.0,
+      "request_e2e_le_fg_ratio": 1.03,
+      "tpot_p99_le_lmcache_ratio": 1.1
+    },
+    "modes": ["fg_only", "lmcache_prelaunch_no_gate", "tempo_predecode_phase_separated"],
+    "replicates_per_mode": 3
+  },
+  "contract_id": "tp16-predecode-phase-separated-m20",
+  "schema_version": "tempo-tp16-predecode-phase-contract-20",
+  "topology": {
+    "nodes": 4,
+    "pairing": [[0, 8], [1, 9], [2, 10], [3, 11], [4, 12], [5, 13], [6, 14], [7, 15]],
+    "receiver_ranks": [8, 9, 10, 11, 12, 13, 14, 15],
+    "source_ranks": [0, 1, 2, 3, 4, 5, 6, 7],
+    "world_size": 16
+  },
+  "transfer": {
+    "bytes_per_source": 16777216,
+    "calls_global": 8,
+    "global_bytes": 134217728,
+    "physical_descriptors_global": 8,
+    "prepared_handle_repost": true
+  }
+}

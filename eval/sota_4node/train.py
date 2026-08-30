@@ -169,6 +169,12 @@ def _v4_configured_stage_floor_bps(args: argparse.Namespace) -> tuple[int, int]:
     )
 
 
+def _v4_open_c0_rate_bps(args: argparse.Namespace) -> int:
+    if str(args.policy) != "v4_open" or not bool(getattr(args, "v4_open_c0", False)):
+        return 0
+    return round(float(args.tempo_v4_d2h_floor_gbps) * 1e9)
+
+
 def load_v4_stage_floor_provenance(
     args: argparse.Namespace,
     output_dir: Path,
@@ -825,6 +831,11 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=V4_ARCHIVE_PFS_SEED_BPS / 1e9,
     )
+    parser.add_argument(
+        "--v4-open-c0",
+        action="store_true",
+        help="enable the fixed-rate C0 v4_open ablation",
+    )
     parser.add_argument("--tempo-v4-controller-timeout-ms", type=float, default=2000.0)
     parser.add_argument(
         "--tempo-v4-control-mode",
@@ -835,6 +846,12 @@ def parse_args() -> argparse.Namespace:
             "gates D2H to compute/residual windows; work_conserving permits "
             "at most one 1 MiB D2H residual request at a collective boundary"
         ),
+    )
+    parser.add_argument(
+        "--tempo-v4-telemetry",
+        choices=("required", "off"),
+        default="required",
+        help="disable the deleted journal publisher for a local prototype screen",
     )
     parser.add_argument("--seed", type=int, default=20260806)
     parser.add_argument("--clock-calibration-samples", type=int, default=21)
@@ -919,6 +936,8 @@ def parse_args() -> argparse.Namespace:
         or args.tempo_v4_pfs_floor_gbps <= 0
     ):
         parser.error("TEMPO v4 stage service floors must be positive")
+    if args.v4_open_c0 and args.policy != "v4_open":
+        parser.error("--v4-open-c0 is only valid with policy=v4_open")
     if args.clock_calibration_samples < 1:
         parser.error("clock-calibration-samples must be positive")
     return args
@@ -3638,6 +3657,7 @@ class TempoV4Backend(TempoV2Backend):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        self.c0_d2h_rate_bps = _v4_open_c0_rate_bps(self.args)
         self.v4 = v4_controller_module()
         self.config = self.v4.ControllerConfig(
             d2h_quantum_bytes=self.args.tempo_v4_d2h_chunk_mb * MIB,
@@ -3837,7 +3857,10 @@ class TempoV4Backend(TempoV2Backend):
         self.telemetry_shared_write_calls_during_measurement = 0
         self.telemetry_handle: Any | None = None
         self.telemetry_published = False
-        self.telemetry_enabled = not bool(self.args.restore_only)
+        self.telemetry_enabled = (
+            not bool(self.args.restore_only)
+            and str(getattr(self.args, "tempo_v4_telemetry", "required")) == "required"
+        )
         if self.telemetry_enabled:
             self._configure_telemetry_journal()
         else:
@@ -4138,6 +4161,10 @@ class TempoV4Backend(TempoV2Backend):
             "immutable_gpu_shadow": True,
             "shadow_copy": True,
             "payload_region_bytes": V4_PAYLOAD_REGION_MIB * MIB,
+            "c0_enabled": bool(self.c0_d2h_rate_bps),
+            "c0_d2h_rate_bps": int(self.c0_d2h_rate_bps),
+            "c0_max_inflight_bytes": V4_D2H_REQUEST_MIB * MIB,
+            "telemetry_mode": str(getattr(self.args, "tempo_v4_telemetry", "required")),
             "pinned_region_bytes": V4_PAYLOAD_REGION_MIB * MIB,
             "d2h_chunk_bytes": self.args.tempo_v4_d2h_chunk_mb * MIB,
             "d2h_quantum_bytes": self.args.tempo_v4_d2h_chunk_mb * MIB,
@@ -5807,7 +5834,9 @@ class TempoV4Backend(TempoV2Backend):
     ) -> tuple[bool, float, int]:
         if chunk_bytes != V4_PAYLOAD_REGION_MIB * MIB:
             raise RuntimeError("v4 shadow payload must use 4 MiB chunks")
-        self.ckpt_engine.configure_d2h_pacing(0.0, 0)
+        self.ckpt_engine.configure_d2h_pacing(
+            float(self.c0_d2h_rate_bps), 0
+        )
         self.checkpoint_id = f"step-{self.checkpoint_step}"
         self.event_expected_state_bytes = state_bytes
         self.event_expected_pfs_bytes = state_bytes
@@ -5919,6 +5948,7 @@ class TempoV4Backend(TempoV2Backend):
             stage_service_selected_pfs_bps=self.stage_floor_provenance[
                 "selected_pfs_bps"
             ],
+            c0_d2h_rate_bps=int(self.c0_d2h_rate_bps),
             stage_service_calibration_consumer=self.args.policy,
             stage_floor_provenance=self.stage_floor_provenance,
             controller_config=asdict(self.config),
@@ -5934,7 +5964,7 @@ class TempoV4Backend(TempoV2Backend):
             },
             raw_stats=armed,
         )
-        return False, 0.0, 0
+        return False, float(self.c0_d2h_rate_bps), 0
 
     def after_engine_save(self) -> None:
         # Keep the identical closed 2 s bootstrap through the post-save
@@ -8363,6 +8393,10 @@ def main() -> None:
         if args.policy in ("v4_open", "tempo_v4")
         else "",
         "v4_controller_timeout_ms": args.tempo_v4_controller_timeout_ms,
+        "c0_d2h_rate_bps": _v4_open_c0_rate_bps(args),
+        "c0_enabled": bool(_v4_open_c0_rate_bps(args)),
+        "c0_max_inflight_bytes": V4_D2H_REQUEST_MIB * MIB,
+        "v4_telemetry_mode": str(args.tempo_v4_telemetry),
         "step_p99_ms": percentile([row["step_ms"] for row in measured], 99),
         "window_step_p99_ms": percentile([row["step_ms"] for row in window_rows], 99),
         "window_probe_p99_ms": percentile([row["probe_ms"] for row in window_rows], 99),

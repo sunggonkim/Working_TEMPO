@@ -11,6 +11,18 @@ repo_root=$(realpath -e -- "$1")
 result_dir=$(realpath -e -- "$2")
 case "${result_dir}/" in "${repo_root}/results/"*) ;; *) exit 2 ;; esac
 
+PREPARE_SRUN_JOB_ARGS=()
+if [[ -n "${TEMPO_GO_C5_SRUN_JOBID:-}" ]]; then
+  [[ "${TEMPO_GO_C5_SRUN_JOBID}" =~ ^[0-9]+$ ]]
+  PREPARE_SRUN_JOB_ARGS=("--jobid=${TEMPO_GO_C5_SRUN_JOBID}")
+fi
+# This helper only creates directories, verifies a broadcast archive, and
+# extracts Python files.  It never opens a communicator or moves application
+# data over Slingshot.  NERSC documents no_vni for precisely this class of
+# step; leaving the default VNI enabled would consume an interconnect slot
+# while the co-job and native vLLM step are already using the fabric.
+PREPARE_SRUN_NETWORK_ARGS=(--network=no_vni)
+
 mapfile -t hosts < <(scontrol show hostnames "${SLURM_JOB_NODELIST}")
 [[ ${#hosts[@]} -eq 4 && $(printf '%s\n' "${hosts[@]}" | sort -u | wc -l) -eq 4 ]]
 site_packages="${repo_root}/.vllm_venv/lib/python3.12/site-packages"
@@ -142,8 +154,9 @@ marker="${overlay}/.bundle-${archive_sha256}.ready"
 artifact="${result_dir}/python-overlay-prepare.json"
 [[ ! -e "${artifact}" ]]
 
-srun --overlap --exact --nodes=4 --ntasks=4 --ntasks-per-node=1 \
-  --distribution=block:block --cpus-per-task=1 --cpu-bind=cores \
+srun "${PREPARE_SRUN_JOB_ARGS[@]}" --overlap --exact --nodes=4 --ntasks=4 --ntasks-per-node=1 \
+  --distribution=block:block --gpus=0 --cpus-per-task=1 --cpu-bind=cores \
+  "${PREPARE_SRUN_NETWORK_ARGS[@]}" \
   --time=00:02:00 mkdir -p -- "${overlay}"
 broadcast_start_ns=$(date +%s%N)
 sbcast --force --compress --timeout=600 \
@@ -163,8 +176,9 @@ export TEMPO_C4_PREPARE_VLLM_DIST="${vllm_dist}"
 export TEMPO_C4_PREPARE_LMCACHE_INIT_SHA256="${lmcache_init_sha256}"
 export TEMPO_C4_PREPARE_LMCACHE_METADATA_SHA256="${lmcache_metadata_sha256}"
 export TEMPO_C4_PREPARE_LMCACHE_DIST="${lmcache_dist}"
-srun --overlap --exact --nodes=4 --ntasks=4 --ntasks-per-node=1 \
-  --distribution=block:block --cpus-per-task=4 --cpu-bind=cores \
+srun "${PREPARE_SRUN_JOB_ARGS[@]}" --overlap --exact --nodes=4 --ntasks=4 --ntasks-per-node=1 \
+  --distribution=block:block --gpus=0 --cpus-per-task=4 --cpu-bind=cores \
+  "${PREPARE_SRUN_NETWORK_ARGS[@]}" \
   --time=00:10:00 --export=ALL \
   --output="${result_dir}/python-overlay-prepare-%N.log" \
   bash -lc '

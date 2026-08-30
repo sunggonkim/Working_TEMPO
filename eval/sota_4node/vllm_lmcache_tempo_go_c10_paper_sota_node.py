@@ -41,13 +41,23 @@ def _qualification(repo_root: Path):
         "C10 paper SOTA manifest path is invalid",
     )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    boundary = manifest.get("claim_boundary", {})
+    post_hoc = boundary.get("post_hoc_extension") is True
+    independent = (
+        boundary.get("post_hoc_extension") is False
+        and boundary.get("independent_validation_claim_allowed") is True
+        and boundary.get("pre_registered_before_fresh_allocation") is True
+    )
     perf._require(
         manifest.get("schema") == "tempo-go-c10-paper-sota-extension-v1"
-        and manifest.get("claim_boundary", {}).get("post_hoc_extension") is True
-        and manifest.get("claim_boundary", {}).get(
-            "independent_validation_claim_allowed") is False,
+        and (post_hoc or independent),
         "C10 paper SOTA claim boundary differs",
     )
+    if independent:
+        forbidden = {str(item) for item in boundary.get(
+            "forbidden_allocation_job_ids", [])}
+        perf._require(os.environ.get("SLURM_JOB_ID", "") not in forbidden,
+                      "independent C10 allocation was used by a prior run")
     parent_spec = manifest.get("parent_independent_validation", {})
     perf._require(
         parent_spec.get("path") == str(contract_path.relative_to(repo_root))

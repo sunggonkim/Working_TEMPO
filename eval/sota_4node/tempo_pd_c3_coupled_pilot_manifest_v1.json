@@ -1,0 +1,63 @@
+{
+  "schema": "tempo-pd-c3-coupled-pilot-manifest-v1",
+  "purpose": "couple the frozen C1 decoder-local tenant with the measured P-only LMCache endpoint knee",
+  "performance_claim_allowed": false,
+  "controller_tuning_allowed": false,
+  "replicates": 1,
+  "foreground_rate_per_s": 2.0,
+  "decoder_hot_rate_per_s": 22.4,
+  "p_only_rates_per_s": [
+    0.0,
+    4.0,
+    8.0,
+    12.0
+  ],
+  "state_mapping": {
+    "0.0": "c1_decoder_hot_control",
+    "4.0": "c3_both_hot_below_remote_knee",
+    "8.0": "c3_both_hot_remote_shoulder",
+    "12.0": "c3_both_hot_first_remote_drain_knee"
+  },
+  "phase_duration_ms": 8000.0,
+  "cooldown_s": 2.0,
+  "prompt_pool": {
+    "size": 32,
+    "prompt_tokens": 4094,
+    "output_tokens": 2,
+    "preseed_outside_measurement": true,
+    "pair_balance": [
+      16,
+      16
+    ]
+  },
+  "foreground": {
+    "prompt_tokens": 4094,
+    "output_tokens": 2,
+    "cache_state": "miss",
+    "arms": [
+      "local",
+      "remote"
+    ]
+  },
+  "source_workload": {
+    "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+    "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+  },
+  "profile": {
+    "path": "eval/sota_4node/real_tempo_pd_elastic_profile_v447.json",
+    "sha256": "de6ef04708a557b825bb482c62ec69069e7988db5b2fbec2cd98eed0a2938cfe"
+  },
+  "transport": "LMCacheConnectorV1:UCX",
+  "decoder_prefix_caching": false,
+  "synthetic_network_background": false,
+  "selection_basis": {
+    "p_only_rate_4": "below measured endpoint knee",
+    "p_only_rate_8": "measured shoulder before drain",
+    "p_only_rate_12": "first 2x latency and greater-than-10-percent drain point"
+  },
+  "interpretation_boundary": {
+    "component_and_workload_characterization_only": true,
+    "physical_switch_bottleneck_claim_allowed": false,
+    "production_performance_claim_allowed": false
+  }
+}

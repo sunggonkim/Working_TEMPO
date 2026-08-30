@@ -1,0 +1,20 @@
+{
+  "schema_version": "tempo-real-tp8-pair-stagger-coalesced-contract-1",
+  "contract_id": "real-tp8-pair-stagger-coalesced-v1",
+  "provenance": {
+    "source": "same_allocation_real_tp8_pair_stagger_observation",
+    "adaptive_pilot": true,
+    "promotion_valid": false,
+    "policy_label": "pair_staggered_coalesced_admission_v1",
+    "global_single_flight": false,
+    "physical_transfer_overlap_possible": true
+  },
+  "schedule": {
+    "scheduled_tokens": [1, 3, 5, 7],
+    "active_pairs": [0, 1, 2, 3],
+    "objects_per_source_call": 32,
+    "bytes_per_source_call": 16777216,
+    "global_bytes": 67108864,
+    "deadline_ns": 1250000000
+  }
+}

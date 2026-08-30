@@ -27,6 +27,10 @@ P_ONLY = "p_only"
 P_ONLY_VALUE = "prefill_only"
 REMOTE_ROUTE = c7.REMOTE_ROUTE
 LOCAL_ROUTE = c7.LOCAL_ROUTE
+PRIORITY_SERVICE_LANE_MODES = frozenset({
+    "vllm_priority_remote_cache_v1",
+    "vllm_priority_business_dual_route_v2",
+})
 
 
 def _patch_c7_seams() -> None:
@@ -127,7 +131,7 @@ def configure_node_environment(**kwargs) -> None:
     _require(
         config.priority_service_lane_mode
         == remote_activation.get("priority_service_lane_mode")
-        == "vllm_priority_remote_cache_v1"
+        and config.priority_service_lane_mode in PRIORITY_SERVICE_LANE_MODES
         and config.priority_service_lane_capacity
         == remote_activation.get("priority_service_lane_capacity_per_decoder")
         and config.priority_service_lane_min_admission_priority
@@ -173,8 +177,9 @@ def configure_node_environment(**kwargs) -> None:
         "C8 control-plane liveness binding differs",
     )
     # Every arm uses the same vLLM priority scheduler.  Baseline requests keep
-    # priority zero; only a TEMPO-measured remote request receives the frozen
-    # negative priority in the canonical router.
+    # priority zero; only a globally committed TEMPO request that is eligible
+    # for the selected service-lane mode receives the frozen negative priority
+    # in the canonical router.
     os.environ.update({
         "TEMPO_VLLM_SCHEDULING_POLICY": "priority",
         "TEMPO_PD_REMOTE_CATCHUP_PRIORITY": "0",

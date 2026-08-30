@@ -1,0 +1,18 @@
+{
+  "schema": "tempo-pd-performance-contract-chunk256-8",
+  "model": "Qwen2.5-7B-Instruct",
+  "topology": "4 nodes, two TP4 prefill/decode replica pairs",
+  "modes": ["fixed_local", "lmcache_always_remote", "tempo_auto"],
+  "calibration_modes": ["fixed_local", "lmcache_always_remote"],
+  "remote_backend": "official LMCacheConnectorV1 PDBackendAsync NIXL UCX",
+  "chunk_size_tokens": 256,
+  "request_rate_per_s": 2.0,
+  "max_workers": 4,
+  "prompt_repetitions": [64, 192, 384],
+  "prompt_tokens_observed": [1220, 3652, 7300],
+  "output_tokens": 32,
+  "samples_per_bucket": 3,
+  "evidence": "one same-allocation calibration plus validation campaign",
+  "promotion_valid": false,
+  "claim_boundary": "actual-vLLM component/system screen, not cross-platform SOTA"
+}

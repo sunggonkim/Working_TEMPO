@@ -39,13 +39,30 @@ def _args() -> argparse.Namespace:
 def _stop(child: subprocess.Popen[Any] | None) -> None:
     if child is None or child.poll() is not None:
         return
-    os.killpg(child.pid, signal.SIGTERM)
+    try:
+        os.killpg(child.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
     deadline = time.monotonic() + TERM_S
-    while child.poll() is None and time.monotonic() < deadline:
-        time.sleep(0.1)
+    try:
+        while child.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        # SIGINT may be broadcast by an interactive Slurm step.  Cleanup
+        # must continue; returning here leaves the vLLM process group behind
+        # and can poison the next step's GPU/NCCL initialization.
+        pass
     if child.poll() is None:
-        os.killpg(child.pid, signal.SIGKILL)
-        child.wait(timeout=5.0)
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+        try:
+            child.wait(timeout=5.0)
+        except (subprocess.TimeoutExpired, KeyboardInterrupt):
+            # The Slurm cgroup will perform the final reap; do not mask the
+            # caller's original experiment failure with a cleanup exception.
+            pass
 
 
 def _wait_url(url: str, children: list[subprocess.Popen[Any]]) -> None:
@@ -219,7 +236,15 @@ def _child_env(
     mode: str,
 ) -> dict[str, str]:
     env = dict(base)
-    cache_root = f"/tmp/tempo-live-pd-{base['SLURM_JOB_ID']}-{mode}-n{node_index}"
+    # Reuse a completed per-allocation cache when a caller explicitly opts
+    # into it.  This is useful for sequential policy arms (e.g. C10): the
+    # policy must change, but rebuilding the same FlashInfer kernels for each
+    # arm would consume the measurement window and can leave a cancelled
+    # Slurm step with orphaned compiler children.
+    cache_mode = os.environ.get("TEMPO_SHARED_CACHE_MODE", mode)
+    cache_root = (
+        f"/tmp/tempo-live-pd-{base['SLURM_JOB_ID']}-{cache_mode}-n{node_index}"
+    )
     env.update({
         "PYTHONHASHSEED": "123",
         "HF_HUB_OFFLINE": "1",

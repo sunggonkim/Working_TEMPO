@@ -61,8 +61,10 @@ def main() -> int:
     base_telemetry = base_global_profile.telemetry
     telemetry = global_profile.telemetry
     _require(
-        global_config.priority_service_lane_mode
-        == "vllm_priority_remote_cache_v1"
+        global_config.priority_service_lane_mode in {
+            "vllm_priority_remote_cache_v1",
+            "vllm_priority_business_dual_route_v2",
+        }
         and global_config.priority_service_lane_capacity > 0
         and global_config.priority_service_lane_min_admission_priority > 0
         and global_config.priority_service_lane_priority in {-2, -1},

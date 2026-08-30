@@ -1,0 +1,103 @@
+{
+  "cuda_visible_devices": "0,1,2,3",
+  "expected_hosts": [
+    "nid001176",
+    "nid001177",
+    "nid001180",
+    "nid008368"
+  ],
+  "forbidden_environment": [],
+  "gid": 76516,
+  "gpus": [
+    {
+      "driver_version": "580.159.04",
+      "index": 0,
+      "memory_mib": 40960,
+      "name": "NVIDIA A100-SXM4-40GB",
+      "uuid": "GPU-51914ca4-01d4-179c-0f8f-58a17c41fb1d"
+    },
+    {
+      "driver_version": "580.159.04",
+      "index": 1,
+      "memory_mib": 40960,
+      "name": "NVIDIA A100-SXM4-40GB",
+      "uuid": "GPU-0e2e8a83-abc5-9cc6-9536-c08b50bfcdf7"
+    },
+    {
+      "driver_version": "580.159.04",
+      "index": 2,
+      "memory_mib": 40960,
+      "name": "NVIDIA A100-SXM4-40GB",
+      "uuid": "GPU-0d687f43-c96f-a92c-10ce-ba8297d7d3ad"
+    },
+    {
+      "driver_version": "580.159.04",
+      "index": 3,
+      "memory_mib": 40960,
+      "name": "NVIDIA A100-SXM4-40GB",
+      "uuid": "GPU-8ce5825c-df5a-3764-fd16-13e6cfc96d6a"
+    }
+  ],
+  "guard_sha256": "423bcaa77d17131d51c0ae97b856802bb61644237442f10efcdf7cf074071710",
+  "guard_version": "1",
+  "hostname": "nid001176",
+  "hostname_resolution": {
+    "nid001176": [
+      "128.55.65.149"
+    ],
+    "nid001177": [
+      "128.55.70.49"
+    ],
+    "nid001180": [
+      "128.55.65.210"
+    ],
+    "nid008368": [
+      "128.55.82.167"
+    ]
+  },
+  "loaded_modules": [
+    "craype-x86-milan",
+    "libfabric/1.22.0",
+    "craype-network-ofi",
+    "xpmem/2.11.5-1.3_g73ade43320bc",
+    "gcc-native/14",
+    "cray-dsmml/0.3.1",
+    "PrgEnv-gnu/8.7.0",
+    "cray-libsci/26.03.0",
+    "cray-mpich/9.1.0",
+    "craype/2.7.36",
+    "perftools-base/26.03.0",
+    "cpe/26.03",
+    "cudatoolkit/13.2",
+    "craype-accel-nvidia80",
+    "gpu/1.0",
+    "sqs/2.0",
+    "darshan/default"
+  ],
+  "local_rank": 0,
+  "model_config_sha256": "7463bb0ea78315365e6c6b74de4e73bbcc8359dfb0c5a737584e077d42c0b03c",
+  "model_path": "/pscratch/sd/s/sgkim/Skim-Tempo/models/Qwen2.5-7B-Instruct",
+  "native_only": true,
+  "nvidia_smi": "/usr/bin/nvidia-smi",
+  "package_versions": {
+    "fastapi": "0.136.3",
+    "httpx": "0.28.1",
+    "lmcache": "0.1.dev1",
+    "pyzmq": "27.1.0",
+    "torch": "2.11.0+cu129",
+    "transformers": "5.15.0",
+    "vllm": "0.26.0+cu129"
+  },
+  "platform": "Linux-6.4.0-150600.23.125_15.0.27-cray_shasta_c-x86_64-with-glibc2.38",
+  "privileged_nic_control": false,
+  "python_executable": "/pscratch/sd/s/sgkim/Skim-Tempo/.vllm_venv/bin/python",
+  "python_version": "3.12.11",
+  "rank": 0,
+  "schema": "tempo-go-perlmutter-native-capability-v1",
+  "slurm_gpus_on_node": "4",
+  "slurm_job_id": "57556218",
+  "slurm_nnodes": 4,
+  "slurm_ntasks": 4,
+  "transport_contract": "LMCacheConnectorV1:UCX",
+  "uid": 76516
+}

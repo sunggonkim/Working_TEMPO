@@ -1,0 +1,46 @@
+{
+  "campaign": {
+    "blocks": 9,
+    "modes": [
+      "quiescent_noop",
+      "quiescent_lmcache_bulk",
+      "quiescent_tempo_bulk"
+    ],
+    "replicates_per_mode": 3,
+    "unmeasured_fence_prewarm": true
+  },
+  "contract_id": "tp16-quiescence-bulk-v4",
+  "epoch": {
+    "bytes_per_source": 4194304,
+    "contiguous_descriptors_per_source": 1,
+    "generated_token_count_one_based": 31,
+    "global_bytes": 33554432,
+    "physical_descriptors": 8,
+    "source_calls": 8,
+    "target_output_token_index_zero_based": 30
+  },
+  "gates": {
+    "exact_bytes_calls_descriptors": true,
+    "hook_trace": true,
+    "output_equivalence": true,
+    "tempo_each_wave_ms": 12.0,
+    "tempo_median_wave_ms": 10.0
+  },
+  "schema_version": "tempo-tp16-quiescence-bulk-contract-4",
+  "topology": {
+    "nodes": 4,
+    "pairing": [
+      [0, 8],
+      [1, 9],
+      [2, 10],
+      [3, 11],
+      [4, 12],
+      [5, 13],
+      [6, 14],
+      [7, 15]
+    ],
+    "receiver_ranks": [8, 9, 10, 11, 12, 13, 14, 15],
+    "source_ranks": [0, 1, 2, 3, 4, 5, 6, 7],
+    "world_size": 16
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "adaptive_implementation_contract": {
+    "fingerprint_sha256": "cdfd106e28a9284f5c1390ab4766f56f9c19215789fef8ef02a0a672bb0c6fa6",
+    "path": "eval/sota_4node/tempo_pd_c4_adaptive_implementation_contract_v1.json",
+    "sha256": "15accb86ff433876e14ae8cffcd4b4537dde90147b2794bb47f3056b0bf8ca54"
+  },
+  "environment_versions": {
+    "lmcache": "0.1.dev1",
+    "python": "3.12.11",
+    "torch": "2.11.0+cu129",
+    "transformers": "5.15.0",
+    "vllm": "0.26.0+cu129"
+  },
+  "files": [
+    {
+      "path": "eval/sota_4node/analyze_tempo_pd_c4_semantic_load.py",
+      "sha256": "1399e961f229f508d5e5f9465a2c8d9575e9c6abf83b577e5915ae9015872e4a"
+    },
+    {
+      "path": "eval/sota_4node/analyze_tempo_pd_independent_validation.py",
+      "sha256": "d4d260bb328825681ce4d692e61a47521e0e9ea6d15670a9f3fbfa8021a5b79a"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_independent_validation_manifest.py",
+      "sha256": "fdb3399fe42327c58fd2ebc6549bac75084266e2945ceb6980077a7b944389dd"
+    },
+    {
+      "path": "eval/sota_4node/build_tempo_pd_independent_validation_run_contract.py",
+      "sha256": "58bd31fd9d8d7efad2b2d9a57ac78f7826547eb5853a37868e39ff8b67dbe475"
+    },
+    {
+      "path": "eval/sota_4node/independent_validation_pd_node_entry.sh",
+      "sha256": "5cdb0be79fa78c84ccaf676f2b0e1e1710646eb4c527756ee17fa4492e28682f"
+    },
+    {
+      "path": "eval/sota_4node/prepare_tempo_pd_independent_validation.sh",
+      "sha256": "4294b1c0c5cd56e44647f6f3fdf0dc925119d6a11fd6af4234edfa80c7662533"
+    },
+    {
+      "path": "eval/sota_4node/promote_tempo_pd_profiles_for_independent_validation.py",
+      "sha256": "f53cf5777ef6c56f2e0b94a69b477cfcc90cf91440e367a173c9cb39eb871fab"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_independent_validation_client.py",
+      "sha256": "2ed177e62485a6176935772e6e28c94cd8b708929ff2b9b82d429ae70cb32c4f"
+    },
+    {
+      "path": "eval/sota_4node/run_tempo_pd_independent_validation_in_allocation.sh",
+      "sha256": "f1f3bcd707a435f414ea20c53bd4990396e0854d6324811e56929ed7b566b405"
+    },
+    {
+      "path": "eval/sota_4node/tempo_pd_independent_validation_preregistration_v1.json",
+      "sha256": "c1de45c97025739e94b91b2da770a38b86b7a170d288c3f47c8cd4b774af7f86"
+    },
+    {
+      "path": "eval/sota_4node/verify_tempo_pd_independent_validation_implementation.py",
+      "sha256": "32ea1b9c573048edee16a4548eddd0ce5e64e5db2c51bd7e413a23c8c0dd7d62"
+    },
+    {
+      "path": "eval/sota_4node/vllm_lmcache_pd_independent_validation_node.py",
+      "sha256": "4c0480e40347ab6821bbfc6454dd2d3dc0dc09d22388ebe6e98b146c741a9477"
+    }
+  ],
+  "fingerprint_sha256": "32fe794b90a8ee5e465250e0b3d89dcbbf070a785a33e20be1f56e4af0b7ddf1",
+  "git_heads": {
+    "repository": "3894bd1f6c91d0498a970575dbbad988ce003c46",
+    "third_party_lmcache": "227d13f5c9fdb52ddb933641d34331f678de03a0"
+  },
+  "held_out_contract": {
+    "paired_samples_per_group": 16,
+    "phase_duration_ms": 12000,
+    "preregistration_sha256": "c1de45c97025739e94b91b2da770a38b86b7a170d288c3f47c8cd4b774af7f86",
+    "replicates": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "separate_calibration_and_validation_slurm_jobs": true,
+    "traffic_shape": "burst",
+    "unchanged_pd_data_plane": true,
+    "workload_groups": 36
+  },
+  "performance_claim_allowed_before_analysis": false,
+  "physical_switch_bottleneck_claim_allowed": false,
+  "post_validation_tuning_allowed": false,
+  "purpose": "frozen held-out independent validation",
+  "schema": "tempo-pd-independent-validation-implementation-contract-v1"
+}

@@ -11,8 +11,20 @@ MANIFEST=$(realpath -e -- "${TEMPO_GO_C10_MANIFEST:-${REPO_ROOT}/eval/sota_4node
 case "${PARENT_CONTRACT}" in "${REPO_ROOT}/"*) ;; *) exit 2 ;; esac
 case "${MANIFEST}" in "${REPO_ROOT}/"*) ;; *) exit 2 ;; esac
 [[ "$(jq -er '.schema' "${MANIFEST}")" == tempo-go-c10-paper-sota-extension-v1 ]]
-[[ "$(jq -er '.claim_boundary.post_hoc_extension' "${MANIFEST}")" == true ]]
-[[ "$(jq -er '.claim_boundary.independent_validation_claim_allowed' "${MANIFEST}")" == false ]]
+POST_HOC_EXTENSION=$(jq -er '.claim_boundary.post_hoc_extension' "${MANIFEST}")
+INDEPENDENT_CLAIM=$(jq -er '.claim_boundary.independent_validation_claim_allowed' "${MANIFEST}")
+if [[ "${POST_HOC_EXTENSION}" == true ]]; then
+  [[ "${INDEPENDENT_CLAIM}" == false ]]
+else
+  [[ "${POST_HOC_EXTENSION}" == false && "${INDEPENDENT_CLAIM}" == true ]]
+  [[ "$(jq -er '.claim_boundary.pre_registered_before_fresh_allocation' "${MANIFEST}")" == true ]]
+  if jq -e --arg job "${SLURM_JOB_ID}" \
+    '.claim_boundary.forbidden_allocation_job_ids | index($job) != null' \
+    "${MANIFEST}" >/dev/null; then
+    echo "independent C10 requires an allocation not used by discovery/post-hoc runs" >&2
+    exit 2
+  fi
+fi
 [[ "$(sha256sum "${PARENT_CONTRACT}" | awk '{print $1}')" == "$(jq -er '.parent_independent_validation.sha256' "${MANIFEST}")" ]]
 
 JOB_RECEIPT=$(scontrol show job "${SLURM_JOB_ID}" -o)
@@ -56,7 +68,29 @@ export TEMPO_PD_FRONTEND_REPLICATE_WARM_AFFINITY=1
 export TEMPO_VLLM_MAX_NUM_SEQS=16
 export TEMPO_VLLM_DECODER_PREFIX_CACHING=0
 export TEMPO_LMCACHE_NIXL_BACKEND=UCX
+# C8 already compiled the identical vLLM/FlashInfer carrier on every node.
+# Reusing that per-allocation cache is part of the C10 execution contract;
+# otherwise the first paper arm can spend its whole 29-minute step in nvcc.
+export TEMPO_SHARED_CACHE_MODE="${TEMPO_SHARED_CACHE_MODE:-tempo_go_c8_independent_validation}"
 unset TEMPO_CXI_BACKGROUND_DUTY_CYCLE TEMPO_CXI_BACKGROUND_START_FILE
+
+PREFLIGHT_SCRIPT="${SCRIPT_DIR}/c10_flashinfer_cache_preflight.sh"
+PREFLIGHT_ROOT="${RESULT_ROOT}/cache_preflight"
+mkdir -p -- "${PREFLIGHT_ROOT}"
+/usr/bin/srun --overlap --exact \
+  --nodes=4 --ntasks=4 --ntasks-per-node=1 \
+  --gpus-per-task=1 --gpu-bind=none --cpus-per-task=32 --cpu-bind=cores \
+  --kill-on-bad-exit=1 --wait=600 --time=00:18:00 --export=ALL \
+  --output="${PREFLIGHT_ROOT}/slurm-node-%N.stdout.log" \
+  --error="${PREFLIGHT_ROOT}/slurm-node-%N.stderr.log" \
+  bash "${PREFLIGHT_SCRIPT}" "${REPO_ROOT}" "${RESULT_ROOT}" "${TEMPO_SHARED_CACHE_MODE}"
+for node_index in 0 1 2 3; do
+  receipt="${PREFLIGHT_ROOT}/node-${node_index}.json"
+  [[ -s "${receipt}" ]]
+  jq -e --arg job "${SLURM_JOB_ID}" --arg mode "${TEMPO_SHARED_CACHE_MODE}" \
+    '.schema == "tempo-go-c10-flashinfer-preflight-v1" and .job_id == $job and .cache_mode == $mode and (.sampling_so_sha256 | length == 64)' \
+    "${receipt}" >/dev/null
+done
 
 mapfile -t HOSTS < <(scontrol show hostnames "${SLURM_JOB_NODELIST}")
 [[ ${#HOSTS[@]} -eq 4 ]]
@@ -113,9 +147,10 @@ if [[ -n "${POLICY_FILTER}" ]]; then
   exit 0
 fi
 
-PARENT_ROOT="${REPO_ROOT}/results/tempo_go_c8_independent_validation_job_57586612_v3"
-PARENT_ANALYSIS="${PARENT_ROOT}/analysis.json"
-TEMPO_RESULT="${PARENT_ROOT}/full_c7_managed_background/result.json"
+PARENT_ANALYSIS="${TEMPO_GO_C10_PARENT_ANALYSIS:-${REPO_ROOT}/results/tempo_go_c8_independent_validation_job_57586612_v3/analysis.json}"
+TEMPO_RESULT="${TEMPO_GO_C10_TEMPO_RESULT:-${REPO_ROOT}/results/tempo_go_c8_independent_validation_job_57586612_v3/full_c7_managed_background/result.json}"
+case "${PARENT_ANALYSIS}" in "${REPO_ROOT}/results/"*) ;; *) exit 2 ;; esac
+case "${TEMPO_RESULT}" in "${REPO_ROOT}/results/"*) ;; *) exit 2 ;; esac
 [[ -s "${PARENT_ANALYSIS}" && -s "${TEMPO_RESULT}" ]]
 
 ANALYZE=(

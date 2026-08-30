@@ -156,7 +156,9 @@ def _load_block(
         # though no completion tokens exist.  Such a row is an execution
         # failure, not a metric-bearing completion, and must not be passed to
         # _metric().
-        if row.get("terminal_kind") == "service_lane_failure":
+        if row.get("terminal_kind") in {
+            "service_lane_failure", "route_failure",
+        }:
             failures += 1
             continue
         if row.get("valid") is not True:

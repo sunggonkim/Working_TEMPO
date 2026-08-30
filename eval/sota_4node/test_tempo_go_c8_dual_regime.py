@@ -13,9 +13,18 @@ from eval.sota_4node.tempo_pd_frontend_v1 import pair_index
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACT = ROOT / "eval/sota_4node/tempo_go_c8_dual_regime_contract_v45.json"
+CONTRACT = ROOT / (
+    "results/tempo_go_c9_candidate_l_protected_reserve_v11/"
+    "tempo_go_c8_candidate_l_contract.json"
+)
 CONTRACT_SHA256 = (
-    "1521d855b8dbddde58afff0a92050969123c0218004288b33b756498f88ca260")
+    "345170034947db51b9cce0286ce7e21c07ced8c71fdf4fb51cd743e71778bdde")
+DUAL_ROUTE_C9 = ROOT / (
+    "results/tempo_go_c9_dual_route_business_lane_v13/"
+    "tempo_go_c9_dual_route_business_lane_population_contract.json"
+)
+DUAL_ROUTE_C9_SHA256 = (
+    "989a09e0f005967ec5f1ff1ec17b9244b5dee0b5e39f04d0b479a8e5c1de8a69")
 
 
 def _section() -> tuple[dict[str, object], dict[str, object]]:
@@ -28,7 +37,7 @@ def _section() -> tuple[dict[str, object], dict[str, object]]:
     return section, spec
 
 
-def test_current_v45_contract_matches_source_revision() -> None:
+def test_current_candidate_l_contract_matches_source_revision() -> None:
     assert hashlib.sha256(CONTRACT.read_bytes()).hexdigest() == CONTRACT_SHA256
     value = json.loads(CONTRACT.read_text(encoding="utf-8"))
     inventory = value["source_inventory"]
@@ -37,6 +46,70 @@ def test_current_v45_contract_matches_source_revision() -> None:
         source = ROOT / relative
         assert source.is_file(), relative
         assert hashlib.sha256(source.read_bytes()).hexdigest() == expected, relative
+
+
+def test_dual_route_population_contract_is_current_source_bound() -> None:
+    assert hashlib.sha256(DUAL_ROUTE_C9.read_bytes()).hexdigest() == (
+        DUAL_ROUTE_C9_SHA256)
+    value = json.loads(DUAL_ROUTE_C9.read_text(encoding="utf-8"))
+    assert value["candidate"]["id"] == "tempo-go-c9-dual-route-business-lane-v2"
+    assert value["system_under_test"]["source_policy"] == (
+        "current_source_bound_dual_route_business_lane_v1")
+    assert value["claim_boundary"] == {
+        "discovery_only": True,
+        "independent_validation_claim_allowed": False,
+        "performance_claim_allowed": False,
+        "reason": (
+            "The same native burst is compared across fixed, predictor, "
+            "queue-GPU, and dual-route TEMPO arms; this remains discovery "
+            "until all population gates pass on a fresh allocation."),
+    }
+    assert [item["arm"] for item in value["execution"]["order"]] == [
+        "fixed_local_d0", "fixed_local_d1", "fixed_remote_p0d1",
+        "fixed_remote_p1d0", "predictor", "queue_gpu",
+        "full_c7_managed_background",
+    ]
+    inventory = value["provenance"]["source_inventory"]
+    assert len(inventory) == 7
+    for relative, expected in inventory.items():
+        source = ROOT / relative
+        assert source.is_file(), relative
+        assert hashlib.sha256(source.read_bytes()).hexdigest() == expected, relative
+
+
+def test_dual_route_population_binds_dual_route_base_profile() -> None:
+    value = json.loads(DUAL_ROUTE_C9.read_text(encoding="utf-8"))
+    base = ROOT / value["system_under_test"]["base_contract"]
+    assert base.is_file()
+    assert hashlib.sha256(base.read_bytes()).hexdigest() == value[
+        "system_under_test"]["base_contract_sha256"]
+    base_value = json.loads(base.read_text(encoding="utf-8"))
+    global_profile = base_value["joint_control"]["global_profile"]
+    assert global_profile["path"] == (
+        "results/tempo_go_c9_dual_route_business_lane_profile_v12/"
+        "real_tempo_go_c9_dual_route_business_lane_profile_v12.json")
+    assert global_profile["sha256"] == (
+        "4f61a538035c1eeef3cb4c078865c0798f18e25919b07d5333147e7346e12367")
+    profile = json.loads(
+        (ROOT / global_profile["path"]).read_text(encoding="utf-8"))
+    assert profile["controller"]["priority_service_lane_mode"] == (
+        "vllm_priority_business_dual_route_v2")
+    # The v13 mechanism is intentionally not Candidate L's protected-reserve
+    # policy.  The absence of that optional field is part of the binding
+    # check, so a copied L profile cannot silently pass as dual-route.
+    assert "protected_service_lane_mode" not in profile["controller"]
+
+
+def test_v13_wrapper_is_contract_pinned_and_uses_generic_runner() -> None:
+    wrapper = ROOT / (
+        "eval/sota_4node/"
+        "run_tempo_go_c9_dual_route_business_lane_v13_in_allocation.sh")
+    text = wrapper.read_text(encoding="utf-8")
+    assert "TEMPO_GO_C9_CAUSAL_BURST_APPROVED" in text
+    assert "tempo_go_c9_dual_route_business_lane_population_contract.json" in text
+    assert "CONTRACT_SHA256=\"989a09e0f005967ec5f1ff1ec17b9244b5dee0b5e39f04d0b479a8e5c1de8a69\"" in text
+    assert "export TEMPO_GO_C9_CAUSAL_BURST_CONTRACT=\"${CONTRACT}\"" in text
+    assert "run_tempo_go_c9_causal_burst_discovery_in_allocation.sh" in text
 
 
 def test_remote_regime_has_exact_dual_decoder_population(monkeypatch) -> None:
@@ -121,7 +194,14 @@ def test_contract_freezes_remote_activation_without_oracle_input() -> None:
     assert remote["managed_remote_priority"] == -2
     assert remote["baseline_request_priority"] == 0
     assert remote["priority_service_lane_mode"] == (
-        "vllm_priority_remote_cache_v1")
+        "vllm_priority_business_dual_route_v2")
+    global_profile = section["global_profile"]
+    assert global_profile["path"].endswith(
+        "real_tempo_go_c9_candidate_l_protected_reserve_v1.json")
+    profile = json.loads(
+        (ROOT / global_profile["path"]).read_text(encoding="utf-8"))
+    assert profile["controller"]["protected_service_lane_mode"] == (
+        "tenant_pair_edge_reservation_v2")
     assert remote["priority_service_lane_capacity_per_decoder"] == 8
     assert remote["decoder_business_admission_mode"] == "priority_drain_v1"
     assert remote["decoder_background_concurrency_limits"] == [8, 8]
@@ -255,3 +335,26 @@ def test_regime_effect_uses_offered_slo_and_tail() -> None:
     assert effect["slo_good_ratio"] == 1.45
     assert effect["e2e_p50_reduction_fraction"] == 0.5
     assert effect["e2e_p99_reduction_fraction"] == 0.5
+
+
+def test_analyzer_accepts_business_dual_route_priority_lane_receipt() -> None:
+    decision = {
+        "tempo_go_service_lane_reservation_status": "accepted",
+        "tempo_go_global_commit_queue_lease": True,
+        "tempo_go_service_lane_reservation": {
+            "status": "accepted",
+            "queue_lease": True,
+            "global_route": analyzer.REMOTE_ROUTE,
+        },
+    }
+    global_decision = {
+        "reason": (
+            "global_priority_business_dual_route_service_lane_route_committed"
+        ),
+        "queue_lease": True,
+        "binding_resources": [
+            analyzer.BUSINESS_PRIORITY_SERVICE_LANE_BINDING,
+        ],
+    }
+    assert analyzer._priority_lane_receipt(
+        decision, global_decision, expected_managed_priority=-2)

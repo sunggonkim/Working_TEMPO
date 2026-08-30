@@ -2215,7 +2215,21 @@ def build_app(pair_urls: list[str]) -> FastAPI:
                         if PRIORITY_SERVICE_LANE_BINDING
                         in tempo_go_decision.binding_resources else "0"
                     ),
+                    "X-Tempo-GO-Service-Queue-Delay-MS": (
+                        str(tempo_go_decision.service_queue_delay_ms)
+                        if tempo_go_decision.service_queue_delay_ms is not None
+                        else None
+                    ),
+                    "X-Tempo-GO-Service-Forecast-MS": (
+                        str(tempo_go_decision.service_forecast_ms)
+                        if tempo_go_decision.service_forecast_ms is not None
+                        else None
+                    ),
                 })
+                headers = {
+                    key: value for key, value in headers.items()
+                    if value is not None
+                }
                 if joint_plan is not None:
                     headers["X-Tempo-GO-Actuation-Plan"] = json.dumps(
                         joint_plan.as_dict(),
@@ -2248,6 +2262,14 @@ def build_app(pair_urls: list[str]) -> FastAPI:
                     "priority_service_lane": headers[
                         "X-Tempo-GO-Priority-Service-Lane"],
                 }
+                for field, header in (
+                    ("service_queue_delay_ms",
+                     "X-Tempo-GO-Service-Queue-Delay-MS"),
+                    ("service_forecast_ms",
+                     "X-Tempo-GO-Service-Forecast-MS"),
+                ):
+                    if header in headers:
+                        commit_payload[field] = headers[header]
                 preflight_response = await client.post(
                     "/tempo/service_lane_preflight",
                     json={

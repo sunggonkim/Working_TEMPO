@@ -1,0 +1,28 @@
+{
+  "schema": "tempo-go-real-trace-business-profile-v1",
+  "profile_id": "mooncake-fast25-capacity-sweep-business-discovery-v1",
+  "assignment": {
+    "mode": "weighted_cycle_v1",
+    "tenant_cycle": [
+      "latency",
+      "interactive",
+      "batch",
+      "background"
+    ],
+    "remaining_deadline_ms": {
+      "latency": 8000.0,
+      "interactive": 12000.0,
+      "batch": 20000.0,
+      "background": 30000.0
+    },
+    "deadline_semantics": "explicit capacity-sweep SLOs cover the measured 8064-token cold population; they are fixed before dispatch and do not encode route or future-arrival information"
+  },
+  "cache_semantics": "natural prefix reuse from source-bound Mooncake hash IDs; no oracle cache state and no hidden warm copy",
+  "policy_inputs_excluded": [
+    "future_arrivals",
+    "oracle_route",
+    "future_cache_evictions",
+    "physical_switch_label"
+  ],
+  "performance_claim_allowed": false
+}

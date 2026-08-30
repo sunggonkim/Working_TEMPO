@@ -1,0 +1,116 @@
+{
+  "claim_boundary": {
+    "controller_performance_claim_allowed": false,
+    "purpose": "P2 workload qualification before any C6 controller comparison"
+  },
+  "decoder_victim_abba": {
+    "aggressor": {
+      "cache_state": "miss",
+      "load_fraction": 0.7,
+      "offered_rate_per_s": 22.4,
+      "output_tokens": 2,
+      "prompt_tokens": 4094,
+      "reference_rate_per_s": 32.0,
+      "route": "decoder_local_chunked_prefill"
+    },
+    "arms": [
+      {
+        "aggressor": false,
+        "name": "00_decoder_victim_clean_a",
+        "replicate": 0
+      },
+      {
+        "aggressor": true,
+        "name": "01_decoder_victim_hot_a",
+        "replicate": 0
+      },
+      {
+        "aggressor": true,
+        "name": "02_decoder_victim_hot_b",
+        "replicate": 1
+      },
+      {
+        "aggressor": false,
+        "name": "03_decoder_victim_clean_b",
+        "replicate": 1
+      }
+    ],
+    "cooldown_s": 5.0,
+    "max_workers": 128,
+    "phase_duration_ms": 60000.0,
+    "profile": {
+      "path": "eval/sota_4node/real_tempo_pd_elastic_profile_v447.json",
+      "sha256": "de6ef04708a557b825bb482c62ec69069e7988db5b2fbec2cd98eed0a2938cfe"
+    },
+    "source_workload": {
+      "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+      "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+    },
+    "slo": {
+      "e2e_ms": 8000.0,
+      "tpot_ms": 40.0
+    },
+    "victim": {
+      "cache_state": "miss",
+      "offered_rate_per_s": 1.0,
+      "output_tokens": 128,
+      "prompt_tokens": 4094,
+      "route": "official_lmcache_remote_prefill"
+    }
+  },
+  "nccl_victim_abba": {
+    "arms": [
+      {
+        "background_mode": "nccl_only",
+        "name": "00_nccl_only_a"
+      },
+      {
+        "background_mode": "nixl_ucx",
+        "name": "01_lmcache_on_a"
+      },
+      {
+        "background_mode": "nixl_ucx",
+        "name": "02_lmcache_on_b"
+      },
+      {
+        "background_mode": "nccl_only",
+        "name": "03_nccl_only_b"
+      }
+    ],
+    "minimum_active_duration_s": 30.0,
+    "parameters": {
+      "block_delay_s": 0.0,
+      "foreground_mib": 16,
+      "kv_mib": 128,
+      "maximum_blocks": 512,
+      "minimum_blocks": 4,
+      "nixl_transfer_timeout_s": 60,
+      "process_group_timeout_s": 120,
+      "requests": 8,
+      "token_iters": 128
+    },
+    "topology": {
+      "background": "four official LMCache NixlChannel UCX P-to-D writes",
+      "nodes": 2,
+      "ranks_per_node": 4,
+      "victim": "eight-rank WORLD NCCL all-reduce completion",
+      "world_size": 8
+    }
+  },
+  "qualification_gates": {
+    "phase_horizon": "every rank active for at least 30 seconds",
+    "q1_any": [
+      "victim_p50_degradation_fraction_at_least_0.25",
+      "victim_p99_ratio_at_least_2.0",
+      "victim_slo_attainment_drop_percentage_points_at_least_20"
+    ],
+    "same_population": "identical NCCL collective kind, bytes, count, topology, and ABBA order"
+  },
+  "schema": "tempo-go-c6-qualification-contract-v1",
+  "transport": {
+    "lmcache": "official checked-out LMCache NixlChannel",
+    "nccl": "NERSC PyTorch NCCL with NCCL_NET=AWS Libfabric",
+    "privileged_or_container_configuration_allowed": false,
+    "synthetic_cxi_is_primary_evidence": false
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "tempo-pd-final-scheme-1",
+  "experiment_job_id": "57012435",
+  "model": "Qwen2.5-7B-Instruct",
+  "topology": {
+    "nodes": 4,
+    "gpus": 16,
+    "replicas": 2,
+    "prefill_tensor_parallel": 4,
+    "decode_tensor_parallel": 4
+  },
+  "controller": {
+    "policy": "workload-fingerprint profiled admission",
+    "fallback": "decoder_local_recompute_or_cache",
+    "remote_admission": "lower-bound remote advantage must exceed frozen margin",
+    "remote_backend": "official LMCacheConnectorV1 PDBackendAsync NIXL UCX",
+    "remote_chunk_size_tokens": 256
+  },
+  "calibration_remote_advantage_lower_bound_ms": [
+    -229.994151,
+    -94.797553,
+    -397.29563100000007
+  ],
+  "validation": {
+    "requests": 9,
+    "tempo_local_routes": 9,
+    "tempo_remote_routes": 0,
+    "exact_output_equivalence": true,
+    "tempo_vs_lmcache_e2e_win_count": 9,
+    "tempo_vs_lmcache_paired_e2e_delta_median_ms": -223.05003599999998,
+    "tempo_vs_lmcache_e2e_p50_reduction_percent": 23.39146973991951,
+    "tempo_vs_lmcache_e2e_p99_reduction_percent": 31.4564918353061,
+    "tempo_vs_lmcache_ttft_p50_reduction_percent": 10.625514956017202,
+    "tempo_vs_lmcache_tpot_p50_reduction_percent": 24.992458989319243,
+    "tempo_vs_lmcache_request_goodput_improvement_percent": 7.030670694543417
+  },
+  "rejected": {
+    "prepared_handle_cache": "zero hits in 72 actual transfers",
+    "aggressive_polling": "request goodput regression",
+    "balanced_polling": "only five of nine paired E2E wins",
+    "libfabric_cxi": "compute-node backend creation failed with NIXL_ERR_BACKEND",
+    "mooncake_proxy": "not run because no comparable, working CXI data path was available"
+  },
+  "artifacts": {
+    "final_result": "results/tempo_pd_chunk256_v8_job_57012435/result.json",
+    "stronger_lmcache_baseline": "results/lmcache_chunk256_v7_job_57012435/result.json",
+    "architecture": "eval/sota_4node/LIVE_PD_ARCHITECTURE_V1.md"
+  },
+  "promotion_valid": false,
+  "claim_boundary": "same-allocation actual-vLLM component/system screen; independent replication and a positive remote-selected regime remain required"
+}

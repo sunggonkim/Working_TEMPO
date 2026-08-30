@@ -1,0 +1,13 @@
+{
+  "schema": "tempo-pd-remote-crossover-continuation-contract-10",
+  "model": "Qwen2.5-7B-Instruct",
+  "topology": "4 nodes, two TP4 prefill/decode replica pairs",
+  "remote_backend": "official LMCacheConnectorV1 PDBackendAsync NIXL UCX",
+  "chunk_size_tokens": 256,
+  "request_rate_per_s": 8.0,
+  "max_workers": 9,
+  "stages": ["calibration_local", "calibration_remote", "validation_tempo"],
+  "validation_references": "exact two-arm crossover v9 raw artifacts from the same allocation",
+  "expected_behavior": "remote for buckets with conservative positive crossover, local otherwise",
+  "promotion_valid": false
+}

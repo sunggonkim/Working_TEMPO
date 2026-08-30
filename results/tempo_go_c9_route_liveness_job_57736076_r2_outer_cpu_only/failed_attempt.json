@@ -1,0 +1,25 @@
+{
+  "schema": "tempo-go-c9-candidate-o-execution-boundary-failure-v1",
+  "status": "execution_only_not_a_campaign_result",
+  "slurm_job_id": 57736076,
+  "outer_step": {
+    "step_id": "57736076.5",
+    "state": "CANCELLED by 0",
+    "elapsed": "00:10:04",
+    "exit_code": "0:9",
+    "invalid_options": ["--time=03:40:00", "--kill-on-bad-exit=1", "--wait=600"],
+    "failure": "helper ranks exited and --wait=600 terminated the still-running rank-0 campaign driver"
+  },
+  "observed_child": {
+    "step_id": "57736076.6",
+    "state": "COMPLETED",
+    "elapsed": "00:13:51",
+    "exit_code": "0:0",
+    "scope": "one fixed-local-d0 inference arm only"
+  },
+  "top_level_completed_receipt": false,
+  "measured_campaign_complete": false,
+  "performance_result": false,
+  "manual_scancel_issued_by_agent": false,
+  "superseded_by": "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/completed_attempt.json"
+}

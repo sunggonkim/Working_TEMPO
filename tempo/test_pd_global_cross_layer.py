@@ -10,7 +10,12 @@ from tempo.pd_global_orchestrator import (
     ResourceVector,
 )
 from tempo.test_pd_global_telemetry import adapter, frontend, live_endpoints
-from tempo.test_pd_global_orchestrator import candidate, controller, request
+from tempo.test_pd_global_orchestrator import (
+    candidate,
+    controller,
+    mesh_candidate,
+    request,
+)
 
 
 def _envelope(pair_index: int = 0) -> dict[str, object]:
@@ -161,6 +166,174 @@ def test_cross_layer_state_changes_global_route_and_is_provenanced() -> None:
     )
     assert value.snapshot(now_ns=11_000)["telemetry_provenance"]["0"][
         "cross_layer"] is not None
+
+
+def test_pair_local_receiver_price_moves_local_work_off_hot_decoder() -> None:
+    """A local escape must still avoid a receiver-contended decoder pair."""
+    batch = _shared_batch()
+    pairs = []
+    for index, pair in enumerate(batch.pairs):
+        cross_layer = pair.cross_layer
+        assert cross_layer is not None
+        signals = tuple(
+            replace(
+                signal,
+                value=(200.0 if signal.name == "lmcache_transfer_p99_ms"
+                       and index == 0 else
+                       0.0 if signal.name == "lmcache_transfer_p99_ms"
+                       else signal.value),
+            )
+            for signal in cross_layer.signals
+        )
+        pairs.append(replace(
+            pair, cross_layer=replace(cross_layer, signals=signals)))
+    value = controller(cross_layer_local_receiver_price_ms=0.1)
+    value.update_telemetry_batch(tuple(pairs))
+    decision = value.submit(request(
+        "local-receiver-price", "latency",
+        (
+            candidate(0, GlobalRoute.LOCAL, e2e=10.0),
+            candidate(1, GlobalRoute.LOCAL, e2e=10.0),
+        ),
+        deadline_ns=2_000_000_000,
+    ), now_ns=11_000)
+    assert decision.kind.value == "admit"
+    assert decision.pair_index == 1
+    assert decision.route is GlobalRoute.LOCAL
+
+
+def test_pair_receiver_guard_denies_new_remote_work_but_keeps_local_fallback() -> None:
+    """A measured hot receiver must stop injecting more remote KV traffic."""
+    batch = _shared_batch()
+    hot = batch.pairs[0]
+    cross_layer = hot.cross_layer
+    assert cross_layer is not None
+    signals = tuple(
+        replace(
+            signal,
+            value=(500.0 if signal.name == "lmcache_transfer_p99_ms"
+                   else signal.value),
+        )
+        for signal in cross_layer.signals
+    )
+    hot = replace(hot, cross_layer=replace(cross_layer, signals=signals))
+    value = controller(
+        cross_layer_remote_receiver_guard_mode="deny_while_hot",
+        cross_layer_remote_receiver_guard_p99_ms=250.0,
+    )
+    value.update_telemetry_batch((hot, batch.pairs[1]))
+    decision = value.submit(request(
+        "receiver-guard", "latency",
+        (
+            candidate(0, GlobalRoute.REMOTE, e2e=10.0),
+            candidate(0, GlobalRoute.LOCAL, e2e=11.0),
+        ),
+        deadline_ns=2_000_000_000,
+    ), now_ns=11_000)
+    assert decision.kind.value == "admit"
+    assert decision.route is GlobalRoute.LOCAL
+    assert any(
+        item.reason == "cross_layer_remote_receiver_hot"
+        and item.binding_resources == ("lmcache_transfer_p99_ms",)
+        for item in decision.rejected_candidates
+    )
+    assert value.snapshot(now_ns=11_000)[
+        "cross_layer_remote_receiver_guard"
+    ] == {
+        "mode": "deny_while_hot",
+        "scope": "pair",
+        "p99_ceiling_ms": 250.0,
+    }
+
+
+def test_shared_receiver_guard_does_not_move_work_to_another_remote_edge() -> None:
+    """A shared incast guard must block the whole compatible remote group."""
+    batch = _shared_batch()
+    hot = batch.pairs[0]
+    cross_layer = hot.cross_layer
+    assert cross_layer is not None
+    hot_signals = tuple(
+        replace(
+            signal,
+            value=(500.0 if signal.name == "lmcache_transfer_p99_ms"
+                   else signal.value),
+        )
+        for signal in cross_layer.signals
+    )
+    pairs = (
+        replace(hot, cross_layer=replace(cross_layer, signals=hot_signals)),
+        batch.pairs[1],
+    )
+    value = controller(
+        mesh_control_mode="receiver_credit_pxd_v1",
+        cross_layer_remote_receiver_guard_mode="deny_while_hot",
+        cross_layer_remote_receiver_guard_scope="shared_group",
+        cross_layer_remote_receiver_guard_p99_ms=250.0,
+    )
+    value.update_telemetry_batch(pairs)
+    decision = value.submit(request(
+        "shared-receiver-guard", "latency",
+        (
+            mesh_candidate(0, 1, e2e=10.0),
+            candidate(1, GlobalRoute.LOCAL, e2e=11.0),
+        ),
+        deadline_ns=2_000_000_000,
+    ), now_ns=11_000)
+    assert decision.kind.value == "admit"
+    assert decision.route is GlobalRoute.LOCAL
+    assert decision.pair_index == 1
+    assert any(
+        item.reason == "cross_layer_remote_receiver_group_hot"
+        and "shared_receiver_group" in item.binding_resources
+        and "hot_receiver_pair:0" in item.binding_resources
+        for item in decision.rejected_candidates
+    )
+    assert value.snapshot(now_ns=11_000)[
+        "cross_layer_remote_receiver_guard"
+    ]["scope"] == "shared_group"
+
+
+def test_declared_shared_group_guard_fails_closed_with_partial_observer_scope() -> None:
+    """An explicit allocation group protects an uninstrumented spare pair."""
+    batch = _shared_batch()
+    hot = batch.pairs[0]
+    cross_layer = hot.cross_layer
+    assert cross_layer is not None
+    hot_signals = tuple(
+        replace(
+            signal,
+            value=(500.0 if signal.name == "lmcache_transfer_p99_ms"
+                   else signal.value),
+        )
+        for signal in cross_layer.signals
+    )
+    pairs = (
+        replace(hot, cross_layer=replace(cross_layer, signals=hot_signals)),
+        replace(batch.pairs[1], cross_layer=None),
+    )
+    value = controller(
+        mesh_control_mode="receiver_credit_pxd_v1",
+        cross_layer_remote_receiver_guard_mode="deny_while_hot",
+        cross_layer_remote_receiver_guard_scope="shared_group",
+        cross_layer_remote_receiver_guard_group_id="c9-allocation-v1",
+        cross_layer_remote_receiver_guard_p99_ms=250.0,
+    )
+    value.update_telemetry_batch(pairs)
+    decision = value.submit(request(
+        "partial-observer-guard", "latency",
+        (
+            mesh_candidate(0, 1, e2e=10.0),
+            candidate(1, GlobalRoute.LOCAL, e2e=11.0),
+        ),
+        deadline_ns=2_000_000_000,
+    ), now_ns=11_000)
+    assert decision.kind.value == "admit"
+    assert decision.route is GlobalRoute.LOCAL
+    assert any(
+        item.reason == "cross_layer_remote_receiver_group_hot"
+        and "receiver_guard_group:c9-allocation-v1" in item.binding_resources
+        for item in decision.rejected_candidates
+    )
 
 
 def test_joint_limits_preserve_capacity_inside_safe_envelope() -> None:

@@ -1,0 +1,2462 @@
+{
+  "aggregates": {
+    "fixed_local_d0": {
+      "miss_hot": {
+        "completed": 120,
+        "mean_e2e_p50_ms": 3188.924109,
+        "mean_e2e_p99_ms": 10488.618293,
+        "mean_tpot_p99_ms": 80.25709046456693,
+        "mean_ttft_p99_ms": 540.229922,
+        "offered": 120,
+        "runs": 1,
+        "slo_good": 76,
+        "slo_good_fraction": 0.6333333333333333
+      },
+      "normal": {
+        "completed": 60,
+        "mean_e2e_p50_ms": 3011.442516,
+        "mean_e2e_p99_ms": 21141.977078,
+        "mean_tpot_p99_ms": 162.30827722047246,
+        "mean_ttft_p99_ms": 1075.536703,
+        "offered": 60,
+        "runs": 1,
+        "slo_good": 30,
+        "slo_good_fraction": 0.5
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "mean_e2e_p50_ms": 26652.631752,
+        "mean_e2e_p99_ms": 38485.01901,
+        "mean_tpot_p99_ms": 214.7912137952756,
+        "mean_ttft_p99_ms": 12960.042402,
+        "offered": 30,
+        "runs": 1,
+        "slo_good": 0,
+        "slo_good_fraction": 0.0
+      }
+    },
+    "fixed_local_d1": {
+      "miss_hot": {
+        "completed": 120,
+        "mean_e2e_p50_ms": 3620.559011,
+        "mean_e2e_p99_ms": 56336.207983,
+        "mean_tpot_p99_ms": 220.32417059055118,
+        "mean_ttft_p99_ms": 52836.789114,
+        "offered": 120,
+        "runs": 1,
+        "slo_good": 67,
+        "slo_good_fraction": 0.5583333333333333
+      },
+      "normal": {
+        "completed": 60,
+        "mean_e2e_p50_ms": 3129.781444,
+        "mean_e2e_p99_ms": 12809.48389,
+        "mean_tpot_p99_ms": 96.72652738582677,
+        "mean_ttft_p99_ms": 570.074701,
+        "offered": 60,
+        "runs": 1,
+        "slo_good": 30,
+        "slo_good_fraction": 0.5
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "mean_e2e_p50_ms": 26635.554846,
+        "mean_e2e_p99_ms": 37962.67261,
+        "mean_tpot_p99_ms": 211.50273675590552,
+        "mean_ttft_p99_ms": 12679.033338,
+        "offered": 30,
+        "runs": 1,
+        "slo_good": 0,
+        "slo_good_fraction": 0.0
+      }
+    },
+    "fixed_remote_p0d1": {
+      "miss_hot": {
+        "completed": 120,
+        "mean_e2e_p50_ms": 6015.845558,
+        "mean_e2e_p99_ms": 50932.065794,
+        "mean_tpot_p99_ms": 60.76464310236221,
+        "mean_ttft_p99_ms": 45884.974008,
+        "offered": 120,
+        "runs": 1,
+        "slo_good": 69,
+        "slo_good_fraction": 0.575
+      },
+      "normal": {
+        "completed": 60,
+        "mean_e2e_p50_ms": 3346.633461,
+        "mean_e2e_p99_ms": 26015.839104,
+        "mean_tpot_p99_ms": 64.37439082677166,
+        "mean_ttft_p99_ms": 18394.109193,
+        "offered": 60,
+        "runs": 1,
+        "slo_good": 30,
+        "slo_good_fraction": 0.5
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "mean_e2e_p50_ms": 26729.163886,
+        "mean_e2e_p99_ms": 37354.631581,
+        "mean_tpot_p99_ms": 268.7963540708662,
+        "mean_ttft_p99_ms": 3292.894712,
+        "offered": 30,
+        "runs": 1,
+        "slo_good": 0,
+        "slo_good_fraction": 0.0
+      }
+    },
+    "fixed_remote_p1d0": {
+      "miss_hot": {
+        "completed": 120,
+        "mean_e2e_p50_ms": 16427.450165,
+        "mean_e2e_p99_ms": 76469.119908,
+        "mean_tpot_p99_ms": 57.14052937795275,
+        "mean_ttft_p99_ms": 73500.285845,
+        "offered": 120,
+        "runs": 1,
+        "slo_good": 24,
+        "slo_good_fraction": 0.2
+      },
+      "normal": {
+        "completed": 60,
+        "mean_e2e_p50_ms": 3294.560411,
+        "mean_e2e_p99_ms": 26141.109079,
+        "mean_tpot_p99_ms": 184.00713538582676,
+        "mean_ttft_p99_ms": 19499.863723,
+        "offered": 60,
+        "runs": 1,
+        "slo_good": 34,
+        "slo_good_fraction": 0.5666666666666667
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "mean_e2e_p50_ms": 26725.418179,
+        "mean_e2e_p99_ms": 37725.315938,
+        "mean_tpot_p99_ms": 271.9227781259842,
+        "mean_ttft_p99_ms": 3214.452635,
+        "offered": 30,
+        "runs": 1,
+        "slo_good": 0,
+        "slo_good_fraction": 0.0
+      }
+    },
+    "full_c7_managed_background": {
+      "miss_hot": {
+        "completed": 120,
+        "mean_e2e_p50_ms": 10833.118838,
+        "mean_e2e_p99_ms": 21139.362159,
+        "mean_tpot_p99_ms": 161.08023276377952,
+        "mean_ttft_p99_ms": 1097.924344,
+        "offered": 120,
+        "runs": 1,
+        "slo_good": 8,
+        "slo_good_fraction": 0.06666666666666667
+      },
+      "normal": {
+        "completed": 60,
+        "mean_e2e_p50_ms": 3072.33057,
+        "mean_e2e_p99_ms": 25751.595473,
+        "mean_tpot_p99_ms": 201.1356532992126,
+        "mean_ttft_p99_ms": 1112.470138,
+        "offered": 60,
+        "runs": 1,
+        "slo_good": 31,
+        "slo_good_fraction": 0.5166666666666667
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "mean_e2e_p50_ms": 3064.46649,
+        "mean_e2e_p99_ms": 3213.544993,
+        "mean_tpot_p99_ms": 23.20342672440945,
+        "mean_ttft_p99_ms": 441.379243,
+        "offered": 30,
+        "runs": 1,
+        "slo_good": 30,
+        "slo_good_fraction": 1.0
+      }
+    },
+    "predictor": {
+      "miss_hot": {
+        "completed": 120,
+        "mean_e2e_p50_ms": 3496.709425,
+        "mean_e2e_p99_ms": 37904.849516,
+        "mean_tpot_p99_ms": 182.82829936220472,
+        "mean_ttft_p99_ms": 35279.680565,
+        "offered": 120,
+        "runs": 1,
+        "slo_good": 83,
+        "slo_good_fraction": 0.6916666666666667
+      },
+      "normal": {
+        "completed": 60,
+        "mean_e2e_p50_ms": 2979.562488,
+        "mean_e2e_p99_ms": 29948.644412,
+        "mean_tpot_p99_ms": 233.52156684251966,
+        "mean_ttft_p99_ms": 534.102394,
+        "offered": 60,
+        "runs": 1,
+        "slo_good": 31,
+        "slo_good_fraction": 0.5166666666666667
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "mean_e2e_p50_ms": 40916.653327,
+        "mean_e2e_p99_ms": 51061.850839,
+        "mean_tpot_p99_ms": 385.95634146456695,
+        "mean_ttft_p99_ms": 9570.95422,
+        "offered": 30,
+        "runs": 1,
+        "slo_good": 13,
+        "slo_good_fraction": 0.43333333333333335
+      }
+    },
+    "queue_gpu": {
+      "miss_hot": {
+        "completed": 120,
+        "mean_e2e_p50_ms": 7569.266206,
+        "mean_e2e_p99_ms": 55189.408795,
+        "mean_tpot_p99_ms": 233.0659967401575,
+        "mean_ttft_p99_ms": 51187.418317,
+        "offered": 120,
+        "runs": 1,
+        "slo_good": 74,
+        "slo_good_fraction": 0.6166666666666667
+      },
+      "normal": {
+        "completed": 60,
+        "mean_e2e_p50_ms": 2973.072747,
+        "mean_e2e_p99_ms": 18292.687973,
+        "mean_tpot_p99_ms": 137.26305757480316,
+        "mean_ttft_p99_ms": 1085.543369,
+        "offered": 60,
+        "runs": 1,
+        "slo_good": 32,
+        "slo_good_fraction": 0.5333333333333333
+      },
+      "remote_favorable": {
+        "completed": 30,
+        "mean_e2e_p50_ms": 40225.227423,
+        "mean_e2e_p99_ms": 54060.240219,
+        "mean_tpot_p99_ms": 418.1404384173228,
+        "mean_ttft_p99_ms": 5211.974265,
+        "offered": 30,
+        "runs": 1,
+        "slo_good": 11,
+        "slo_good_fraction": 0.36666666666666664
+      }
+    }
+  },
+  "blocks": [
+    {
+      "arm": "fixed_local_d0",
+      "block_execution_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/block_execution_receipt.json",
+      "block_execution_receipt_sha256": "36dd7e0b3865663414a8a651e735275c57949e38c9055c64531254efce90be71",
+      "cojob": {
+        "active_loop": null,
+        "blocks": 39,
+        "lmcache_transfer_p99_ms": 6157.618921,
+        "nccl_collective_p99_ms": 1.010708,
+        "nixl_timeout_lower_bound_ms": 60000.0,
+        "observer_sequence": 39
+      },
+      "cojob_failure": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/cojob/cojob_failure.json",
+      "cojob_failure_sha256": "e0f4a17dfe065ac043ec92bfa6cf19ae3212559e3fa150fac9efd9768ff18382",
+      "cojob_outcome": "overload_timeout",
+      "cojob_outcome_valid": true,
+      "cojob_pair_count": 2,
+      "cojob_result": null,
+      "cojob_result_sha256": null,
+      "correct": true,
+      "decision_telemetry": {
+        "business_by_block": {
+          "00_control_a": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "01_remote_cool_hot_d0": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "02_combined_hot_d0": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "03_remote_cool_hot_d1": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "04_combined_hot_d1": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "05_p_only_dual_decoder_hot": {
+            "background": {
+              "completed": 1344,
+              "completed_output_tokens": 2688,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 1344,
+              "offered_output_tokens": 2688
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "06_control_b": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          }
+        },
+        "by_block": {
+          "00_control_a": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "01_remote_cool_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "02_combined_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "03_remote_cool_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "04_combined_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "05_p_only_dual_decoder_hot": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "06_control_b": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          }
+        },
+        "constrained_limit_decisions": 0,
+        "critical_guard_decisions": 0,
+        "cross_layer_actuated_decisions": 0,
+        "cross_layer_supported_decisions": 0,
+        "cross_layer_supported_fraction": 0.0,
+        "cross_layer_telemetry_available_decisions": 0,
+        "dispatch_stagger_decisions": 0,
+        "observer_signal_decision_counts": {},
+        "pair_activation_suppressed_decisions": 0,
+        "raw_files": [
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d0_measured/00_control_a.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d0_measured/01_remote_cool_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d0_measured/02_combined_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d0_measured/03_remote_cool_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d0_measured/04_combined_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d0_measured/05_p_only_dual_decoder_hot.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d0_measured/06_control_b.raw.json"
+        ],
+        "signal_decision_counts": {},
+        "victim_global_admits": 0,
+        "victim_global_decisions": 0,
+        "victim_global_rejects": 0
+      },
+      "index": 0,
+      "name": "00_fixed_local_d0",
+      "native_transport": true,
+      "observer": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/cojob/nccl_observer.json",
+      "observer_sha256": "92bd3eb9b2b42c595782db49b9af6393f12039dbb248e0c384b32e15f91eb59b",
+      "observers": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/cojob/nccl_observer.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/cojob-pair-1/nccl_observer.json"
+      ],
+      "regimes": {
+        "miss_hot": {
+          "completed": 120,
+          "e2e_p50_ms": 3188.924109,
+          "e2e_p99_ms": 10488.618293,
+          "edge_counts": {
+            "local:d0": 120
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 120,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 120
+          },
+          "slo_good": 76,
+          "tpot_p99_ms": 80.25709046456693,
+          "ttft_p99_ms": 540.229922
+        },
+        "normal": {
+          "completed": 60,
+          "e2e_p50_ms": 3011.442516,
+          "e2e_p99_ms": 21141.977078,
+          "edge_counts": {
+            "local:d0": 60
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 60,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 60
+          },
+          "slo_good": 30,
+          "tpot_p99_ms": 162.30827722047246,
+          "ttft_p99_ms": 1075.536703
+        },
+        "remote_favorable": {
+          "completed": 30,
+          "e2e_p50_ms": 26652.631752,
+          "e2e_p99_ms": 38485.01901,
+          "edge_counts": {
+            "local:d0": 30
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 30,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 30
+          },
+          "slo_good": 0,
+          "tpot_p99_ms": 214.7912137952756,
+          "ttft_p99_ms": 12960.042402
+        }
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/inference/result.json",
+      "result_sha256": "10d26e8e9e8e6eb48cc3a4a98246fb4a25c6d5295a1e23b0f302faf953ca828a",
+      "transport_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/cojob/native_transport_receipt.json",
+      "transport_receipt_sha256": "12534852e7e35aa1884ae70203100e97b07ba7303a9f74ecfe8d30560014f734",
+      "transport_receipts": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/cojob/native_transport_receipt.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/00_fixed_local_d0/cojob-pair-1/native_transport_receipt.json"
+      ]
+    },
+    {
+      "arm": "fixed_local_d1",
+      "block_execution_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/block_execution_receipt.json",
+      "block_execution_receipt_sha256": "5910c798d6dadbbeaa4eabb83c858beaa0a491d519a5b450e244ce4c4a36b600",
+      "cojob": {
+        "active_loop": null,
+        "blocks": 24,
+        "lmcache_transfer_p99_ms": 6044.916943,
+        "nccl_collective_p99_ms": 1.016704,
+        "nixl_timeout_lower_bound_ms": 60000.0,
+        "observer_sequence": 24
+      },
+      "cojob_failure": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/cojob/cojob_failure.json",
+      "cojob_failure_sha256": "0de96d7ebeaa7870152ab9db8c13f0cd678892e9f7f51cc116a1c71ad1f0ae78",
+      "cojob_outcome": "overload_timeout",
+      "cojob_outcome_valid": true,
+      "cojob_pair_count": 2,
+      "cojob_result": null,
+      "cojob_result_sha256": null,
+      "correct": true,
+      "decision_telemetry": {
+        "business_by_block": {
+          "00_control_a": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "01_remote_cool_hot_d0": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "02_combined_hot_d0": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "03_remote_cool_hot_d1": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "04_combined_hot_d1": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "05_p_only_dual_decoder_hot": {
+            "background": {
+              "completed": 1344,
+              "completed_output_tokens": 2688,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 1344,
+              "offered_output_tokens": 2688
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "06_control_b": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          }
+        },
+        "by_block": {
+          "00_control_a": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "01_remote_cool_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "02_combined_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "03_remote_cool_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "04_combined_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "05_p_only_dual_decoder_hot": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "06_control_b": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          }
+        },
+        "constrained_limit_decisions": 0,
+        "critical_guard_decisions": 0,
+        "cross_layer_actuated_decisions": 0,
+        "cross_layer_supported_decisions": 0,
+        "cross_layer_supported_fraction": 0.0,
+        "cross_layer_telemetry_available_decisions": 0,
+        "dispatch_stagger_decisions": 0,
+        "observer_signal_decision_counts": {},
+        "pair_activation_suppressed_decisions": 0,
+        "raw_files": [
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d1_measured/00_control_a.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d1_measured/01_remote_cool_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d1_measured/02_combined_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d1_measured/03_remote_cool_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d1_measured/04_combined_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d1_measured/05_p_only_dual_decoder_hot.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_local_d1_measured/06_control_b.raw.json"
+        ],
+        "signal_decision_counts": {},
+        "victim_global_admits": 0,
+        "victim_global_decisions": 0,
+        "victim_global_rejects": 0
+      },
+      "index": 1,
+      "name": "01_fixed_local_d1",
+      "native_transport": true,
+      "observer": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/cojob/nccl_observer.json",
+      "observer_sha256": "b7c96d05a3293a2851d0f2b2efa2011bd24a6508eccaf207b5642dfa8a6345c7",
+      "observers": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/cojob/nccl_observer.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/cojob-pair-1/nccl_observer.json"
+      ],
+      "regimes": {
+        "miss_hot": {
+          "completed": 120,
+          "e2e_p50_ms": 3620.559011,
+          "e2e_p99_ms": 56336.207983,
+          "edge_counts": {
+            "local:d1": 120
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 120,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 120
+          },
+          "slo_good": 67,
+          "tpot_p99_ms": 220.32417059055118,
+          "ttft_p99_ms": 52836.789114
+        },
+        "normal": {
+          "completed": 60,
+          "e2e_p50_ms": 3129.781444,
+          "e2e_p99_ms": 12809.48389,
+          "edge_counts": {
+            "local:d1": 60
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 60,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 60
+          },
+          "slo_good": 30,
+          "tpot_p99_ms": 96.72652738582677,
+          "ttft_p99_ms": 570.074701
+        },
+        "remote_favorable": {
+          "completed": 30,
+          "e2e_p50_ms": 26635.554846,
+          "e2e_p99_ms": 37962.67261,
+          "edge_counts": {
+            "local:d1": 30
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 30,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 30
+          },
+          "slo_good": 0,
+          "tpot_p99_ms": 211.50273675590552,
+          "ttft_p99_ms": 12679.033338
+        }
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/inference/result.json",
+      "result_sha256": "6d9be0a1a4111191df9d93336aef41626d858e33c9a926ab554e7c5625879cc7",
+      "transport_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/cojob/native_transport_receipt.json",
+      "transport_receipt_sha256": "0819724dc583812b6aaecbd0fea78c709ddf014f5afd432e0c014dbff22b983f",
+      "transport_receipts": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/cojob/native_transport_receipt.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/01_fixed_local_d1/cojob-pair-1/native_transport_receipt.json"
+      ]
+    },
+    {
+      "arm": "fixed_remote_p0d1",
+      "block_execution_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/block_execution_receipt.json",
+      "block_execution_receipt_sha256": "95eb8142404d9d3a2229a7c83db17e510fcef864e357522ab2a018f52a544b00",
+      "cojob": {
+        "active_loop": null,
+        "blocks": 25,
+        "lmcache_transfer_p99_ms": 6068.091404,
+        "nccl_collective_p99_ms": 1.287547,
+        "nixl_timeout_lower_bound_ms": 60000.0,
+        "observer_sequence": 25
+      },
+      "cojob_failure": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/cojob/cojob_failure.json",
+      "cojob_failure_sha256": "84bfc87ad1fabe522054f3cf00535a01a97c84dafd4fb74977bb4bbc03a9f30a",
+      "cojob_outcome": "overload_timeout",
+      "cojob_outcome_valid": true,
+      "cojob_pair_count": 2,
+      "cojob_result": null,
+      "cojob_result_sha256": null,
+      "correct": true,
+      "decision_telemetry": {
+        "business_by_block": {
+          "00_control_a": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "01_remote_cool_hot_d0": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "02_combined_hot_d0": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "03_remote_cool_hot_d1": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "04_combined_hot_d1": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "05_p_only_dual_decoder_hot": {
+            "background": {
+              "completed": 1344,
+              "completed_output_tokens": 2688,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 1344,
+              "offered_output_tokens": 2688
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "06_control_b": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          }
+        },
+        "by_block": {
+          "00_control_a": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "01_remote_cool_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "02_combined_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "03_remote_cool_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "04_combined_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "05_p_only_dual_decoder_hot": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "06_control_b": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          }
+        },
+        "constrained_limit_decisions": 0,
+        "critical_guard_decisions": 0,
+        "cross_layer_actuated_decisions": 0,
+        "cross_layer_supported_decisions": 0,
+        "cross_layer_supported_fraction": 0.0,
+        "cross_layer_telemetry_available_decisions": 0,
+        "dispatch_stagger_decisions": 0,
+        "observer_signal_decision_counts": {},
+        "pair_activation_suppressed_decisions": 0,
+        "raw_files": [
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p0d1_measured/00_control_a.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p0d1_measured/01_remote_cool_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p0d1_measured/02_combined_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p0d1_measured/03_remote_cool_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p0d1_measured/04_combined_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p0d1_measured/05_p_only_dual_decoder_hot.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p0d1_measured/06_control_b.raw.json"
+        ],
+        "signal_decision_counts": {},
+        "victim_global_admits": 0,
+        "victim_global_decisions": 0,
+        "victim_global_rejects": 0
+      },
+      "index": 2,
+      "name": "02_fixed_remote_p0d1",
+      "native_transport": true,
+      "observer": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/cojob/nccl_observer.json",
+      "observer_sha256": "995fbfeebda23def2a1b05ab165d83af23e93a42092407096bb76a34c93cbff8",
+      "observers": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/cojob/nccl_observer.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/cojob-pair-1/nccl_observer.json"
+      ],
+      "regimes": {
+        "miss_hot": {
+          "completed": 120,
+          "e2e_p50_ms": 6015.845558,
+          "e2e_p99_ms": 50932.065794,
+          "edge_counts": {
+            "remote:p0->d1": 120
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 120,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 120
+          },
+          "slo_good": 69,
+          "tpot_p99_ms": 60.76464310236221,
+          "ttft_p99_ms": 45884.974008
+        },
+        "normal": {
+          "completed": 60,
+          "e2e_p50_ms": 3346.633461,
+          "e2e_p99_ms": 26015.839104,
+          "edge_counts": {
+            "remote:p0->d1": 60
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 60,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 60
+          },
+          "slo_good": 30,
+          "tpot_p99_ms": 64.37439082677166,
+          "ttft_p99_ms": 18394.109193
+        },
+        "remote_favorable": {
+          "completed": 30,
+          "e2e_p50_ms": 26729.163886,
+          "e2e_p99_ms": 37354.631581,
+          "edge_counts": {
+            "remote:p0->d1": 30
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 30,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 30
+          },
+          "slo_good": 0,
+          "tpot_p99_ms": 268.7963540708662,
+          "ttft_p99_ms": 3292.894712
+        }
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/inference/result.json",
+      "result_sha256": "5bd11bc899a430809b8bd85a33644e4820903e6b4814434034a2047ccdfd61f6",
+      "transport_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/cojob/native_transport_receipt.json",
+      "transport_receipt_sha256": "9baa75aa49540078d8bd88a8a226d7b77de0d16dce95d684b0680117ac87ad79",
+      "transport_receipts": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/cojob/native_transport_receipt.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/02_fixed_remote_p0d1/cojob-pair-1/native_transport_receipt.json"
+      ]
+    },
+    {
+      "arm": "fixed_remote_p1d0",
+      "block_execution_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/block_execution_receipt.json",
+      "block_execution_receipt_sha256": "917bbeba4b53c7d7c2a03eb88f53aefe1df07b99d8689968b42aa47354dc77fa",
+      "cojob": {
+        "active_loop": null,
+        "blocks": 19,
+        "lmcache_transfer_p99_ms": 6116.868901,
+        "nccl_collective_p99_ms": 1.025451,
+        "nixl_timeout_lower_bound_ms": 60000.0,
+        "observer_sequence": 19
+      },
+      "cojob_failure": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/cojob/cojob_failure.json",
+      "cojob_failure_sha256": "76d6008fa39c1d05c060c13be81d6bf3a6928c2b67ac20ad5c610eece24d89da",
+      "cojob_outcome": "overload_timeout",
+      "cojob_outcome_valid": true,
+      "cojob_pair_count": 2,
+      "cojob_result": null,
+      "cojob_result_sha256": null,
+      "correct": true,
+      "decision_telemetry": {
+        "business_by_block": {
+          "00_control_a": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "01_remote_cool_hot_d0": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "02_combined_hot_d0": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "03_remote_cool_hot_d1": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "04_combined_hot_d1": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "05_p_only_dual_decoder_hot": {
+            "background": {
+              "completed": 1344,
+              "completed_output_tokens": 2688,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 1344,
+              "offered_output_tokens": 2688
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "06_control_b": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          }
+        },
+        "by_block": {
+          "00_control_a": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "01_remote_cool_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "02_combined_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "03_remote_cool_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "04_combined_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "05_p_only_dual_decoder_hot": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "06_control_b": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          }
+        },
+        "constrained_limit_decisions": 0,
+        "critical_guard_decisions": 0,
+        "cross_layer_actuated_decisions": 0,
+        "cross_layer_supported_decisions": 0,
+        "cross_layer_supported_fraction": 0.0,
+        "cross_layer_telemetry_available_decisions": 0,
+        "dispatch_stagger_decisions": 0,
+        "observer_signal_decision_counts": {},
+        "pair_activation_suppressed_decisions": 0,
+        "raw_files": [
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p1d0_measured/00_control_a.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p1d0_measured/01_remote_cool_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p1d0_measured/02_combined_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p1d0_measured/03_remote_cool_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p1d0_measured/04_combined_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p1d0_measured/05_p_only_dual_decoder_hot.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/inference/tempo_go_c8_dual_regime/c8_dual_fixed_remote_p1d0_measured/06_control_b.raw.json"
+        ],
+        "signal_decision_counts": {},
+        "victim_global_admits": 0,
+        "victim_global_decisions": 0,
+        "victim_global_rejects": 0
+      },
+      "index": 3,
+      "name": "03_fixed_remote_p1d0",
+      "native_transport": true,
+      "observer": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/cojob/nccl_observer.json",
+      "observer_sha256": "315b0997f19195d1793e3e274b06f9ed8880b56103e1493d571808820aa829ce",
+      "observers": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/cojob/nccl_observer.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/cojob-pair-1/nccl_observer.json"
+      ],
+      "regimes": {
+        "miss_hot": {
+          "completed": 120,
+          "e2e_p50_ms": 16427.450165,
+          "e2e_p99_ms": 76469.119908,
+          "edge_counts": {
+            "remote:p1->d0": 120
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 120,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 120
+          },
+          "slo_good": 24,
+          "tpot_p99_ms": 57.14052937795275,
+          "ttft_p99_ms": 73500.285845
+        },
+        "normal": {
+          "completed": 60,
+          "e2e_p50_ms": 3294.560411,
+          "e2e_p99_ms": 26141.109079,
+          "edge_counts": {
+            "remote:p1->d0": 60
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 60,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 60
+          },
+          "slo_good": 34,
+          "tpot_p99_ms": 184.00713538582676,
+          "ttft_p99_ms": 19499.863723
+        },
+        "remote_favorable": {
+          "completed": 30,
+          "e2e_p50_ms": 26725.418179,
+          "e2e_p99_ms": 37725.315938,
+          "edge_counts": {
+            "remote:p1->d0": 30
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 30,
+          "route_counts": {
+            "official_lmcache_remote_prefill": 30
+          },
+          "slo_good": 0,
+          "tpot_p99_ms": 271.9227781259842,
+          "ttft_p99_ms": 3214.452635
+        }
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/inference/result.json",
+      "result_sha256": "c1b076792c89aff41ca915da4385d37cd6a8319840f86c6ac7f5d7ddabd759d5",
+      "transport_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/cojob/native_transport_receipt.json",
+      "transport_receipt_sha256": "13065a8aa2315393a9486729fc7c3b4e405bd13f4f3bea39f4029621940ca170",
+      "transport_receipts": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/cojob/native_transport_receipt.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/03_fixed_remote_p1d0/cojob-pair-1/native_transport_receipt.json"
+      ]
+    },
+    {
+      "arm": "predictor",
+      "block_execution_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/block_execution_receipt.json",
+      "block_execution_receipt_sha256": "94f94e30607b63c36f178252c0a1b24e16771fb5e01b69b4ba11e77cdfda72e1",
+      "cojob": {
+        "active_loop": null,
+        "blocks": 18,
+        "lmcache_transfer_p99_ms": 63458.507662,
+        "nccl_collective_p99_ms": 36.95238,
+        "nixl_timeout_lower_bound_ms": 60000.0,
+        "observer_sequence": 18
+      },
+      "cojob_failure": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/cojob/cojob_failure.json",
+      "cojob_failure_sha256": "6366268b55b95b14dc9f5c70a9b86cff62106a091f67ff9ddfbf178523ee502b",
+      "cojob_outcome": "overload_timeout",
+      "cojob_outcome_valid": true,
+      "cojob_pair_count": 2,
+      "cojob_result": null,
+      "cojob_result_sha256": null,
+      "correct": true,
+      "decision_telemetry": {
+        "business_by_block": {
+          "00_control_a": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "01_remote_cool_hot_d0": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "02_combined_hot_d0": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "03_remote_cool_hot_d1": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "04_combined_hot_d1": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "05_p_only_dual_decoder_hot": {
+            "background": {
+              "completed": 1344,
+              "completed_output_tokens": 2688,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 1344,
+              "offered_output_tokens": 2688
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "06_control_b": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          }
+        },
+        "by_block": {
+          "00_control_a": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "01_remote_cool_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "02_combined_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "03_remote_cool_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "04_combined_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "05_p_only_dual_decoder_hot": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "06_control_b": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          }
+        },
+        "constrained_limit_decisions": 0,
+        "critical_guard_decisions": 0,
+        "cross_layer_actuated_decisions": 0,
+        "cross_layer_supported_decisions": 0,
+        "cross_layer_supported_fraction": 0.0,
+        "cross_layer_telemetry_available_decisions": 0,
+        "dispatch_stagger_decisions": 0,
+        "observer_signal_decision_counts": {},
+        "pair_activation_suppressed_decisions": 0,
+        "raw_files": [
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/inference/tempo_go_c8_dual_regime/c8_dual_predictor_measured/00_control_a.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/inference/tempo_go_c8_dual_regime/c8_dual_predictor_measured/01_remote_cool_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/inference/tempo_go_c8_dual_regime/c8_dual_predictor_measured/02_combined_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/inference/tempo_go_c8_dual_regime/c8_dual_predictor_measured/03_remote_cool_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/inference/tempo_go_c8_dual_regime/c8_dual_predictor_measured/04_combined_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/inference/tempo_go_c8_dual_regime/c8_dual_predictor_measured/05_p_only_dual_decoder_hot.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/inference/tempo_go_c8_dual_regime/c8_dual_predictor_measured/06_control_b.raw.json"
+        ],
+        "signal_decision_counts": {},
+        "victim_global_admits": 0,
+        "victim_global_decisions": 0,
+        "victim_global_rejects": 0
+      },
+      "index": 4,
+      "name": "04_predictor",
+      "native_transport": true,
+      "observer": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/cojob/nccl_observer.json",
+      "observer_sha256": "47bcdc7049f6b39d5290a5448e0bfe9304a1842f39897769477e993e356d4b63",
+      "observers": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/cojob/nccl_observer.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/cojob-pair-1/nccl_observer.json"
+      ],
+      "regimes": {
+        "miss_hot": {
+          "completed": 120,
+          "e2e_p50_ms": 3496.709425,
+          "e2e_p99_ms": 37904.849516,
+          "edge_counts": {
+            "local:d0": 60,
+            "local:d1": 60
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 120,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 120
+          },
+          "slo_good": 83,
+          "tpot_p99_ms": 182.82829936220472,
+          "ttft_p99_ms": 35279.680565
+        },
+        "normal": {
+          "completed": 60,
+          "e2e_p50_ms": 2979.562488,
+          "e2e_p99_ms": 29948.644412,
+          "edge_counts": {
+            "local:d0": 30,
+            "local:d1": 30
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 60,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 60
+          },
+          "slo_good": 31,
+          "tpot_p99_ms": 233.52156684251966,
+          "ttft_p99_ms": 534.102394
+        },
+        "remote_favorable": {
+          "completed": 30,
+          "e2e_p50_ms": 40916.653327,
+          "e2e_p99_ms": 51061.850839,
+          "edge_counts": {
+            "local:d0": 15,
+            "local:d1": 15
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 30,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 30
+          },
+          "slo_good": 13,
+          "tpot_p99_ms": 385.95634146456695,
+          "ttft_p99_ms": 9570.95422
+        }
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/inference/result.json",
+      "result_sha256": "0956cf385f5b15d1fb3de6ae6e9bc195b77cd2010ee20bdb62ca4ea7c4c33ed6",
+      "transport_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/cojob/native_transport_receipt.json",
+      "transport_receipt_sha256": "c099712a3b52d5c12b9af51cccd82069b7385614b859975aa353be62511810b0",
+      "transport_receipts": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/cojob/native_transport_receipt.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/04_predictor/cojob-pair-1/native_transport_receipt.json"
+      ]
+    },
+    {
+      "arm": "queue_gpu",
+      "block_execution_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/block_execution_receipt.json",
+      "block_execution_receipt_sha256": "447806528b77325afb3372a7b083eb333133849e77c6f0af0e9d4c2ac55f0aad",
+      "cojob": {
+        "active_loop": null,
+        "blocks": 19,
+        "lmcache_transfer_p99_ms": 9597.683159,
+        "nccl_collective_p99_ms": 34.228165,
+        "nixl_timeout_lower_bound_ms": 60000.0,
+        "observer_sequence": 19
+      },
+      "cojob_failure": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/cojob/cojob_failure.json",
+      "cojob_failure_sha256": "245ecc861e9e64259ae530da8b5676f224fbd8dbca50f7eecc6d8558e0a6885e",
+      "cojob_outcome": "overload_timeout",
+      "cojob_outcome_valid": true,
+      "cojob_pair_count": 2,
+      "cojob_result": null,
+      "cojob_result_sha256": null,
+      "correct": true,
+      "decision_telemetry": {
+        "business_by_block": {
+          "00_control_a": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "01_remote_cool_hot_d0": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "02_combined_hot_d0": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "03_remote_cool_hot_d1": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 468,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "04_combined_hot_d1": {
+            "background": {
+              "completed": 468,
+              "completed_output_tokens": 936,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "05_p_only_dual_decoder_hot": {
+            "background": {
+              "completed": 1344,
+              "completed_output_tokens": 2688,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 1344,
+              "offered_output_tokens": 2688
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "06_control_b": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          }
+        },
+        "by_block": {
+          "00_control_a": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "01_remote_cool_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "02_combined_hot_d0": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "03_remote_cool_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "04_combined_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "05_p_only_dual_decoder_hot": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          },
+          "06_control_b": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 0
+          }
+        },
+        "constrained_limit_decisions": 0,
+        "critical_guard_decisions": 0,
+        "cross_layer_actuated_decisions": 0,
+        "cross_layer_supported_decisions": 0,
+        "cross_layer_supported_fraction": 0.0,
+        "cross_layer_telemetry_available_decisions": 0,
+        "dispatch_stagger_decisions": 0,
+        "observer_signal_decision_counts": {},
+        "pair_activation_suppressed_decisions": 0,
+        "raw_files": [
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/inference/tempo_go_c8_dual_regime/c8_dual_queue_gpu_measured/00_control_a.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/inference/tempo_go_c8_dual_regime/c8_dual_queue_gpu_measured/01_remote_cool_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/inference/tempo_go_c8_dual_regime/c8_dual_queue_gpu_measured/02_combined_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/inference/tempo_go_c8_dual_regime/c8_dual_queue_gpu_measured/03_remote_cool_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/inference/tempo_go_c8_dual_regime/c8_dual_queue_gpu_measured/04_combined_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/inference/tempo_go_c8_dual_regime/c8_dual_queue_gpu_measured/05_p_only_dual_decoder_hot.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/inference/tempo_go_c8_dual_regime/c8_dual_queue_gpu_measured/06_control_b.raw.json"
+        ],
+        "signal_decision_counts": {},
+        "victim_global_admits": 0,
+        "victim_global_decisions": 0,
+        "victim_global_rejects": 0
+      },
+      "index": 5,
+      "name": "05_queue_gpu",
+      "native_transport": true,
+      "observer": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/cojob/nccl_observer.json",
+      "observer_sha256": "42ef9bd5fae6410f42b8eee74e944bbd31e2ff033105ce195b3ab21212c231c2",
+      "observers": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/cojob/nccl_observer.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/cojob-pair-1/nccl_observer.json"
+      ],
+      "regimes": {
+        "miss_hot": {
+          "completed": 120,
+          "e2e_p50_ms": 7569.266206,
+          "e2e_p99_ms": 55189.408795,
+          "edge_counts": {
+            "local:d0": 70,
+            "local:d1": 50
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 120,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 120
+          },
+          "slo_good": 74,
+          "tpot_p99_ms": 233.0659967401575,
+          "ttft_p99_ms": 51187.418317
+        },
+        "normal": {
+          "completed": 60,
+          "e2e_p50_ms": 2973.072747,
+          "e2e_p99_ms": 18292.687973,
+          "edge_counts": {
+            "local:d0": 29,
+            "local:d1": 31
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 60,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 60
+          },
+          "slo_good": 32,
+          "tpot_p99_ms": 137.26305757480316,
+          "ttft_p99_ms": 1085.543369
+        },
+        "remote_favorable": {
+          "completed": 30,
+          "e2e_p50_ms": 40225.227423,
+          "e2e_p99_ms": 54060.240219,
+          "edge_counts": {
+            "local:d0": 7,
+            "local:d1": 3,
+            "remote:p0->d0": 10,
+            "remote:p1->d1": 10
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 30,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 10,
+            "official_lmcache_remote_prefill": 20
+          },
+          "slo_good": 11,
+          "tpot_p99_ms": 418.1404384173228,
+          "ttft_p99_ms": 5211.974265
+        }
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/inference/result.json",
+      "result_sha256": "42163b3417020ecbb802ffdfe59f07d03dd29ea124b7f9240ad59ab645dcb0f2",
+      "transport_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/cojob/native_transport_receipt.json",
+      "transport_receipt_sha256": "616bdf029b9d45e86b51931efed02f7cdce44bc609d1d6aad44be2bd35c2b82a",
+      "transport_receipts": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/cojob/native_transport_receipt.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/05_queue_gpu/cojob-pair-1/native_transport_receipt.json"
+      ]
+    },
+    {
+      "arm": "full_c7_managed_background",
+      "block_execution_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/block_execution_receipt.json",
+      "block_execution_receipt_sha256": "7d1bea712cd760445094993ca2582e448ad1b4ee7c4b2f9e81581f9712fe1f82",
+      "cojob": {
+        "active_loop": null,
+        "blocks": 40,
+        "lmcache_transfer_p99_ms": 6148.143762,
+        "nccl_collective_p99_ms": 1.02016,
+        "nixl_timeout_lower_bound_ms": 60000.0,
+        "observer_sequence": 40
+      },
+      "cojob_failure": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/cojob/cojob_failure.json",
+      "cojob_failure_sha256": "2e75fe15495abe4659d57b912c0c985510350c392a911ffa0a99ed0bc396462c",
+      "cojob_outcome": "overload_timeout",
+      "cojob_outcome_valid": true,
+      "cojob_pair_count": 2,
+      "cojob_result": null,
+      "cojob_result_sha256": null,
+      "correct": true,
+      "decision_telemetry": {
+        "business_by_block": {
+          "00_control_a": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "01_remote_cool_hot_d0": {
+            "background": {
+              "completed": 166,
+              "completed_output_tokens": 312,
+              "failures": 0,
+              "global_rejects": 68,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "02_combined_hot_d0": {
+            "background": {
+              "completed": 208,
+              "completed_output_tokens": 380,
+              "failures": 0,
+              "global_rejects": 260,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "03_remote_cool_hot_d1": {
+            "background": {
+              "completed": 234,
+              "completed_output_tokens": 362,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 234,
+              "offered_output_tokens": 468
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "04_combined_hot_d1": {
+            "background": {
+              "completed": 177,
+              "completed_output_tokens": 284,
+              "failures": 0,
+              "global_rejects": 291,
+              "offered": 468,
+              "offered_output_tokens": 936
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "05_p_only_dual_decoder_hot": {
+            "background": {
+              "completed": 1344,
+              "completed_output_tokens": 2688,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 1344,
+              "offered_output_tokens": 2688
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          },
+          "06_control_b": {
+            "background": {
+              "completed": 0,
+              "completed_output_tokens": 0,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 0,
+              "offered_output_tokens": 0
+            },
+            "foreground": {
+              "completed": 30,
+              "completed_output_tokens": 3840,
+              "failures": 0,
+              "global_rejects": 0,
+              "offered": 30,
+              "offered_output_tokens": 3840
+            }
+          }
+        },
+        "by_block": {
+          "00_control_a": {
+            "observer_actuated_decisions": 9,
+            "observer_supported_decisions": 9,
+            "victim_global_decisions": 30
+          },
+          "01_remote_cool_hot_d0": {
+            "observer_actuated_decisions": 30,
+            "observer_supported_decisions": 30,
+            "victim_global_decisions": 30
+          },
+          "02_combined_hot_d0": {
+            "observer_actuated_decisions": 30,
+            "observer_supported_decisions": 30,
+            "victim_global_decisions": 30
+          },
+          "03_remote_cool_hot_d1": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 30
+          },
+          "04_combined_hot_d1": {
+            "observer_actuated_decisions": 29,
+            "observer_supported_decisions": 29,
+            "victim_global_decisions": 30
+          },
+          "05_p_only_dual_decoder_hot": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 30
+          },
+          "06_control_b": {
+            "observer_actuated_decisions": 0,
+            "observer_supported_decisions": 0,
+            "victim_global_decisions": 30
+          }
+        },
+        "constrained_limit_decisions": 0,
+        "critical_guard_decisions": 0,
+        "cross_layer_actuated_decisions": 98,
+        "cross_layer_supported_decisions": 98,
+        "cross_layer_supported_fraction": 0.4666666666666667,
+        "cross_layer_telemetry_available_decisions": 210,
+        "dispatch_stagger_decisions": 0,
+        "observer_signal_decision_counts": {
+          "lmcache_transfer_p99_ms": 98,
+          "nccl_collective_p99_ms": 98
+        },
+        "pair_activation_suppressed_decisions": 0,
+        "raw_files": [
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/inference/tempo_go_c8_dual_regime/c8_dual_full_c7_managed_background_measured/00_control_a.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/inference/tempo_go_c8_dual_regime/c8_dual_full_c7_managed_background_measured/01_remote_cool_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/inference/tempo_go_c8_dual_regime/c8_dual_full_c7_managed_background_measured/02_combined_hot_d0.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/inference/tempo_go_c8_dual_regime/c8_dual_full_c7_managed_background_measured/03_remote_cool_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/inference/tempo_go_c8_dual_regime/c8_dual_full_c7_managed_background_measured/04_combined_hot_d1.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/inference/tempo_go_c8_dual_regime/c8_dual_full_c7_managed_background_measured/05_p_only_dual_decoder_hot.raw.json",
+          "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/inference/tempo_go_c8_dual_regime/c8_dual_full_c7_managed_background_measured/06_control_b.raw.json"
+        ],
+        "signal_decision_counts": {
+          "cassini_by_nic_pause_fraction_max": 31,
+          "cassini_ecn_fraction_max": 203,
+          "cassini_host_posted_cycles_per_packet_max": 203,
+          "cassini_retries": 203,
+          "cassini_rx_pause_fraction_max": 203,
+          "cassini_timeouts": 203,
+          "cassini_tx_pause_fraction_max": 203,
+          "lmcache_remote_kv_bytes_inflight": 210,
+          "lmcache_remote_semantic_ops_inflight": 210,
+          "lmcache_transfer_p99_ms": 98,
+          "nccl_collective_p99_ms": 98
+        },
+        "victim_global_admits": 210,
+        "victim_global_decisions": 210,
+        "victim_global_rejects": 0
+      },
+      "index": 6,
+      "name": "06_candidate_l",
+      "native_transport": true,
+      "observer": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/cojob/nccl_observer.json",
+      "observer_sha256": "be56a22da3fbf453a6adfadeb899ee540147e1d7d4c226042ae5599436f65b49",
+      "observers": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/cojob/nccl_observer.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/cojob-pair-1/nccl_observer.json"
+      ],
+      "regimes": {
+        "miss_hot": {
+          "completed": 120,
+          "e2e_p50_ms": 10833.118838,
+          "e2e_p99_ms": 21139.362159,
+          "edge_counts": {
+            "local:d0": 89,
+            "local:d1": 24,
+            "remote:p1->d1": 7
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 120,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 113,
+            "official_lmcache_remote_prefill": 7
+          },
+          "slo_good": 8,
+          "tpot_p99_ms": 161.08023276377952,
+          "ttft_p99_ms": 1097.924344
+        },
+        "normal": {
+          "completed": 60,
+          "e2e_p50_ms": 3072.33057,
+          "e2e_p99_ms": 25751.595473,
+          "edge_counts": {
+            "local:d0": 27,
+            "local:d1": 33
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 60,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 60
+          },
+          "slo_good": 31,
+          "tpot_p99_ms": 201.1356532992126,
+          "ttft_p99_ms": 1112.470138
+        },
+        "remote_favorable": {
+          "completed": 30,
+          "e2e_p50_ms": 3064.46649,
+          "e2e_p99_ms": 3213.544993,
+          "edge_counts": {
+            "local:d1": 5,
+            "remote:p0->d0": 24,
+            "remote:p0->d1": 1
+          },
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 30,
+          "route_counts": {
+            "decoder_local_chunked_prefill": 5,
+            "official_lmcache_remote_prefill": 25
+          },
+          "slo_good": 30,
+          "tpot_p99_ms": 23.20342672440945,
+          "ttft_p99_ms": 441.379243
+        }
+      },
+      "result": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/inference/result.json",
+      "result_sha256": "26a8caca5a493e12d3eda4ae90c4b23bb0831a9c351e391a76c541c4553988cd",
+      "transport_receipt": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/cojob/native_transport_receipt.json",
+      "transport_receipt_sha256": "ea0750c2ba133a3773127aa90e7303b217e4edb7a6559e4118130b42384c8913",
+      "transport_receipts": [
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/cojob/native_transport_receipt.json",
+        "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228/06_candidate_l/cojob-pair-1/native_transport_receipt.json"
+      ]
+    }
+  ],
+  "business": {
+    "baselines": {
+      "fixed_local_d0": {
+        "background": {
+          "completed": 2748,
+          "completed_output_tokens": 5496,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 2748,
+          "offered_output_tokens": 5496
+        },
+        "foreground": {
+          "completed": 210,
+          "completed_output_tokens": 26880,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 210,
+          "offered_output_tokens": 26880
+        }
+      },
+      "fixed_local_d1": {
+        "background": {
+          "completed": 2748,
+          "completed_output_tokens": 5496,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 2748,
+          "offered_output_tokens": 5496
+        },
+        "foreground": {
+          "completed": 210,
+          "completed_output_tokens": 26880,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 210,
+          "offered_output_tokens": 26880
+        }
+      },
+      "fixed_remote_p0d1": {
+        "background": {
+          "completed": 2748,
+          "completed_output_tokens": 5496,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 2748,
+          "offered_output_tokens": 5496
+        },
+        "foreground": {
+          "completed": 210,
+          "completed_output_tokens": 26880,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 210,
+          "offered_output_tokens": 26880
+        }
+      },
+      "fixed_remote_p1d0": {
+        "background": {
+          "completed": 2748,
+          "completed_output_tokens": 5496,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 2748,
+          "offered_output_tokens": 5496
+        },
+        "foreground": {
+          "completed": 210,
+          "completed_output_tokens": 26880,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 210,
+          "offered_output_tokens": 26880
+        }
+      },
+      "predictor": {
+        "background": {
+          "completed": 2748,
+          "completed_output_tokens": 5496,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 2748,
+          "offered_output_tokens": 5496
+        },
+        "foreground": {
+          "completed": 210,
+          "completed_output_tokens": 26880,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 210,
+          "offered_output_tokens": 26880
+        }
+      }
+    },
+    "full_tempo": {
+      "background": {
+        "completed": 2129,
+        "completed_output_tokens": 4026,
+        "completion_fraction": 0.774745269286754,
+        "failures": 0,
+        "global_rejects": 619,
+        "offered": 2748,
+        "offered_output_tokens": 5496
+      },
+      "foreground": {
+        "completed": 210,
+        "completed_output_tokens": 26880,
+        "completion_fraction": 1.0,
+        "failures": 0,
+        "global_rejects": 0,
+        "offered": 210,
+        "offered_output_tokens": 26880
+      }
+    }
+  },
+  "causal_discovery_positive": false,
+  "claim_boundary": {
+    "discovery_only": true,
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "reason": "The same native burst is compared across fixed, predictor, queue-GPU, and dual-route TEMPO arms; this remains discovery until all population gates pass on a fresh allocation."
+  },
+  "comparison_baselines": {
+    "best_fixed_arm_by_regime": {
+      "miss_hot": "fixed_local_d0",
+      "normal": "fixed_local_d1",
+      "remote_favorable": "fixed_remote_p0d1"
+    },
+    "fixed_arms": [
+      "fixed_local_d0",
+      "fixed_local_d1",
+      "fixed_remote_p0d1",
+      "fixed_remote_p1d0"
+    ],
+    "predictor_arm": "predictor"
+  },
+  "contract": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_dual_route_business_lane_v13/tempo_go_c9_dual_route_business_lane_population_contract.json",
+  "contract_sha256": "989a09e0f005967ec5f1ff1ec17b9244b5dee0b5e39f04d0b479a8e5c1de8a69",
+  "effects": {
+    "vs_best_fixed": {
+      "miss_hot": {
+        "blind_slo_good_fraction": 0.6333333333333333,
+        "full_minus_blind_p50_fraction": 2.39710776039669,
+        "full_p99_reduction_fraction": -1.015457286028628,
+        "full_slo_good_fraction": 0.06666666666666667,
+        "full_slo_good_ratio": 0.10526315789473685
+      },
+      "normal": {
+        "blind_slo_good_fraction": 0.5,
+        "full_minus_blind_p50_fraction": -0.018356193564294167,
+        "full_p99_reduction_fraction": -1.0103538670362466,
+        "full_slo_good_fraction": 0.5166666666666667,
+        "full_slo_good_ratio": 1.0333333333333334
+      },
+      "remote_favorable": {
+        "blind_slo_good_fraction": 0.0,
+        "full_minus_blind_p50_fraction": -0.8853512027884612,
+        "full_p99_reduction_fraction": 0.9139719799931172,
+        "full_slo_good_fraction": 1.0,
+        "full_slo_good_ratio": 1000000000.0
+      }
+    },
+    "vs_predictor": {
+      "miss_hot": {
+        "blind_slo_good_fraction": 0.6916666666666667,
+        "full_minus_blind_p50_fraction": 2.098089523981536,
+        "full_p99_reduction_fraction": 0.44230454865473423,
+        "full_slo_good_fraction": 0.06666666666666667,
+        "full_slo_good_ratio": 0.0963855421686747
+      },
+      "normal": {
+        "blind_slo_good_fraction": 0.5166666666666667,
+        "full_minus_blind_p50_fraction": 0.031134799949193093,
+        "full_p99_reduction_fraction": 0.14014153299433818,
+        "full_slo_good_fraction": 0.5166666666666667,
+        "full_slo_good_ratio": 1.0
+      },
+      "remote_favorable": {
+        "blind_slo_good_fraction": 0.43333333333333335,
+        "full_minus_blind_p50_fraction": -0.9251046642180331,
+        "full_p99_reduction_fraction": 0.9370656382368036,
+        "full_slo_good_fraction": 1.0,
+        "full_slo_good_ratio": 2.3076923076923075
+      }
+    }
+  },
+  "gates": {
+    "baseline_cross_layer_blind": true,
+    "correctness": true,
+    "fixed_baseline_present": true,
+    "full_cross_layer_actuation": true,
+    "full_observer_supported": false,
+    "native_transport": true,
+    "normal_p50_regression_bounded": false,
+    "predictor_baseline_present": true,
+    "same_population": true,
+    "stressed_p99_reduction_vs_best_fixed": false,
+    "stressed_p99_reduction_vs_predictor": true,
+    "stressed_slo_not_lower_vs_best_fixed": false,
+    "stressed_slo_not_lower_vs_predictor": false
+  },
+  "root": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_causal_burst_job_57730228",
+  "schema": "tempo-go-c9-causal-burst-analysis-v1",
+  "telemetry": {
+    "baseline_cross_layer_supported_decisions": 0,
+    "full_cross_layer_actuation_observed": true,
+    "full_cross_layer_supported_decisions": 98,
+    "full_cross_layer_supported_fraction": 0.4666666666666667,
+    "full_victim_global_decisions": 210,
+    "observer_support_scope": "all_victim_global_decisions"
+  }
+}

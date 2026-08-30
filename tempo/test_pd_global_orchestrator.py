@@ -16,6 +16,7 @@ from tempo.pd_global_orchestrator import (
     RouteCandidate,
     RejectedCandidate,
     TenantPolicy,
+    global_decision_dict,
     global_failure_dict,
     global_failure_fingerprint,
     global_service_lane_queue_promotion_dict,
@@ -204,6 +205,158 @@ def test_missing_or_stale_telemetry_fails_closed_to_queue() -> None:
     assert late.kind is GlobalDecisionKind.QUEUE
 
 
+def test_protected_service_lane_reserves_decoder_and_endpoint_slots() -> None:
+    value = controller(
+        tenants=(
+            TenantPolicy("latency", 2.0, admission_priority=100),
+            TenantPolicy("batch", 1.0, admission_priority=0),
+        ),
+        mesh_control_mode="receiver_credit_pxd_v1",
+        protected_service_lane_mode="tenant_pair_edge_reservation_v1",
+        protected_service_lane_capacity=1,
+        protected_service_lane_min_admission_priority=100,
+    )
+    seed(value)
+
+    background = value.submit(request(
+        "lane-background-0", "batch",
+        (candidate(0, GlobalRoute.LOCAL, e2e=20),),
+    ), now_ns=10)
+    assert background.kind is GlobalDecisionKind.ADMIT
+
+    blocked = value.submit(request(
+        "lane-background-1", "batch",
+        (candidate(0, GlobalRoute.LOCAL, e2e=20),),
+    ), now_ns=11)
+    assert blocked.kind is GlobalDecisionKind.QUEUE
+    assert any(
+        item.reason == "protected_service_lane_reserve"
+        for item in blocked.rejected_candidates
+    )
+
+    protected = value.submit(request(
+        "lane-protected-0", "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=20),),
+    ), now_ns=12)
+    assert protected.kind is GlobalDecisionKind.ADMIT
+    assert protected.protected_service_lane is True
+    assert protected.protected_service_lane_key == "local:d0"
+    assert protected.protected_service_lane_before == 0
+    assert protected.protected_service_lane_after == 1
+    assert "global_protected_service_lane_reservation_v1" in (
+        protected.binding_resources)
+    snapshot = value.snapshot(now_ns=12)
+    assert snapshot["protected_service_lane_debt"]["local:d0"] == 1
+
+
+def test_protected_service_lane_v2_is_reserve_not_protected_ceiling() -> None:
+    value = controller(
+        tenants=(
+            TenantPolicy("latency", 2.0, admission_priority=100),
+            TenantPolicy("batch", 1.0, admission_priority=0),
+        ),
+        mesh_control_mode="receiver_credit_pxd_v1",
+        protected_service_lane_mode="tenant_pair_edge_reservation_v2",
+        protected_service_lane_capacity=1,
+        protected_service_lane_min_admission_priority=100,
+    )
+    seed(value)
+
+    first = value.submit(request(
+        "reserve-protected-0", "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=20),),
+    ), now_ns=10)
+    assert first.kind is GlobalDecisionKind.ADMIT
+
+    # The physical pair has two slots.  v2 must allow protected work to use
+    # the second slot even though the protected reserve is only one slot.
+    second = value.submit(request(
+        "reserve-protected-1", "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=20),),
+    ), now_ns=11)
+    assert second.kind is GlobalDecisionKind.ADMIT
+    assert second.protected_service_lane is True
+    assert second.protected_service_lane_before == 1
+    assert second.protected_service_lane_after == 2
+
+    # Lower-priority work still cannot consume the reserved slot once both
+    # physical slots are busy.
+    blocked = value.submit(request(
+        "reserve-background-0", "batch",
+        (candidate(0, GlobalRoute.LOCAL, e2e=20),),
+    ), now_ns=12)
+    assert blocked.kind is GlobalDecisionKind.QUEUE
+    assert any(
+        item.reason in {"capacity", "protected_service_lane_reserve"}
+        for item in blocked.rejected_candidates
+    )
+
+
+def test_protected_service_lane_queue_promotion_does_not_double_count_owned_request() -> None:
+    value = controller(
+        tenants=(
+            TenantPolicy(
+                "latency", 2.0, admission_priority=100,
+                queue_lease_on_timeout=True,
+            ),
+            TenantPolicy("batch", 1.0),
+        ),
+        mesh_control_mode="receiver_credit_pxd_v1",
+        protected_service_lane_mode="tenant_pair_edge_reservation_v1",
+        protected_service_lane_capacity=1,
+        protected_service_lane_min_admission_priority=100,
+        overload_action="endpoint_queue_lease",
+        endpoint_queue_debt_mode="completion_credit_mesh_endpoint_queue_v1",
+    )
+    value.update_telemetry(telemetry(
+        0, scheduler_running=0, scheduler_waiting=0,
+        scheduler_kv=0.0, completion_residual=0, completion_completed=1,
+    ))
+    value.update_telemetry(telemetry(
+        1, scheduler_running=0, scheduler_waiting=0,
+        scheduler_kv=0.0, completion_residual=0,
+    ))
+    request_id = "protected-queue-promotion"
+    admitted = value.submit(request(
+        request_id, "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=20),),
+    ), now_ns=10)
+    assert admitted.kind is GlobalDecisionKind.ADMIT
+    assert admitted.protected_service_lane is True
+
+    promoted = value.promote_service_lane_queue_lease(
+        request_id, now_ns=11)
+    assert promoted.receipt.status == "promoted"
+    assert promoted.decision is not None
+
+
+def test_protected_service_lane_is_edge_scoped_for_remote_mesh() -> None:
+    value = controller(
+        tenants=(
+            TenantPolicy("latency", 2.0, admission_priority=100),
+            TenantPolicy("batch", 1.0, admission_priority=0),
+        ),
+        mesh_control_mode="receiver_credit_pxd_v1",
+        protected_service_lane_mode="tenant_pair_edge_reservation_v1",
+        protected_service_lane_capacity=1,
+        protected_service_lane_min_admission_priority=100,
+    )
+    seed(value)
+    first = value.submit(request(
+        "edge-lane-0", "latency",
+        (mesh_candidate(0, 1, e2e=20),),
+    ), now_ns=10)
+    assert first.kind is GlobalDecisionKind.ADMIT
+    assert first.protected_service_lane_key == "remote:p0->d1"
+
+    second = value.submit(request(
+        "edge-lane-1", "latency",
+        (mesh_candidate(0, 1, e2e=20), mesh_candidate(1, 1, e2e=20)),
+    ), now_ns=11)
+    assert second.kind is GlobalDecisionKind.ADMIT
+    assert second.protected_service_lane_key == "remote:p1->d1"
+
+
 def test_bounded_stale_grace_keeps_admission_work_conserving() -> None:
     value = controller(telemetry_stale_grace_ns=1_000)
     seed(value, sampled_ns=10)
@@ -226,6 +379,47 @@ def test_bounded_stale_grace_keeps_admission_work_conserving() -> None:
     ), now_ns=2_500)
     assert decision.kind is GlobalDecisionKind.QUEUE
     assert decision.reason == "global_telemetry_unavailable"
+
+
+def test_service_feasibility_lease_rejects_observed_decoder_backlog() -> None:
+    value = controller(service_feasibility_mode="deadline_residual_v1")
+    value.update_telemetry(telemetry(
+        0,
+        scheduler_running=2,
+        scheduler_waiting=2,
+        scheduler_kv=0.5,
+        completion_residual=2,
+    ))
+    value.update_telemetry(telemetry(1))
+    decision = value.submit(request(
+        "service-infeasible",
+        "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=10),),
+        deadline_ns=20_000_010,
+    ), now_ns=10)
+    assert decision.kind is GlobalDecisionKind.QUEUE
+    assert any(
+        item.reason == "global_service_lane_slo_infeasible"
+        for item in decision.rejected_candidates
+    )
+    assert value.snapshot(now_ns=10)["service_feasibility_mode"] == (
+        "deadline_residual_v1")
+
+
+def test_service_feasibility_receipt_records_observed_wave_forecast() -> None:
+    value = controller(service_feasibility_mode="deadline_residual_v1")
+    seed(value)
+    decision = value.submit(request(
+        "service-feasible",
+        "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=10),),
+        deadline_ns=1_000_000_000,
+    ), now_ns=10)
+    assert decision.kind is GlobalDecisionKind.ADMIT
+    assert decision.service_queue_delay_ms == 0.0
+    assert decision.service_forecast_ms == 11.0
+    payload = global_decision_dict(decision)
+    assert payload["service_forecast_ms"] == 11.0
 
 
 def test_remote_cache_chunk_group_is_serialized_until_first_response() -> None:
@@ -705,6 +899,44 @@ def test_telemetry_failure_delta_quarantines_pair_before_new_admission() -> None
         "fully_quarantined_pairs"] == []
 
 
+def test_telemetry_failure_delta_route_scope_preserves_healthy_sibling() -> None:
+    value = controller(
+        telemetry_failure_quarantine_mode="deny_until_probe",
+        telemetry_failure_quarantine_scope="route",
+    )
+    seed(value)
+    value.update_telemetry(telemetry(
+        0,
+        sequence=2,
+        sampled_ns=20,
+        remote_failure_count=1,
+        remote_last_failure_kind="lmcache_transfer_failure",
+    ))
+    snapshot = value.snapshot(now_ns=21)
+    assert snapshot["admission_guards"]["fully_quarantined_pairs"] == []
+    quarantine = snapshot["route_failure_quarantines"]
+    assert [(item["pair_index"], item["route"]) for item in quarantine] == [
+        (0, GlobalRoute.REMOTE.value),
+    ]
+    decision = value.submit(request(
+        "route-isolated-sibling",
+        "latency",
+        (
+            candidate(0, GlobalRoute.REMOTE, e2e=1),
+            candidate(0, GlobalRoute.LOCAL, e2e=2),
+            candidate(1, GlobalRoute.LOCAL, e2e=20),
+        ),
+    ), now_ns=22)
+    assert decision.kind is GlobalDecisionKind.ADMIT
+    assert decision.pair_index == 0
+    assert decision.route is GlobalRoute.LOCAL
+    assert any(
+        item.reason == "route_failure_quarantine"
+        and item.route is GlobalRoute.REMOTE
+        for item in decision.rejected_candidates
+    )
+
+
 def test_explicit_route_failure_quarantines_path_and_reassigns_waiter() -> None:
     value = controller(route_failure_quarantine_mode="deny_until_probe")
     value.update_telemetry(telemetry(0, sampled_ns=10_000))
@@ -1016,6 +1248,53 @@ def test_business_pair_packing_activates_a_clean_pair_for_priority() -> None:
     }
     assert snapshot["tenant_policies"]["background"][
         "pair_spread_limit"] == 1
+
+
+def test_business_pair_packing_spills_when_clean_pair_is_under_pressure() -> None:
+    capacity = ResourceVector(
+        decode_tokens=100, active_sequences=10, endpoint_requests=10,
+        local_prefill_token_ms=100, remote_prefill_token_ms=100,
+        remote_kv_bytes=1_000, remote_semantic_ops=2,
+    )
+    value = controller(
+        capacities=(PairCapacity(0, capacity), PairCapacity(1, capacity)),
+        business_clean_pair_pressure_fraction=0.5,
+        tenants=(
+            TenantPolicy(
+                "latency", 2.0, admission_priority=800,
+                protected_capacity_fraction=0.2),
+            TenantPolicy(
+                "background", 0.5, admission_priority=0,
+                pair_spread_limit=1),
+        ),
+    )
+    seed(value)
+    packed = value.submit(request(
+        "packed-background-spill", "background", (
+            candidate(1, GlobalRoute.LOCAL, e2e=10),
+        ),
+    ), now_ns=10)
+    assert packed.pair_index == 1
+    value.update_telemetry(telemetry(
+        0, sequence=2, sampled_ns=20,
+        observed=ResourceVector(active_sequences=6, endpoint_requests=6),
+    ))
+    value.update_telemetry(telemetry(
+        1, sequence=2, sampled_ns=20,
+        observed=ResourceVector(active_sequences=1, endpoint_requests=1),
+    ))
+    urgent = value.submit(request(
+        "urgent-spill", "latency", (
+            candidate(0, GlobalRoute.LOCAL, e2e=100),
+            candidate(1, GlobalRoute.LOCAL, e2e=2),
+        ),
+    ), now_ns=21)
+    assert urgent.pair_index == 1
+    assert not any(
+        item.pair_index == 1
+        and item.reason == "higher_priority_clean_pair_available"
+        for item in urgent.rejected_candidates
+    )
 
 
 def test_admission_wait_budget_obeys_tenant_queue_slo() -> None:
@@ -1749,6 +2028,74 @@ def test_priority_remote_cache_lane_bypasses_only_ordinary_decoder_backlog() -> 
     )
 
 
+def test_business_dual_route_lane_uses_local_priority_when_fabric_route_is_unusable() -> None:
+    value = controller(
+        mesh_control_mode="receiver_credit_pxd_v1",
+        minimum_active_pairs=1,
+        maximum_active_pairs=2,
+        overload_action="endpoint_queue_lease",
+        endpoint_queue_debt_mode=(
+            "completion_credit_mesh_endpoint_queue_v1"),
+        endpoint_queue_admission_mode="headroom_first_v1",
+        endpoint_queue_capacity=32,
+        priority_service_lane_mode=(
+            "vllm_priority_business_dual_route_v2"),
+        priority_service_lane_capacity=1,
+        priority_service_lane_min_admission_priority=800,
+        priority_service_lane_priority=-2,
+        tenants=(
+            TenantPolicy(
+                "latency", 4.0, admission_priority=1_000,
+                protected_capacity_fraction=0.2,
+            ),
+            TenantPolicy(
+                "interactive", 2.0, e2e_slo_ms=8_000.0,
+                queue_lease_on_timeout=True, admission_priority=800,
+            ),
+            TenantPolicy("background", 0.5),
+        ),
+    )
+    value.update_telemetry(telemetry(
+        0,
+        observed=ResourceVector(
+            decode_tokens=100,
+            active_sequences=2,
+            endpoint_requests=2,
+            local_prefill_token_ms=100,
+        ),
+        scheduler_running=2,
+        scheduler_waiting=68,
+        scheduler_kv=0.9,
+        completion_residual=8,
+        completion_completed=10,
+    ))
+    value.update_telemetry(telemetry(
+        1,
+        scheduler_running=2,
+        scheduler_waiting=68,
+        scheduler_kv=0.9,
+        completion_residual=8,
+        completion_completed=10,
+    ))
+    queued = value.submit(request(
+        "priority-local-d0", "interactive",
+        (candidate(0, GlobalRoute.LOCAL, e2e=10),),
+    ), now_ns=11)
+    assert queued.kind is GlobalDecisionKind.QUEUE
+
+    leased = value.lease_queued_to_endpoint(
+        "priority-local-d0", now_ns=12)
+    assert leased is not None and leased.queue_lease is True
+    assert leased.route is GlobalRoute.LOCAL
+    assert leased.reason == (
+        "global_priority_business_dual_route_service_lane_route_committed")
+    assert "vllm_priority_business_dual_route_service_lane" in (
+        leased.binding_resources)
+    assert value.snapshot(now_ns=12)["priority_service_lane_debt"] == {
+        "0": 1, "1": 0,
+    }
+
+
 def test_priority_lane_balances_only_near_tie_remote_sources() -> None:
     value = controller(
         mesh_control_mode="receiver_credit_pxd_v1",
@@ -2121,6 +2468,128 @@ def test_service_lane_queue_offer_promotes_existing_ownership_once() -> None:
             "service-lane-promote", now_ns=13)
     value.mark_first_response("service-lane-promote", now_ns=14)
     value.complete("service-lane-promote", now_ns=15)
+
+
+def test_mesh_shared_liveness_probe_reuses_one_failure_free_probe_with_headroom() -> None:
+    value = controller(
+        mesh_control_mode="receiver_credit_pxd_v1",
+        minimum_active_pairs=1,
+        maximum_active_pairs=1,
+        overload_action="endpoint_queue_lease",
+        endpoint_queue_debt_mode=(
+            "completion_credit_mesh_endpoint_queue_v1"),
+        completion_liveness_shared_probe_mode="headroom_shared_v1",
+        endpoint_queue_capacity=16,
+        tenants=(
+            TenantPolicy("latency", 2.0, queue_lease_on_timeout=True),
+            TenantPolicy("batch", 1.0),
+        ),
+    )
+    value.update_telemetry(telemetry(
+        0,
+        scheduler_running=0,
+        scheduler_waiting=0,
+        scheduler_kv=0.0,
+        completion_residual=0,
+        completion_completed=4,
+    ))
+    value.update_telemetry(telemetry(
+        1,
+        scheduler_running=0,
+        scheduler_waiting=0,
+        scheduler_kv=0.0,
+        completion_residual=0,
+        completion_completed=4,
+    ))
+    holder = value.submit(request(
+        "shared-probe-holder", "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=10, decode=100),),
+    ), now_ns=11)
+    assert holder.kind is GlobalDecisionKind.ADMIT
+    waiter = value.submit(request(
+        "shared-probe-waiter", "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=10),),
+    ), now_ns=12)
+    assert waiter.kind is GlobalDecisionKind.QUEUE
+
+    # The first queue lease consumes the one failure-free recovery probe.
+    # The second lease arrives while that probe is still in flight.  It may
+    # share the evidence only because native endpoint queue headroom remains.
+    value.update_telemetry(telemetry(
+        0,
+        sequence=2,
+        sampled_ns=13,
+        local_health=PathHealth.SKIP,
+        scheduler_running=0,
+        scheduler_waiting=0,
+        scheduler_kv=0.0,
+        completion_residual=0,
+        completion_completed=4,
+    ))
+    first = value.promote_service_lane_queue_lease(
+        "shared-probe-holder", now_ns=14)
+    assert first.decision is not None
+    assert first.receipt.completion_liveness_probe is True
+    second = value.lease_queued_to_endpoint(
+        "shared-probe-waiter", now_ns=15)
+    assert second is not None
+    assert second.queue_lease is True
+    assert "completion_liveness_shared_probe" in second.binding_resources
+    assert second.reason == (
+        "global_endpoint_completion_liveness_shared_probe_route_committed")
+
+    value.mark_first_response("shared-probe-holder", now_ns=16)
+    value.complete("shared-probe-holder", now_ns=17)
+    value.mark_first_response("shared-probe-waiter", now_ns=18)
+    value.complete("shared-probe-waiter", now_ns=19)
+
+
+def test_mesh_headroom_admission_can_lease_initial_waiter_without_credit() -> None:
+    value = controller(
+        mesh_control_mode="receiver_credit_pxd_v1",
+        minimum_active_pairs=1,
+        maximum_active_pairs=1,
+        overload_action="endpoint_queue_lease",
+        endpoint_queue_debt_mode=(
+            "completion_credit_mesh_endpoint_queue_v1"),
+        endpoint_queue_admission_mode="headroom_first_v1",
+        endpoint_queue_headroom_admission_mode="completion_progress_v1",
+        endpoint_queue_capacity=16,
+        tenants=(
+            TenantPolicy("latency", 2.0, queue_lease_on_timeout=True),
+            TenantPolicy("batch", 1.0),
+        ),
+    )
+    for pair in (0, 1):
+        value.update_telemetry(telemetry(
+            pair,
+            scheduler_running=0,
+            scheduler_waiting=0,
+            scheduler_kv=0.0,
+            completion_residual=0,
+            completion_completed=4,
+        ))
+    holder = value.submit(request(
+        "headroom-holder", "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=10, decode=100),),
+    ), now_ns=11)
+    assert holder.kind is GlobalDecisionKind.ADMIT
+    waiter = value.submit(request(
+        "headroom-waiter", "latency",
+        (candidate(0, GlobalRoute.LOCAL, e2e=10),),
+    ), now_ns=12)
+    assert waiter.kind is GlobalDecisionKind.QUEUE
+    leased = value.lease_queued_to_endpoint("headroom-waiter", now_ns=13)
+    assert leased is not None
+    assert leased.queue_lease is True
+    assert leased.reason == (
+        "global_endpoint_completion_progress_headroom_route_committed")
+    assert "completion_progress_headroom" in leased.binding_resources
+    assert "completion_first_response_credit" not in leased.binding_resources
+    value.mark_first_response("headroom-holder", now_ns=14)
+    value.complete("headroom-holder", now_ns=15)
+    value.mark_first_response("headroom-waiter", now_ns=16)
+    value.complete("headroom-waiter", now_ns=17)
 
 
 def test_service_lane_queue_promotion_consumes_causal_completion_credit() -> None:

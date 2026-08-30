@@ -1,0 +1,157 @@
+{
+  "c6_performance": {
+    "aggressor": {
+      "cache_state": "miss",
+      "load_fraction": 0.7,
+      "offered_rate_per_s": 22.4,
+      "output_tokens": 2,
+      "prompt_tokens": 4094,
+      "reference_rate_per_s": 32.0,
+      "route": "decoder_local_chunked_prefill",
+      "tenant_id": "background"
+    },
+    "cooldown_s": 5.0,
+    "elastic_profile": {
+      "path": "results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+      "sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53"
+    },
+    "endpoint_profile": {
+      "path": "results/tempo_go_c5_cross_layer_short_slice_v4_profiles/real_tempo_pd_endpoint_service_profile_short_slice_v1.json",
+      "sha256": "8776221a0bc0d932205c97e1a943a130cd206e73ce6b863fb6cce67c33f1a4cf"
+    },
+    "fixed_server_epochs": [
+      {
+        "block_order": [
+          {
+            "hot_decoder_index": null,
+            "name": "00_fixed_p0d1_normal",
+            "policy": "fixed_p0d1"
+          },
+          {
+            "hot_decoder_index": 0,
+            "name": "01_fixed_p0d1_hot_d0",
+            "policy": "fixed_p0d1"
+          },
+          {
+            "hot_decoder_index": 1,
+            "name": "02_fixed_p0d1_hot_d1",
+            "policy": "fixed_p0d1"
+          }
+        ],
+        "fresh_vllm_lmcache_epoch": true,
+        "policy": "fixed_p0d1"
+      },
+      {
+        "block_order": [
+          {
+            "hot_decoder_index": null,
+            "name": "00_fixed_p1d0_normal",
+            "policy": "fixed_p1d0"
+          },
+          {
+            "hot_decoder_index": 0,
+            "name": "01_fixed_p1d0_hot_d0",
+            "policy": "fixed_p1d0"
+          },
+          {
+            "hot_decoder_index": 1,
+            "name": "02_fixed_p1d0_hot_d1",
+            "policy": "fixed_p1d0"
+          }
+        ],
+        "fresh_vllm_lmcache_epoch": true,
+        "policy": "fixed_p1d0"
+      }
+    ],
+    "full_block_order": [
+      {
+        "hot_decoder_index": null,
+        "name": "00_full_c6_normal",
+        "policy": "full_c6"
+      },
+      {
+        "hot_decoder_index": 0,
+        "name": "01_full_c6_hot_d0",
+        "policy": "full_c6"
+      },
+      {
+        "hot_decoder_index": 1,
+        "name": "02_full_c6_hot_d1",
+        "policy": "full_c6"
+      }
+    ],
+    "global_profile": {
+      "fingerprint_sha256": "727c5800101928251b7b3ed26bd0f064337043ab267f3116a0410a321a9cb14e",
+      "path": "results/tempo_go_c6_performance_v1_contract/real_tempo_go_c6_receiver_credit_pxd_profile_v1.json",
+      "sha256": "c9984bf2d30b6e2314e59d24177600be48fdded206b4c49ce25e62e9e17c1bb7"
+    },
+    "max_workers": 128,
+    "phase_duration_ms": 60000.0,
+    "policies": {
+      "fixed_p0d1": {
+        "decoder_index": 1,
+        "edge_id": "remote:p0->d1",
+        "prefill_index": 0,
+        "remote_decode_placement": "cross"
+      },
+      "fixed_p1d0": {
+        "decoder_index": 0,
+        "edge_id": "remote:p1->d0",
+        "prefill_index": 1,
+        "remote_decode_placement": "cross"
+      },
+      "full_c6": {
+        "mesh_control_mode": "receiver_credit_pxd_v1",
+        "remote_decode_placement": "global_mesh"
+      }
+    },
+    "profile": {
+      "path": "results/tempo_go_c5_anchor_priors_c12_v3_retry1/real_tempo_pd_elastic_profile_c12_anchor_output2_screen_v3.json",
+      "sha256": "bb8b31c55a2cc8642209c7eb2426007a02b94c25b37b808cd45e6e49b2442f53"
+    },
+    "source_workload": {
+      "path": "results/tempo_elastic_pd_canonical_discovery_57198936/run02_libfabric_cxi_peermem_pd1g_cold_q25_longp1230_cxibg100_dynamic_v544b/tempo_elastic_pd_v445/warmup.jsonl",
+      "sha256": "c313b6d9da95fe08db6d4d7d94e986ac70ef67f62576e73c365e16b9b3cd73fd"
+    },
+    "tenant_slos": {
+      "batch": {
+        "e2e_ms": 16000.0,
+        "tpot_ms": 250.0
+      },
+      "interactive": {
+        "e2e_ms": 8000.0,
+        "tpot_ms": 150.0
+      }
+    },
+    "thresholds": {
+      "full_incremental_slo_goodput_ratio": 1.1,
+      "normal_e2e_regression_fraction": 0.03,
+      "overload_p99_reduction_fraction": 0.3,
+      "overload_slo_goodput_ratio": 1.5,
+      "reject_or_fail_increase_allowed": 0
+    },
+    "victim": {
+      "cache_state": "miss",
+      "offered_rate_per_s": 2.0,
+      "output_tokens": 128,
+      "prompt_tokens": 4094,
+      "route_scope": "fixed_cross_edge_or_full_pxd_mesh",
+      "tenant_assignment": "ordinal_even_interactive_odd_batch"
+    }
+  },
+  "claim_boundary": {
+    "controller_performance_claim_allowed": true,
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": true,
+    "purpose": "P4 same-population native discovery comparison of strongest fixed cross edge versus full C6"
+  },
+  "qualification_kind": "c6_performance",
+  "schema": "tempo-go-c6-performance-contract-v1",
+  "transport": {
+    "lmcache": "official checked-out LMCacheConnectorV1 NIXL UCX",
+    "native_only": true,
+    "privileged_or_container_configuration_allowed": false,
+    "synthetic_cxi_background": false,
+    "topology": "Perlmutter P0/D0/P1/D1 TP4 with full immutable P-by-D mesh"
+  }
+}

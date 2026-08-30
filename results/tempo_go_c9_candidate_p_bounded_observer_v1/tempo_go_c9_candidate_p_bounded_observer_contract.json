@@ -1,0 +1,179 @@
+{
+  "burst": {
+    "block_delay_s": 0.25,
+    "cojob_pair_count": 2,
+    "cojob_time_limit": "00:29:00",
+    "cojob_timeout_s": 1740,
+    "foreground_mib": 16,
+    "interpretation": "Each physical pair runs a bounded 4-source x 8 MiB receiver-incast block plus native NCCL collective. The resident buffers are reused and blocks are spaced by 250 ms, preserving contention while avoiding the 2 GiB timeout-shaped observer-lifetime confound.",
+    "kv_mib_per_request": 8,
+    "maximum_blocks": 2048,
+    "minimum_active_duration_s": 600,
+    "minimum_blocks": 1,
+    "nixl_transfer_timeout_s": 60,
+    "observer_max_age_ms": 60000,
+    "process_group_timeout_s": 120,
+    "requests_per_source": 1,
+    "start_delay_s": 0,
+    "token_iters": 256,
+    "traffic_pattern": "incast_4to1",
+    "transport": {
+      "lmcache": "official NixlChannel with UCX",
+      "nccl": "AWS Libfabric over Slingshot/CXI",
+      "socket_fallback_forbidden": true
+    }
+  },
+  "candidate": {
+    "base_contract": "results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c8_candidate_o_route_liveness_contract.json",
+    "experimental_delta": "bounded_resident_dual_pair_observer_lifecycle",
+    "id": "tempo-go-c9-candidate-p-bounded-observer-v1",
+    "independent_validation_claim_allowed": false,
+    "parent": "results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c9_candidate_o_route_liveness_population_contract.json",
+    "performance_claim_allowed": false,
+    "policy_delta_from_candidate_o": "none"
+  },
+  "claim_boundary": {
+    "discovery_only": true,
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "reason": "current-source reproduction of the historical v10 load boundary; all offered-population, terminal, observer, and performance gates must pass before promotion to a held-out validation"
+  },
+  "execution": {
+    "cojob_readiness_timeout_s": 240,
+    "cooldown_s": 5,
+    "inference_timeout_s": 1800,
+    "minimum_outer_time_reason": "seven-arm sequential native population requires a 150-minute outer step; fail closed before GPU launch when the parent budget is shorter",
+    "minimum_outer_time_s": 9000,
+    "one_campaign_no_retry": true,
+    "order": [
+      {
+        "arm": "fixed_local_d0",
+        "name": "00_fixed_local_d0",
+        "port_slot": 2420
+      },
+      {
+        "arm": "fixed_local_d1",
+        "name": "01_fixed_local_d1",
+        "port_slot": 2460
+      },
+      {
+        "arm": "fixed_remote_p0d1",
+        "name": "02_fixed_remote_p0d1",
+        "port_slot": 2500
+      },
+      {
+        "arm": "fixed_remote_p1d0",
+        "name": "03_fixed_remote_p1d0",
+        "port_slot": 2540
+      },
+      {
+        "arm": "predictor",
+        "name": "04_predictor",
+        "port_slot": 2580
+      },
+      {
+        "arm": "queue_gpu",
+        "name": "05_queue_gpu",
+        "port_slot": 2620
+      },
+      {
+        "arm": "full_c7_managed_background",
+        "name": "06_candidate_p_bounded_observer",
+        "port_slot": 2660
+      }
+    ],
+    "paired_indices": []
+  },
+  "gates": {
+    "correctness_required": true,
+    "maximum_normal_p50_regression_fraction": 0.03,
+    "minimum_full_supported_observer_fraction": 1.0,
+    "minimum_stressed_p99_reduction_fraction": 0.15,
+    "minimum_stressed_slo_good_ratio": 1.0,
+    "require_ablation_cross_layer_blind": true,
+    "require_all_full_decisions_observer_supported": true,
+    "require_baseline_cross_layer_blind": false,
+    "require_full_cross_layer_actuation": true,
+    "require_native_transport_receipt": true
+  },
+  "provenance": {
+    "base_contract": "results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c8_candidate_o_route_liveness_contract.json",
+    "base_contract_sha256": "3b7f82f29a8870157cb6d5bb6264edca550b88cc1027e430f8eeb1020315e585",
+    "base_source_inventory_count": 33,
+    "bounded_resident_observer": {
+      "both_physical_pairs_observed": true,
+      "historical_reference_contract": "eval/sota_4node/tempo_go_c9_pair_local_contract_v10.json",
+      "historical_reference_contract_sha256": "2f9d5236d8f0867b1e531c8ca5933706f9a160378abf72e9b42bd723cf1d3afe",
+      "policy_delta_from_candidate_o": false,
+      "same_offered_population": true,
+      "schema": "tempo-go-bounded-resident-observer-lifecycle-v1",
+      "stale_max_age_relaxed": false
+    },
+    "business_pair_spill": {
+      "cache_affinity_override": false,
+      "future_arrival_policy_input": false,
+      "phase_label_policy_input": false,
+      "pressure_fraction": 0.5,
+      "schema": "tempo-go-business-pair-spill-v1",
+      "source_of_pressure": "live_pair_telemetry_and_global_owned_work"
+    },
+    "c9_source_inventory_count": 7,
+    "candidate_parent": "results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c9_candidate_o_route_liveness_population_contract.json",
+    "failure_isolation": {
+      "candidate_scope": "route",
+      "explicit_route_failure_probe_required": true,
+      "parent_scope": "pair",
+      "same_request_retry": false,
+      "schema": "tempo-go-route-scoped-failure-isolation-v1"
+    },
+    "independent_validation_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "population_comparison": {
+      "fixed_arms": [
+        "fixed_local_d0",
+        "fixed_local_d1",
+        "fixed_remote_p0d1",
+        "fixed_remote_p1d0"
+      ],
+      "predictor_arm": "predictor",
+      "queue_gpu_arm": "queue_gpu",
+      "same_offered_population_required": true,
+      "tempo_arm": "full_c7_managed_background"
+    },
+    "schema": "tempo-go-c9-candidate-p-bounded-observer-current-source-v1",
+    "source_inventory": {
+      "eval/sota_4node/analyze_tempo_go_c9_causal_burst_discovery.py": "073c281ff187e6c14c375da979d969009fa1a387be67b590e6d936ffb83be121",
+      "eval/sota_4node/c9_gate_node_entry.sh": "f6d46d07f5e8bea93d79a407164aed961d11c3a0ab9ed4f67b4155cbaba0d1b1",
+      "eval/sota_4node/require_perlmutter_4node_4h_interactive.sh": "bd2619befd53540054260c7652d60aabe7ae3b4ee032679530115d982b7ab992",
+      "eval/sota_4node/run_lmcache_nixl_contention_2node.py": "8421055bb09445673d9e70d780a0a77483d37769b70e582cf992499ab9214420",
+      "eval/sota_4node/run_lmcache_nixl_contention_2node_in_allocation.sh": "390dce84d9fd8a3339787ec380e9f3c52916ba638629cf3e05d7b656eccafb9d",
+      "eval/sota_4node/run_tempo_go_c8_dual_regime_client.py": "9fa7908f9e5785d49914baaa21fa8a8b9d2c565ee0c1f90ba966a44e8534e1d3",
+      "eval/sota_4node/run_tempo_go_c9_causal_burst_discovery_in_allocation.sh": "399af01a9b6c20887a579e3b52c2b521ff6574ead666db3afe1aa7fea92d022b",
+      "eval/sota_4node/vllm_lmcache_tempo_go_c9_gate_node.py": "ac0da22a419a4abd4725f47020e7d82539de5014d1d23c87600eb56b24e5bc7c",
+      "tempo/cross_layer_observer.py": "a8112f4e5070bf2299bcaa19e09ddb9e1e713f5ccbd32837c1a27e9bc0521c6c"
+    },
+    "template": "results/tempo_go_c9_causal_burst_current_source_v27.json",
+    "template_sha256": "ee92b5deaa5b0466749751f565045164232d89e5f80a429d243d4dc76796b546"
+  },
+  "purpose": "Current-source seven-arm reproduction of Candidate O under the bounded-resident dual-pair NCCL plus official LMCache/NIXL incast shape that kept the observer live in the historical v9/v10 campaign.",
+  "schema": "tempo-go-c9-causal-burst-discovery-v1",
+  "source_inventory": {
+    "eval/sota_4node/analyze_tempo_go_c9_causal_burst_discovery.py": "073c281ff187e6c14c375da979d969009fa1a387be67b590e6d936ffb83be121",
+    "eval/sota_4node/c9_gate_node_entry.sh": "f6d46d07f5e8bea93d79a407164aed961d11c3a0ab9ed4f67b4155cbaba0d1b1",
+    "eval/sota_4node/require_perlmutter_4node_4h_interactive.sh": "bd2619befd53540054260c7652d60aabe7ae3b4ee032679530115d982b7ab992",
+    "eval/sota_4node/run_lmcache_nixl_contention_2node.py": "8421055bb09445673d9e70d780a0a77483d37769b70e582cf992499ab9214420",
+    "eval/sota_4node/run_lmcache_nixl_contention_2node_in_allocation.sh": "390dce84d9fd8a3339787ec380e9f3c52916ba638629cf3e05d7b656eccafb9d",
+    "eval/sota_4node/run_tempo_go_c8_dual_regime_client.py": "9fa7908f9e5785d49914baaa21fa8a8b9d2c565ee0c1f90ba966a44e8534e1d3",
+    "eval/sota_4node/run_tempo_go_c9_causal_burst_discovery_in_allocation.sh": "399af01a9b6c20887a579e3b52c2b521ff6574ead666db3afe1aa7fea92d022b",
+    "eval/sota_4node/vllm_lmcache_tempo_go_c9_gate_node.py": "ac0da22a419a4abd4725f47020e7d82539de5014d1d23c87600eb56b24e5bc7c",
+    "tempo/cross_layer_observer.py": "a8112f4e5070bf2299bcaa19e09ddb9e1e713f5ccbd32837c1a27e9bc0521c6c"
+  },
+  "system_under_test": {
+    "base_contract": "results/tempo_go_c9_candidate_o_route_liveness_v1/tempo_go_c8_candidate_o_route_liveness_contract.json",
+    "base_contract_sha256": "3b7f82f29a8870157cb6d5bb6264edca550b88cc1027e430f8eeb1020315e585",
+    "node_entry": "eval/sota_4node/c9_gate_node_entry.sh",
+    "observer_scope": "both physical P/D pairs; each pair runs one native 8-rank NCCL and official LMCache/NIXL-UCX bounded receiver-incast producer",
+    "source_policy": "current_source_bound_candidate_p_bounded_observer_v1",
+    "topology": "P0-D0-P1-D1, Qwen2.5-7B-Instruct, TP4 per node, official LMCacheConnectorV1 NIXL-UCX"
+  }
+}

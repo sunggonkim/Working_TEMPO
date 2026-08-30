@@ -1,0 +1,47 @@
+{
+  "schema": "tempo-go-mooncake-fast25-source-manifest-v1",
+  "upstream": {
+    "commit": "cafc50785855f7904c7de7727a6c0baf5c7a3dc8",
+    "license_file_url": "https://github.com/kvcache-ai/Mooncake/blob/cafc50785855f7904c7de7727a6c0baf5c7a3dc8/LICENSE",
+    "readme_url": "https://github.com/kvcache-ai/Mooncake/blob/cafc50785855f7904c7de7727a6c0baf5c7a3dc8/FAST25-release/README.md",
+    "repository": "https://github.com/kvcache-ai/Mooncake"
+  },
+  "trace_contract": {
+    "arrival_semantics": "relative_timestamp_ms; preserve ordering and replay offsets unless an explicit load multiplier is recorded",
+    "block_size_tokens": 512,
+    "fields": [
+      "timestamp",
+      "input_length",
+      "output_length",
+      "hash_ids"
+    ],
+    "hash_semantics": "equal hash IDs within one trace identify equal reusable 512-token prefix blocks",
+    "raw_prompt_content_available": false
+  },
+  "files": {
+    "conversation": {
+      "bytes": 3029533,
+      "git_blob_sha1": "5a371794b81d7fc7487ec8a02a2c631bcc7fbdf8",
+      "local_path": "conversation_trace.jsonl",
+      "requests": 12031,
+      "sha256": "b8cbb061a85206d729d91cdc2981f43c9e0d99209dce588d3af5f7934408b9df",
+      "url": "https://raw.githubusercontent.com/kvcache-ai/Mooncake/cafc50785855f7904c7de7727a6c0baf5c7a3dc8/FAST25-release/traces/conversation_trace.jsonl"
+    },
+    "synthetic": {
+      "bytes": 1136313,
+      "git_blob_sha1": "e4838049c0dcfc358a5f24ab08251279475cba94",
+      "local_path": "synthetic_trace.jsonl",
+      "requests": 3993,
+      "sha256": "bd070915a98fc0ed264d7cfef2ce746002eb3076a695ec31ba2674c0111ec131",
+      "url": "https://raw.githubusercontent.com/kvcache-ai/Mooncake/cafc50785855f7904c7de7727a6c0baf5c7a3dc8/FAST25-release/traces/synthetic_trace.jsonl"
+    },
+    "toolagent": {
+      "bytes": 4415857,
+      "git_blob_sha1": "b765599d1e0828b37f68d481563c385d3c11de54",
+      "local_path": "toolagent_trace.jsonl",
+      "requests": 23608,
+      "sha256": "48a2db1a13d3bc05e6330140c64f604ba366df20d3c9e128b5c35a01c1fa5f71",
+      "url": "https://raw.githubusercontent.com/kvcache-ai/Mooncake/cafc50785855f7904c7de7727a6c0baf5c7a3dc8/FAST25-release/traces/toolagent_trace.jsonl"
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "gpu_count": 16,
+  "guard_sha256": "b37ea8d3f37e98f1df39408e76ec52302bc7274cf307e5378c90135504eb541f",
+  "model_config_sha256": "7463bb0ea78315365e6c6b74de4e73bbcc8359dfb0c5a737584e077d42c0b03c",
+  "native_only": true,
+  "node_count": 4,
+  "nodes": [
+    "nid001765",
+    "nid002589",
+    "nid003016",
+    "nid003381"
+  ],
+  "package_versions": {
+    "fastapi": "0.136.3",
+    "httpx": "0.28.1",
+    "lmcache": "0.1.dev1",
+    "pyzmq": "27.1.0",
+    "torch": "2.11.0+cu129",
+    "transformers": "5.15.0",
+    "vllm": "0.26.0+cu129"
+  },
+  "passed": true,
+  "privileged_nic_control": false,
+  "rank_receipts": [
+    {
+      "path": "rank-000.json",
+      "sha256": "474e4253fcfab0926a2420c6156d041c74bb28efa5729466391f77313fbc029d"
+    },
+    {
+      "path": "rank-001.json",
+      "sha256": "3477e015912f21d53c3570b796528bc68724a78e4cfab8ab6b8e25b3ac0e82e4"
+    },
+    {
+      "path": "rank-002.json",
+      "sha256": "fde01c269602e70611721de44440d29f3ef390ceb5b0f2b19d833f17cc7d4c20"
+    },
+    {
+      "path": "rank-003.json",
+      "sha256": "2a508ea39a666e018396f8f5cacca80d915029db64d229e5ab9433b9c1f7debc"
+    }
+  ],
+  "schema": "tempo-go-perlmutter-native-capability-manifest-v1",
+  "slurm_job_id": "57384994",
+  "srun_command": "/usr/bin/srun --nodes=4 --ntasks=4 --ntasks-per-node=1 --gpus-per-task=4 --gpu-bind=none --kill-on-bad-exit=1 /pscratch/sd/s/sgkim/Skim-Tempo/.vllm_venv/bin/python /pscratch/sd/s/sgkim/Skim-Tempo/eval/sota_4node/probe_tempo_go_native_rank.py rank --repo-root /pscratch/sd/s/sgkim/Skim-Tempo --output-dir /pscratch/sd/s/sgkim/Skim-Tempo/eval/sota_4node/results/tempo_go_g0/job-57384994-native-v1",
+  "transport_contract": "LMCacheConnectorV1:UCX"
+}

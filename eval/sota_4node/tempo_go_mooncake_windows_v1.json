@@ -1,0 +1,163 @@
+{
+  "capacity_normalization": {
+    "load_multipliers_frozen": false,
+    "required_next_step": "measure per-scale fixed-carrier capacity before freezing normal, knee, overload, and microburst multipliers"
+  },
+  "performance_claim_allowed": false,
+  "schema": "tempo-go-mooncake-fast25-window-selection-v1",
+  "selected": {
+    "conversation_long_decode": {
+      "metrics": {
+        "base_offered_rate_per_s": 2.625,
+        "duration_ms": 24000,
+        "first_timestamp_ms": 291000,
+        "input_tokens": {
+          "max": 82278,
+          "mean": 14847.65625,
+          "p50": 12638.0,
+          "p90": 29479.0
+        },
+        "last_timestamp_ms": 315000,
+        "output_tokens": {
+          "max": 945,
+          "mean": 324.25,
+          "p50": 370.0,
+          "p90": 611.0
+        },
+        "request_count": 64,
+        "reuse": {
+          "mean_prior_reusable_input_fraction": 0.11440617846295692,
+          "mean_prior_reusable_prefix_tokens": 504.0,
+          "request_fraction": 0.984375,
+          "requests_with_prior_reusable_prefix": 63
+        },
+        "start_index": 896,
+        "stop_index_exclusive": 960
+      },
+      "objective": "maximize aligned-window median input tokens, then median output tokens; earliest index breaks ties",
+      "trace": "conversation"
+    },
+    "synthetic_zero_reuse_burst": {
+      "metrics": {
+        "base_offered_rate_per_s": 5.176238599950702,
+        "duration_ms": 12171,
+        "first_timestamp_ms": 610971,
+        "input_tokens": {
+          "max": 66458,
+          "mean": 15821.984375,
+          "p50": 12509.5,
+          "p90": 40024.0
+        },
+        "last_timestamp_ms": 623142,
+        "output_tokens": {
+          "max": 778,
+          "mean": 127.78125,
+          "p50": 39.5,
+          "p90": 345.0
+        },
+        "request_count": 64,
+        "reuse": {
+          "mean_prior_reusable_input_fraction": 0.0,
+          "mean_prior_reusable_prefix_tokens": 0.0,
+          "request_fraction": 0.0,
+          "requests_with_prior_reusable_prefix": 0
+        },
+        "start_index": 2304,
+        "stop_index_exclusive": 2368
+      },
+      "objective": "among aligned windows with zero prior reusable-prefix requests, maximize native offered rate, then median input; earliest index breaks ties",
+      "trace": "synthetic"
+    },
+    "toolagent_native_burst": {
+      "metrics": {
+        "base_offered_rate_per_s": 21.0,
+        "duration_ms": 3000,
+        "first_timestamp_ms": 3444000,
+        "input_tokens": {
+          "max": 55822,
+          "mean": 8172.765625,
+          "p50": 6166.5,
+          "p90": 18573.0
+        },
+        "last_timestamp_ms": 3447000,
+        "output_tokens": {
+          "max": 595,
+          "mean": 178.609375,
+          "p50": 31.0,
+          "p90": 485.0
+        },
+        "request_count": 64,
+        "reuse": {
+          "mean_prior_reusable_input_fraction": 0.49332725148635936,
+          "mean_prior_reusable_prefix_tokens": 2520.0,
+          "request_fraction": 0.953125,
+          "requests_with_prior_reusable_prefix": 61
+        },
+        "start_index": 22912,
+        "stop_index_exclusive": 22976
+      },
+      "objective": "maximize aligned-window native offered rate, then mean prior reusable input fraction; earliest index breaks ties",
+      "trace": "toolagent"
+    },
+    "toolagent_prefix_reuse": {
+      "metrics": {
+        "base_offered_rate_per_s": 7.0007778642071345,
+        "duration_ms": 8999,
+        "first_timestamp_ms": 825000,
+        "input_tokens": {
+          "max": 37451,
+          "mean": 6833.484375,
+          "p50": 6208.0,
+          "p90": 8452.0
+        },
+        "last_timestamp_ms": 833999,
+        "output_tokens": {
+          "max": 740,
+          "mean": 106.90625,
+          "p50": 25.5,
+          "p90": 371.0
+        },
+        "request_count": 64,
+        "reuse": {
+          "mean_prior_reusable_input_fraction": 0.7075980231050618,
+          "mean_prior_reusable_prefix_tokens": 4080.0,
+          "request_fraction": 0.953125,
+          "requests_with_prior_reusable_prefix": 61
+        },
+        "start_index": 4992,
+        "stop_index_exclusive": 5056
+      },
+      "objective": "maximize aligned-window mean prior reusable input fraction, then native offered rate; earliest index breaks ties",
+      "trace": "toolagent"
+    }
+  },
+  "source_manifest": "/pscratch/sd/s/sgkim/Skim-Tempo/eval/sota_4node/data/mooncake_fast25/source_manifest_v1.json",
+  "source_manifest_sha256": "05805168bd5c6be4d258cce1e134a5149ccf1eb9fafa69e8545ae108485bdd1a",
+  "source_receipts": {
+    "conversation": {
+      "aligned_candidate_windows": 187,
+      "source_git_blob_sha1": "5a371794b81d7fc7487ec8a02a2c631bcc7fbdf8",
+      "source_sha256": "b8cbb061a85206d729d91cdc2981f43c9e0d99209dce588d3af5f7934408b9df",
+      "upstream_commit": "cafc50785855f7904c7de7727a6c0baf5c7a3dc8"
+    },
+    "synthetic": {
+      "aligned_candidate_windows": 62,
+      "source_git_blob_sha1": "e4838049c0dcfc358a5f24ab08251279475cba94",
+      "source_sha256": "bd070915a98fc0ed264d7cfef2ce746002eb3076a695ec31ba2674c0111ec131",
+      "upstream_commit": "cafc50785855f7904c7de7727a6c0baf5c7a3dc8"
+    },
+    "toolagent": {
+      "aligned_candidate_windows": 368,
+      "source_git_blob_sha1": "b765599d1e0828b37f68d481563c385d3c11de54",
+      "source_sha256": "48a2db1a13d3bc05e6330140c64f604ba366df20d3c9e128b5c35a01c1fa5f71",
+      "upstream_commit": "cafc50785855f7904c7de7727a6c0baf5c7a3dc8"
+    }
+  },
+  "window_contract": {
+    "alignment": "non-overlapping source-index multiples of 64",
+    "prefix_reuse_semantics": "complete leading 512-token hash blocks shared with a prior request in the same window; no eviction or placement assumed",
+    "selection_uses_inference_performance": false,
+    "selection_uses_policy_output": false,
+    "window_size": 64
+  }
+}

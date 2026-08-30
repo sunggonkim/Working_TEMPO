@@ -15,6 +15,13 @@ before running an agent or a diagnostic command.
 - Do not submit, cancel, or retry Slurm work without explicit user approval.
   A pending job must be observed with one monitor, not by repeated logins or
   multiple watchers.
+- When the user explicitly approves a long-lived interactive allocation,
+  prefer `salloc --no-shell` and launch compute work with an explicit
+  `srun --jobid=<allocation>` attachment.  Verify the exact RUNNING job,
+  node/GPU/time/QOS receipt and that no GPU step is active before launching
+  one new step.  This keeps an SSH/chat PTY SIGHUP from releasing the whole
+  allocation; it does not authorize duplicate allocations or background
+  watchers.
 - Do not run persistent polling, login loops, compute-node SSH, or background
   agents. Prefer scheduler mail notifications and a single, infrequent status
   check.

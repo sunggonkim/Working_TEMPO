@@ -25,7 +25,7 @@ from tempo.pd_contention_workload import CacheState
 
 SCHEMA = "tempo-pd-cache-state-preparation-plan-v1"
 PREP_OUTPUT_TOKENS = 2
-_ARM = re.compile(r"^epd-(local|remote|predictor|tempo)-")
+_ARM = re.compile(r"^epd-(local|remote|predictor|queue_gpu|tempo)-")
 _ITEM = re.compile(r"-item-([0-9]+)$")
 _STATE_MARKERS = {
     CacheState.MISS: "-cache-miss-measured-",

@@ -33,6 +33,7 @@ FRONTEND_LEDGER_SCHEMA = "tempo-go-frontend-ledger-v1"
 ENDPOINT_CONTROLLER_SCHEMA = "tempo-pd-endpoint-controller-v1"
 SCHEDULER_SCHEMA = "tempo-go-vllm-scheduler-snapshot-v1"
 COMPLETION_SCHEMA = "tempo-go-endpoint-completion-v1"
+SERVICE_LANE_SCHEMA = "tempo-go-endpoint-service-lane-v1"
 CROSS_LAYER_SCHEMA = "tempo-go-cross-layer-envelope-v1"
 
 _LOCAL_ROUTE = "decoder_local_chunked_prefill"
@@ -254,6 +255,17 @@ class GlobalTelemetryBatch:
                         "completed_first_responses": (
                             item.endpoint_completed_first_responses),
                         "residual_inflight": item.endpoint_residual_inflight,
+                    },
+                    "service_lane": {
+                        "schema": SERVICE_LANE_SCHEMA,
+                        "endpoint_queue_requests": item.service_lane_queue_requests,
+                        "pending_queue_offers": item.service_lane_queue_offers,
+                        "pending_global_commits": (
+                            item.service_lane_pending_global_commits),
+                        "active_reservations": (
+                            item.service_lane_active_reservations),
+                        "active_queue_leases": (
+                            item.service_lane_active_queue_leases),
                     },
                     "cross_layer": (
                         item.cross_layer.as_dict()
@@ -552,6 +564,7 @@ class GlobalTelemetryAdapter:
 
         scheduler = self._parse_scheduler(raw.get("vllm_scheduler"))
         completion = self._parse_completion(controller.get("completion"))
+        service_lane = self._parse_service_lane(raw.get("service_lane"))
         cross_layer = self._parse_cross_layer(
             raw.get("cross_layer"), pair_index=contract.pair_index)
 
@@ -620,6 +633,21 @@ class GlobalTelemetryAdapter:
             endpoint_residual_inflight=(
                 completion["residual_inflight"] if completion else None),
             completion_schema=completion["schema"] if completion else None,
+            service_lane_queue_requests=(
+                service_lane["endpoint_queue_requests"]
+                if service_lane else None),
+            service_lane_queue_offers=(
+                service_lane["pending_queue_offers"]
+                if service_lane else None),
+            service_lane_pending_global_commits=(
+                service_lane["pending_global_commits"]
+                if service_lane else None),
+            service_lane_active_reservations=(
+                service_lane["active_reservations"]
+                if service_lane else None),
+            service_lane_active_queue_leases=(
+                service_lane["active_queue_leases"]
+                if service_lane else None),
             cross_layer=cross_layer,
             schema=TELEMETRY_SCHEMA,
         )
@@ -631,6 +659,26 @@ class GlobalTelemetryAdapter:
             mesh_remote,
             pair_count=len(self.contracts),
         )
+
+    def _parse_service_lane(self, value: object) -> dict[str, int] | None:
+        """Parse endpoint queue ownership separately from vLLM waiters."""
+        if value is None:
+            return None
+        raw = _mapping("endpoint.service_lane", value)
+        required = {
+            "schema", "endpoint_queue_requests", "pending_queue_offers",
+            "pending_global_commits", "active_reservations",
+            "active_queue_leases",
+        }
+        if set(raw) != required:
+            raise ValueError(
+                "endpoint service-lane telemetry inventory is not exact")
+        if raw["schema"] != SERVICE_LANE_SCHEMA:
+            raise ValueError("endpoint service-lane telemetry schema mismatch")
+        return {
+            name: _nonnegative_int(f"endpoint.service_lane.{name}", raw[name])
+            for name in required - {"schema"}
+        }
 
     def _parse_cross_layer(
         self, value: object, *, pair_index: int
@@ -852,4 +900,5 @@ __all__ = [
     "GlobalTelemetryAdapter",
     "GlobalTelemetryBatch",
     "SCHEDULER_SCHEMA",
+    "SERVICE_LANE_SCHEMA",
 ]

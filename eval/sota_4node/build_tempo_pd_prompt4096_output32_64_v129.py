@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""Convert prompt4096 rows to an output32/output64 controller workload."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    if args.output.exists():
+        raise ValueError(f"refusing to overwrite: {args.output}")
+    source = [json.loads(line) for line in
+              args.source.read_text(encoding="utf-8").splitlines()]
+    if len(source) != 24:
+        raise ValueError("exact 24 source rows required")
+    rows = []
+    for index, source_row in enumerate(source):
+        row = dict(source_row)
+        output_tokens = 32 if index < 12 else 64
+        row["max_tokens"] = output_tokens
+        row["request_id"] = f"long4096-o{output_tokens}-r{index % 12}"
+        rows.append(row)
+    args.output.parent.mkdir(parents=True, exist_ok=False)
+    args.output.write_text(
+        "".join(json.dumps(row, separators=(",", ":")) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    print(json.dumps({"rows": 24, "outputs": {"32": 12, "64": 12}},
+                     sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

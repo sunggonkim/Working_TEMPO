@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tempo-vllm-lmcache-4node-campaign-analysis-1",
+  "title": "Three-run same-allocation TEMPO 4-node campaign analysis",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "analysis_method",
+    "claim_scope",
+    "promotion_valid",
+    "experimental_design",
+    "contract",
+    "validation",
+    "runs",
+    "pooled_modes",
+    "paired_comparisons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "tempo-vllm-lmcache-4node-campaign-analysis-1"
+    },
+    "analysis_method": {
+      "const": "descriptive_robust_no_bootstrap"
+    },
+    "claim_scope": {
+      "const": "same_allocation_three_campaigns_research_prototype_only"
+    },
+    "promotion_valid": {
+      "const": false
+    },
+    "experimental_design": {
+      "type": "object",
+      "required": [
+        "same_allocation_three_campaigns",
+        "allocation_id",
+        "allocation_independence",
+        "run_count",
+        "samples_per_mode_per_run",
+        "pooled_samples_per_mode",
+        "paired_by"
+      ],
+      "properties": {
+        "same_allocation_three_campaigns": {"const": true},
+        "allocation_id": {"type": "string", "minLength": 1},
+        "allocation_independence": {"const": false},
+        "run_count": {"const": 3},
+        "samples_per_mode_per_run": {"const": 3},
+        "pooled_samples_per_mode": {"const": 9},
+        "paired_by": {
+          "const": ["run_label", "prompt_occurrence"]
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "required": [
+        "nodes",
+        "world_size",
+        "background_bytes_per_block",
+        "source_calls_per_background_block",
+        "modes"
+      ],
+      "properties": {
+        "nodes": {"const": 4},
+        "world_size": {"const": 16},
+        "background_bytes_per_block": {"const": 134217728},
+        "source_calls_per_background_block": {"const": 8},
+        "modes": {"const": ["fg_only", "lmcache_greedy", "tempo_group2"]}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "required": [
+        "all_three_run_contracts_met",
+        "all_tempo_runtime_gates_met",
+        "all_tempo_schedule_adherence_met",
+        "all_tempo_absolute_deadlines_met",
+        "all_tempo_no_post_foreground_drain_met"
+      ],
+      "properties": {
+        "all_three_run_contracts_met": {"const": true},
+        "all_tempo_runtime_gates_met": {"type": "boolean"},
+        "all_tempo_schedule_adherence_met": {"type": "boolean"},
+        "all_tempo_absolute_deadlines_met": {"type": "boolean"},
+        "all_tempo_no_post_foreground_drain_met": {"type": "boolean"}
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["label", "source_path", "allocation_id", "checks", "mode_summaries"]
+      }
+    },
+    "pooled_modes": {
+      "type": "object",
+      "required": ["fg_only", "lmcache_greedy", "tempo_group2"],
+      "additionalProperties": false,
+      "properties": {
+        "fg_only": {"$ref": "#/$defs/pooledMode"},
+        "lmcache_greedy": {"$ref": "#/$defs/pooledMode"},
+        "tempo_group2": {"$ref": "#/$defs/pooledMode"}
+      }
+    },
+    "paired_comparisons": {
+      "type": "object",
+      "required": ["tempo_group2_vs_lmcache_greedy", "tempo_group2_vs_fg_only"]
+    }
+  },
+  "$defs": {
+    "robustSummary": {
+      "type": "object",
+      "required": ["samples", "median", "min", "max", "mad"],
+      "properties": {
+        "samples": {"type": "integer", "minimum": 1},
+        "median": {"type": "number"},
+        "min": {"type": "number"},
+        "max": {"type": "number"},
+        "mad": {"type": "number", "minimum": 0}
+      }
+    },
+    "pooledMode": {
+      "type": "object",
+      "required": ["samples", "metrics"],
+      "properties": {
+        "samples": {"const": 9},
+        "metrics": {
+          "type": "object",
+          "required": [
+            "ttft_ms",
+            "tpot_p50_ms",
+            "request_e2e_ms",
+            "background_finish_from_request_start_ms"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ttft_ms": {"$ref": "#/$defs/robustSummary"},
+            "tpot_p50_ms": {"$ref": "#/$defs/robustSummary"},
+            "request_e2e_ms": {"$ref": "#/$defs/robustSummary"},
+            "background_finish_from_request_start_ms": {"$ref": "#/$defs/robustSummary"}
+          }
+        }
+      }
+    }
+  }
+}

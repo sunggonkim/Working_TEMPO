@@ -1,0 +1,117 @@
+{
+  "capacities": [
+    {
+      "active_sequences": 16,
+      "decode_tokens": 4096,
+      "endpoint_requests": 16,
+      "local_prefill_token_ms": 16993182,
+      "pair_index": 0,
+      "remote_kv_bytes": 939065344,
+      "remote_prefill_token_ms": 11217384,
+      "remote_semantic_ops": 4
+    },
+    {
+      "active_sequences": 16,
+      "decode_tokens": 4096,
+      "endpoint_requests": 16,
+      "local_prefill_token_ms": 16993182,
+      "pair_index": 1,
+      "remote_kv_bytes": 939065344,
+      "remote_prefill_token_ms": 11217384,
+      "remote_semantic_ops": 4
+    }
+  ],
+  "causality": {
+    "decoder_credit_scope": "request_start_to_http_eof",
+    "endpoint_credit_scope": "route_commit_to_first_response",
+    "future_arrivals_policy_input": false,
+    "oracle_policy_input": false,
+    "phase_label_policy_input": false,
+    "physical_switch_label_policy_input": false,
+    "telemetry_clock": "frontend_perf_counter_interval_start"
+  },
+  "controller": {
+    "activation_penalty_ms": 1.0,
+    "maximum_active_pairs": 2,
+    "maximum_queue_wait_ns": 2000000000,
+    "minimum_active_pairs": 1,
+    "probe_penalty_ms": 10.0,
+    "queue_capacity": 128,
+    "scale_down_idle_ns": 5000000000,
+    "scale_up_utilization": 0.75,
+    "utilization_penalty_ms": 100.0
+  },
+  "deployment_scope": "discovery",
+  "fingerprint_sha256": "383503d03ee5c5a45ff9540c6a8bf635a0807b5fc6bf10b3c4d2381baef31f0f",
+  "identity": {
+    "elastic_profile_fingerprint_sha256": "7b161a59723c2b358e602fcce569b4e3c85d4677c1b9fce144bed6f6d548a8a3",
+    "endpoint_profile_deployment_scope": "calibration_only",
+    "endpoint_profile_fingerprint_sha256": "8499a3c0465ad94abc0887180f2e627cc812fa98e5f1caf412b6b74bc17aad21",
+    "endpoint_profile_id": "tempo-pd-endpoint-qwen25-ucx-c4-semantic-credit-epoch-v2",
+    "endpoint_profile_schema": "tempo-pd-endpoint-service-profile-v2",
+    "model_config_sha256": "7463bb0ea78315365e6c6b74de4e73bbcc8359dfb0c5a737584e077d42c0b03c",
+    "router_schema": "tempo-elastic-pd-router-canonical",
+    "workload_manifest_sha256": "c029e24a7cfea6cd567ffd89dc2b49b9822d92514341f73f04582f0f70aa7544"
+  },
+  "profile_id": "tempo-go-qwen25-perlmutter-discovery-v1",
+  "schema": "tempo-go-profile-v1",
+  "telemetry": {
+    "agent_epoch_source": "slurm_job_id_frontend_start_ns",
+    "controller_generation": 0,
+    "endpoint_feedback_mode": "adaptive",
+    "endpoint_routing_policy": "semantic_epoch_v1",
+    "freshness_ns": 100000000,
+    "maximum_collection_span_ns": 50000000,
+    "refresh_timeout_ns": 50000000,
+    "tokenizer_timeout_ns": 5000000000,
+    "scheduler_observation_required": true
+  },
+  "tenants": [
+    {
+      "e2e_slo_ms": 4000.0,
+      "maximum_queue_wait_ns": 500000000,
+      "minimum_service_fraction": 0.15,
+      "tenant_id": "latency",
+      "tpot_slo_ms": 100.0,
+      "ttft_slo_ms": 1000.0,
+      "weight": 4.0
+    },
+    {
+      "e2e_slo_ms": 8000.0,
+      "maximum_queue_wait_ns": 1000000000,
+      "minimum_service_fraction": 0.15,
+      "tenant_id": "interactive",
+      "tpot_slo_ms": 150.0,
+      "ttft_slo_ms": 2000.0,
+      "weight": 2.0
+    },
+    {
+      "e2e_slo_ms": 16000.0,
+      "maximum_queue_wait_ns": 2000000000,
+      "minimum_service_fraction": 0.1,
+      "tenant_id": "batch",
+      "tpot_slo_ms": 250.0,
+      "ttft_slo_ms": 3000.0,
+      "weight": 1.0
+    },
+    {
+      "e2e_slo_ms": 30000.0,
+      "maximum_queue_wait_ns": 5000000000,
+      "minimum_service_fraction": 0.05,
+      "tenant_id": "background",
+      "tpot_slo_ms": 400.0,
+      "ttft_slo_ms": 5000.0,
+      "weight": 0.5
+    }
+  ],
+  "topology": {
+    "gpu_count": 16,
+    "native_only": true,
+    "node_count": 4,
+    "pair_count": 2,
+    "prewarmed_pair_count": 2,
+    "privileged_nic_control": false,
+    "route_immutable": true
+  },
+  "transport": "LMCacheConnectorV1:UCX"
+}

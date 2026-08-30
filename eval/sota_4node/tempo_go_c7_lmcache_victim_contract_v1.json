@@ -1,0 +1,79 @@
+{
+  "claim_boundary": {
+    "controller_performance_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "purpose": "Qualify official LMCache P-to-D completion as a material victim of sustained real NCCL before C7 controller tuning"
+  },
+  "lmcache_victim_abba": {
+    "arms": [
+      {
+        "name": "00_lmcache_control_a",
+        "nccl_load": "control",
+        "token_iters": 1
+      },
+      {
+        "name": "01_lmcache_nccl_hot_a",
+        "nccl_load": "hot",
+        "token_iters": 8192
+      },
+      {
+        "name": "02_lmcache_nccl_hot_b",
+        "nccl_load": "hot",
+        "token_iters": 8192
+      },
+      {
+        "name": "03_lmcache_control_b",
+        "nccl_load": "control",
+        "token_iters": 1
+      }
+    ],
+    "minimum_active_duration_s": 30,
+    "parameters": {
+      "block_delay_s": 0,
+      "foreground_mib": 32,
+      "kv_mib": 128,
+      "maximum_blocks": 17,
+      "minimum_blocks": 16,
+      "nixl_transfer_timeout_s": 120,
+      "process_group_timeout_s": 120,
+      "requests": 8
+    },
+    "qualification_gates": {
+      "same_victim_population": "identical official LMCache transfer count, bytes, topology, and ABBA node pair; only NCCL collective count changes",
+      "transfer_p50_degradation_fraction": 0.25,
+      "transfer_p99_ratio": 2.0,
+      "transfer_slo_attainment_drop_percentage_points": 20.0,
+      "transfer_slo_ms": 5000.0
+    },
+    "topology": {
+      "aggressor": "eight-rank WORLD NCCL all-reduce on every GPU, using NERSC AWS Libfabric over Slingshot",
+      "nodes": 2,
+      "ranks_per_node": 4,
+      "traffic_pattern": "paired_1to1",
+      "victim": "four concurrent official LMCache NixlChannel UCX P-to-D writes, one source and receiver per GPU",
+      "world_size": 8
+    }
+  },
+  "schema": "tempo-go-c7-lmcache-victim-abba-contract-v1",
+  "source_binding": {
+    "component_python": {
+      "path": "eval/sota_4node/run_lmcache_nixl_contention_2node.py",
+      "sha256": "8421055bb09445673d9e70d780a0a77483d37769b70e582cf992499ab9214420"
+    },
+    "component_wrapper": {
+      "path": "eval/sota_4node/run_lmcache_nixl_contention_2node_in_allocation.sh",
+      "sha256": "6bb6bd20997e2207123016c50f92f8adc051d3e3b864a0aec27eea8c820b656d"
+    },
+    "lmcache_commit": "227d13f5c9fdb52ddb933641d34331f678de03a0",
+    "lmcache_nixl_channel": {
+      "path": "third_party/lmcache/lmcache/v1/transfer_channel/nixl_channel.py",
+      "sha256": "7ee4c852664702cae58eeeac6c79468cff882156e23b21f39cd3a45284f2fece"
+    }
+  },
+  "transport": {
+    "lmcache": "official checked-out LMCache NixlChannel with NIXL UCX",
+    "nccl": "NERSC PyTorch NCCL with NCCL_NET=AWS Libfabric",
+    "privileged_or_container_configuration_allowed": false,
+    "synthetic_cxi_is_primary_evidence": false
+  }
+}

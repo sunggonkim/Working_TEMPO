@@ -96,6 +96,7 @@ JOINT_ACTUATION_SCHEMA_V3 = "tempo-go-joint-actuation-v3"
 GLOBAL_PROFILE_SHA_ENV = "TEMPO_GO_PROFILE_SHA256"
 GLOBAL_PROFILE_ENV = "TEMPO_GO_PROFILE"
 NCCL_OBSERVER_MAX_AGE_MS_ENV = "TEMPO_GO_NCCL_OBSERVER_MAX_AGE_MS"
+NCCL_OBSERVER_PATH_TEMPLATE_ENV = "TEMPO_GO_NCCL_OBSERVER_PATH_TEMPLATE"
 ENDPOINT_FEEDBACK_MODE_ENV = "TEMPO_PD_ENDPOINT_FEEDBACK_MODE"
 ENDPOINT_FEEDBACK_DISABLED_MODE = "disabled"
 ENDPOINT_FEEDBACK_ADAPTIVE_MODE = "adaptive"
@@ -535,6 +536,8 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             raise ValueError(
                 "TEMPO request priorities require vLLM priority scheduling")
         self.global_priority_service_lane_enabled = False
+        self.global_priority_service_lane_mode = "disabled"
+        self.global_priority_service_lane_priority = 0
         raw_global_profile = os.environ.get(GLOBAL_PROFILE_ENV)
         if priority_enabled and raw_global_profile:
             global_profile = load_global_profile(
@@ -543,9 +546,10 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             if global_profile.fingerprint_sha256 != self.global_profile_sha256:
                 raise ValueError(
                     "priority service-lane global profile identity differs")
-            if global_config.priority_service_lane_mode == (
-                "vllm_priority_remote_cache_v1"
-            ):
+            if global_config.priority_service_lane_mode in {
+                "vllm_priority_remote_cache_v1",
+                "vllm_priority_business_dual_route_v2",
+            }:
                 if (
                     self.strong_remote_catchup_priority
                     != global_config.priority_service_lane_priority
@@ -562,6 +566,10 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                         "router priority action differs from frozen global lane"
                     )
                 self.global_priority_service_lane_enabled = True
+                self.global_priority_service_lane_mode = (
+                    global_config.priority_service_lane_mode)
+                self.global_priority_service_lane_priority = (
+                    global_config.priority_service_lane_priority)
 
         self._request_source_cached_tokens = {}
         self._request_decoder_cache_parsers = {}
@@ -855,6 +863,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         profile_sha256, decision_sha256, telemetry_sequence,
         actuation_plan=None, queue_lease=None, prefill_index=None,
         decoder_index=None, edge_id=None, priority_service_lane=None,
+        service_queue_delay_ms=None, service_forecast_ms=None,
     ):
         """Bind one frontend global decision before tokenization/upstream work."""
 
@@ -871,6 +880,30 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 raise ValueError(
                     "TEMPO-GO priority service-lane flag is invalid")
             parsed_priority_service_lane = priority_service_lane == "1"
+        service_values = {
+            "service_queue_delay_ms": service_queue_delay_ms,
+            "service_forecast_ms": service_forecast_ms,
+        }
+        service_present = {
+            name: value is not None for name, value in service_values.items()
+        }
+        if any(service_present.values()) and not all(service_present.values()):
+            raise ValueError("TEMPO-GO service forecast headers are incomplete")
+        parsed_service = {}
+        for name, value in service_values.items():
+            if value is None:
+                parsed_service[name] = None
+                continue
+            try:
+                parsed = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"TEMPO-GO {name} must be a finite non-negative number"
+                ) from exc
+            if not math.isfinite(parsed) or parsed < 0.0:
+                raise ValueError(
+                    f"TEMPO-GO {name} must be a finite non-negative number")
+            parsed_service[name] = parsed
         raw = {
             "schema": schema,
             "pair_index": pair_index,
@@ -1219,6 +1252,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             "actuation_plan": parsed_actuation,
             "queue_lease": parsed_queue_lease,
             "priority_service_lane": parsed_priority_service_lane,
+            **parsed_service,
             "phase_label_policy_input": False,
             "physical_switch_label_policy_input": False,
             "future_arrivals_policy_input": False,
@@ -1261,7 +1295,10 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             "edge_id", "route", "profile_sha256", "decision_sha256",
             "telemetry_sequence", "actuation_plan", "queue_lease",
         }
-        optional = {"priority_service_lane"}
+        optional = {
+            "priority_service_lane", "service_queue_delay_ms",
+            "service_forecast_ms",
+        }
         if not required <= set(commit) or set(commit) - required - optional:
             raise ValueError("global commit preflight inventory is not exact")
         if isinstance(commit["actuation_plan"], dict):
@@ -1297,6 +1334,22 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             raise ValueError(
                 "global commit preflight priority service lane is invalid")
         provisional["priority_service_lane"] = priority_service_lane
+        for field in ("service_queue_delay_ms", "service_forecast_ms"):
+            value = provisional.get(field)
+            if value is None:
+                continue
+            try:
+                parsed = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"global commit {field} is invalid") from exc
+            if not math.isfinite(parsed) or parsed < 0.0:
+                raise ValueError(f"global commit {field} is invalid")
+            provisional[field] = parsed
+        if (provisional.get("service_queue_delay_ms") is None) != (
+            provisional.get("service_forecast_ms") is None
+        ):
+            raise ValueError("global commit service forecast is incomplete")
         # These values are copied directly from the immutable HTTP headers.
         # Keep their canonical string representation: prepare_global_commit
         # intentionally rejects JSON-number aliases (the v23 frontend used
@@ -1354,6 +1407,10 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                     queue_lease=provisional["queue_lease"],
                     priority_service_lane=provisional[
                         "priority_service_lane"],
+                    service_queue_delay_ms=provisional.get(
+                        "service_queue_delay_ms"),
+                    service_forecast_ms=provisional.get(
+                        "service_forecast_ms"),
                 )
                 return self._record_service_lane_reservation(
                     request_id, record)
@@ -1636,7 +1693,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             "reason": reason,
             "global_route": global_commit.get("route"),
             "endpoint_route": endpoint_route,
-            "queue_lease": bool(global_commit.get("queue_lease", False)),
+                "queue_lease": bool(global_commit.get("queue_lease", False)),
             "controller_generation": generation,
             "endpoint_decision": endpoint_decision,
             "received_ns": time.perf_counter_ns(),
@@ -2244,6 +2301,43 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
     def endpoint_controller_state(self):
         profile = self.endpoint_service_profile
         controller = self.endpoint_feedback
+        with self._lock:
+            active_records = {
+                request_id: record
+                for request_id, record in self._records.items()
+                if record.phase not in {
+                    ElasticPhase.COMPLETE.value,
+                    ElasticPhase.FAILED.value,
+                }
+            }
+            endpoint_request_ids = set(self._endpoint_requests)
+            queue_offer_ids = set(self._request_service_lane_queue_offers)
+            pending_global_commit_ids = set(self._request_pending_global_commits)
+            global_commits = dict(self._request_global_commits)
+            reservation_ids = set(self._request_service_lane_reservations)
+        endpoint_queue_ids = {
+            request_id for request_id, record in active_records.items()
+            if request_id in endpoint_request_ids
+            and record.route is ElasticRoute.QUEUE
+        }
+        active_reservation_ids = {
+            request_id for request_id in reservation_ids
+            if request_id in active_records
+        }
+        active_queue_lease_ids = {
+            request_id for request_id in active_reservation_ids
+            if active_records[request_id].route is ElasticRoute.QUEUE
+            and global_commits.get(request_id, {}).get("queue_lease")
+            in {True, "1"}
+        }
+        service_lane = {
+            "schema": "tempo-go-endpoint-service-lane-v1",
+            "endpoint_queue_requests": len(endpoint_queue_ids),
+            "pending_queue_offers": len(queue_offer_ids),
+            "pending_global_commits": len(pending_global_commit_ids),
+            "active_reservations": len(active_reservation_ids),
+            "active_queue_leases": len(active_queue_lease_ids),
+        }
         if profile is None or controller is None:
             return {
                 "schema": ROUTER_SCHEMA,
@@ -2255,17 +2349,10 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 "controller_generation": self._endpoint_controller_generation,
                 "queued_requests": 0,
                 "passive_registered_requests": 0,
+                "service_lane": service_lane,
             }
         with self._lock:
-            queued_requests = sum(
-                record.route is ElasticRoute.QUEUE
-                and record.phase not in {
-                    ElasticPhase.COMPLETE.value,
-                    ElasticPhase.FAILED.value,
-                }
-                for record in self._records.values()
-                if record.request_id in self._endpoint_requests
-            )
+            queued_requests = len(endpoint_queue_ids)
             passive_registered = len(self._passive_endpoint_requests)
             records = dict(self._records)
             endpoint_requests = dict(self._endpoint_requests)
@@ -2350,6 +2437,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             "controller_generation": self._endpoint_controller_generation,
             "queued_requests": queued_requests,
             "passive_registered_requests": passive_registered,
+            "service_lane": service_lane,
             "mesh_remote_by_decoder": mesh_remote_by_decoder,
         }
 
@@ -2437,6 +2525,15 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         # monotonic timestamps across hosts.  A stale, completed, malformed,
         # or mixed-epoch snapshot is explicit not_collected state.
         nccl_path = os.environ.get("TEMPO_GO_NCCL_TELEMETRY_PATH")
+        observer_template = os.environ.get(NCCL_OBSERVER_PATH_TEMPLATE_ENV)
+        if observer_template and self.local_decoder_index is not None:
+            try:
+                nccl_path = observer_template.format(
+                    pair=self.local_decoder_index,
+                    node=socket.gethostname(),
+                )
+            except (KeyError, IndexError, ValueError):
+                nccl_path = None
         nccl: NCCLObserverSnapshot | None = None
         nccl_age_ms: float | None = None
         if nccl_path:
@@ -2481,7 +2578,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                     else "cuda_collective_observer_unavailable"
                 ),
                 "uncertainty": nccl.uncertainty_ms if nccl is not None else 0.0,
-                "scope": "communicator",
+                "scope": "pair" if observer_template else "communicator",
             })
         if nccl is not None:
             for name, unit, value in (
@@ -2496,7 +2593,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                     "support": "supported",
                     "source": "tempo-nccl-observer-v1",
                     "uncertainty": nccl.uncertainty_ms,
-                    "scope": "communicator",
+                    "scope": "pair" if observer_template else "communicator",
                 })
         window_ms = (
             float(cassini.get("window_ms"))
@@ -3461,6 +3558,11 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             and isinstance(global_commit, dict)
             and global_commit.get("priority_service_lane") is True
         )
+        business_priority_lane_eligible = bool(
+            priority_lane_committed
+            and self.global_priority_service_lane_mode
+            == "vllm_priority_business_dual_route_v2"
+        )
         fabric_congested = bool(
             pressure
             and pressure.get("fabric_congested") is True
@@ -3481,7 +3583,11 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             and tempo_measured
             and record.route is ElasticRoute.REMOTE
             and (
-                priority_lane_committed
+                (
+                    priority_lane_committed
+                    and self.global_priority_service_lane_mode
+                    == "vllm_priority_remote_cache_v1"
+                )
                 or (
                     not self.global_priority_service_lane_enabled
                     and (
@@ -3522,6 +3628,8 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
         medium_remote_eligible = (
             medium_remote_candidate and not suppress_remote_priority)
         priorities = [requested_priority]
+        if business_priority_lane_eligible:
+            priorities.append(self.global_priority_service_lane_priority)
         if remote_eligible:
             priorities.append(self.remote_catchup_priority)
         if strong_remote_eligible:
@@ -3534,7 +3642,10 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
             priorities.append(self.median_guard_priority)
         effective_priority = min(priorities)
         priority_class = (
-            "strong_remote_catchup"
+            "global_business_dual_route_service_lane"
+            if business_priority_lane_eligible
+            and effective_priority == self.global_priority_service_lane_priority
+            else "strong_remote_catchup"
             if strong_remote_eligible
             and effective_priority == self.strong_remote_catchup_priority
             else "long_remote_catchup"
@@ -3640,6 +3751,11 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 "priority_class": priority_class,
                 "global_priority_service_lane_committed": (
                     priority_lane_committed),
+                "global_business_priority_lane_eligible": (
+                    business_priority_lane_eligible),
+                "global_business_priority_lane_applied": (
+                    priority_class
+                    == "global_business_dual_route_service_lane"),
                 "fabric_congested": fabric_congested,
                 "fabric_congestion_suppressed": (
                     suppress_remote_priority
@@ -4048,6 +4164,17 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                     if cached_tokens != 0:
                         raise ValueError(
                             "cold measured remote request observed a source hit")
+                    return self.observe_cache_completion(
+                        request_id, prefill_resident=True,
+                        decode_resident=False, actual_kv_bytes=actual_kv_bytes)
+                if (
+                    os.environ.get("TEMPO_REAL_TRACE_NATURAL_CACHE") == "1"
+                    and prior_event is None
+                ):
+                    # A source-bound trace may begin with either an LMCache
+                    # hit or miss; unlike synthetic C9 arms, it does not have
+                    # a pre-seeded catalog row.  The completed remote backend
+                    # response is the residency evidence in this mode.
                     return self.observe_cache_completion(
                         request_id, prefill_resident=True,
                         decode_resident=False, actual_kv_bytes=actual_kv_bytes)
@@ -4468,6 +4595,7 @@ class ElasticPDRouterCore(runtime.ElasticPDRouterCore):
                 "decoder_index", "edge_id", "route",
                 "profile_sha256", "decision_sha256", "telemetry_sequence",
                 "queue_lease", "priority_service_lane",
+                "service_queue_delay_ms", "service_forecast_ms",
                 "phase_label_policy_input",
                 "physical_switch_label_policy_input",
                 "future_arrivals_policy_input", "received_ns",
@@ -4905,6 +5033,8 @@ class _GlobalCommitMiddleware:
         "actuation_plan": "x-tempo-go-actuation-plan",
         "queue_lease": "x-tempo-go-queue-lease",
         "priority_service_lane": "x-tempo-go-priority-service-lane",
+        "service_queue_delay_ms": "x-tempo-go-service-queue-delay-ms",
+        "service_forecast_ms": "x-tempo-go-service-forecast-ms",
     }
 
     def __init__(self, app, *, core):

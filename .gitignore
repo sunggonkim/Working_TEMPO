@@ -3,9 +3,17 @@ __pycache__/
 *.egg-info/
 .baseline_build/
 .baseline_deps/
+.build/
+.deps/
+.tools/
+.sota_venv/
+.vllm_venv/
 .vscode/
 eval/archive-local/
 paper/archive-local/
+paper/previousPapers/
+models/
+*.orig
 
 # Runtime artifacts stay local. Source-bound status is recorded in paper/.
 logs/

@@ -1,0 +1,6 @@
+[submodule "third_party/mooncake"]
+	path = third_party/mooncake
+	url = https://github.com/kvcache-ai/Mooncake.git
+[submodule "third_party/lmcache"]
+	path = third_party/lmcache
+	url = https://github.com/LMCache/LMCache.git

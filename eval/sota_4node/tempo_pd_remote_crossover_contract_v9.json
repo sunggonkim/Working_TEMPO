@@ -1,0 +1,15 @@
+{
+  "schema": "tempo-pd-remote-crossover-contract-9",
+  "model": "Qwen2.5-7B-Instruct",
+  "topology": "4 nodes, two TP4 prefill/decode replica pairs",
+  "arms": ["fixed_local", "official_lmcache_remote_chunk256"],
+  "remote_backend": "official LMCacheConnectorV1 PDBackendAsync NIXL UCX",
+  "chunk_size_tokens": 256,
+  "request_rate": "launcher_argument",
+  "max_workers": "launcher_argument",
+  "prompt_repetitions": [64, 192, 384],
+  "output_tokens": 32,
+  "samples_per_bucket": 3,
+  "purpose": "find a positive remote crossover before full controller validation",
+  "promotion_valid": false
+}

@@ -1,0 +1,78 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1450" height="730" viewBox="0 0 1450 730" role="img" aria-labelledby="figure-title figure-description">
+  <title id="figure-title">Candidate M N O business and observer progression</title>
+  <desc id="figure-description">Raw-terminal corrected business completion, failure, rejection, and observer support.</desc>
+  <rect x="0.00" y="0.00" width="1450.00" height="730.00" fill="#FFFFFF" />
+  <text x="48.00" y="43.00" fill="#172033" font-size="26" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">M→N→O: route-liveness는 business completion을 회복했지만 관측·tail gate는 남음</text>
+  <text x="48.00" y="72.00" fill="#5F6B7A" font-size="14" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Same offered population · M/N↔O는 separate allocation이라 비인과 context · valid failure receipt ≠ completion</text>
+  <rect x="35.00" y="98.00" width="710.00" height="570.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <rect x="765.00" y="98.00" width="650.00" height="570.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <text x="70.00" y="138.00" fill="#172033" font-size="18" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Background terminal outcome (% of offered)</text>
+  <text x="800.00" y="138.00" fill="#172033" font-size="18" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Completion and observer support (%)</text>
+  <line x1="110.00" y1="540.00" x2="670.00" y2="540.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="100.00" y="545.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">0</text>
+  <line x1="110.00" y1="470.00" x2="670.00" y2="470.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="100.00" y="475.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">20</text>
+  <line x1="110.00" y1="400.00" x2="670.00" y2="400.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="100.00" y="405.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">40</text>
+  <line x1="110.00" y1="330.00" x2="670.00" y2="330.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="100.00" y="335.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">60</text>
+  <line x1="110.00" y1="260.00" x2="670.00" y2="260.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="100.00" y="265.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">80</text>
+  <line x1="110.00" y1="190.00" x2="670.00" y2="190.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="100.00" y="195.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">100</text>
+  <rect x="157.33" y="351.75" width="92.00" height="188.25" fill="#059669" rx="2" />
+  <rect x="157.33" y="342.46" width="92.00" height="9.30" fill="#F59E0B" rx="2" />
+  <rect x="157.33" y="190.00" width="92.00" height="152.46" fill="#DC2626" rx="2" />
+  <text x="203.33" y="570.00" fill="#172033" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Candidate M</text>
+  <text x="203.33" y="178.00" fill="#94A3B8" font-size="12" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">53.8%</text>
+  <rect x="344.00" y="366.40" width="92.00" height="173.60" fill="#059669" rx="2" />
+  <rect x="344.00" y="359.27" width="92.00" height="7.13" fill="#F59E0B" rx="2" />
+  <rect x="344.00" y="190.00" width="92.00" height="169.27" fill="#DC2626" rx="2" />
+  <text x="390.00" y="570.00" fill="#172033" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Candidate N</text>
+  <text x="390.00" y="178.00" fill="#D97706" font-size="12" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">49.6%</text>
+  <rect x="530.67" y="284.76" width="92.00" height="255.24" fill="#059669" rx="2" />
+  <rect x="530.67" y="279.67" width="92.00" height="5.09" fill="#F59E0B" rx="2" />
+  <rect x="530.67" y="190.00" width="92.00" height="89.67" fill="#DC2626" rx="2" />
+  <text x="576.67" y="570.00" fill="#172033" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Candidate O</text>
+  <text x="576.67" y="178.00" fill="#1457D9" font-size="12" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">72.9%</text>
+  <rect x="135.00" y="583.00" width="18.00" height="12.00" fill="#059669" rx="2" />
+  <text x="160.00" y="594.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">complete</text>
+  <rect x="305.00" y="583.00" width="18.00" height="12.00" fill="#F59E0B" rx="2" />
+  <text x="330.00" y="594.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">service failure</text>
+  <rect x="475.00" y="583.00" width="18.00" height="12.00" fill="#DC2626" rx="2" />
+  <text x="500.00" y="594.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">queue reject</text>
+  <text x="390.00" y="637.00" fill="#1457D9" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Candidate O: 2,004 complete · 40 failure · 704 queue reject</text>
+  <line x1="825.00" y1="540.00" x2="1345.00" y2="540.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="815.00" y="545.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">0</text>
+  <line x1="825.00" y1="470.00" x2="1345.00" y2="470.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="815.00" y="475.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">20</text>
+  <line x1="825.00" y1="400.00" x2="1345.00" y2="400.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="815.00" y="405.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">40</text>
+  <line x1="825.00" y1="330.00" x2="1345.00" y2="330.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="815.00" y="335.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">60</text>
+  <line x1="825.00" y1="260.00" x2="1345.00" y2="260.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="815.00" y="265.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">80</text>
+  <line x1="825.00" y1="190.00" x2="1345.00" y2="190.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="815.00" y="195.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">100</text>
+  <rect x="867.67" y="201.67" width="26.00" height="338.33" fill="#059669" rx="2" />
+  <rect x="898.67" y="351.75" width="26.00" height="188.25" fill="#78A7FF" rx="2" />
+  <rect x="929.67" y="381.67" width="26.00" height="158.33" fill="#7C3AED" rx="2" />
+  <text x="911.67" y="570.00" fill="#172033" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Candidate M</text>
+  <rect x="1041.00" y="445.00" width="26.00" height="95.00" fill="#059669" rx="2" />
+  <rect x="1072.00" y="366.40" width="26.00" height="173.60" fill="#78A7FF" rx="2" />
+  <rect x="1103.00" y="503.33" width="26.00" height="36.67" fill="#7C3AED" rx="2" />
+  <text x="1085.00" y="570.00" fill="#172033" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Candidate N</text>
+  <rect x="1214.33" y="195.00" width="26.00" height="345.00" fill="#059669" rx="2" />
+  <rect x="1245.33" y="284.76" width="26.00" height="255.24" fill="#78A7FF" rx="2" />
+  <rect x="1276.33" y="478.33" width="26.00" height="61.67" fill="#7C3AED" rx="2" />
+  <text x="1258.33" y="570.00" fill="#172033" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Candidate O</text>
+  <rect x="850.00" y="583.00" width="18.00" height="12.00" fill="#059669" rx="2" />
+  <text x="875.00" y="594.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">foreground</text>
+  <rect x="1005.00" y="583.00" width="18.00" height="12.00" fill="#78A7FF" rx="2" />
+  <text x="1030.00" y="594.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">background</text>
+  <rect x="1160.00" y="583.00" width="18.00" height="12.00" fill="#7C3AED" rx="2" />
+  <text x="1185.00" y="594.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">observer</text>
+  <text x="1085.00" y="625.00" fill="#DC2626" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">O: foreground 207/210 · background 2004/2748 · observer 37/210</text>
+  <text x="1085.00" y="649.00" fill="#DC2626" font-size="12" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">route-scope mechanism activation: 0/1,614 decisions → causal positive 아님</text>
+</svg>

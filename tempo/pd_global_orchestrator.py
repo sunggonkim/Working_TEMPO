@@ -36,8 +36,17 @@ SERVICE_LANE_RESERVATION_SCHEMA = "tempo-go-service-lane-reservation-v1"
 SERVICE_LANE_QUEUE_PROMOTION_SCHEMA = (
     "tempo-go-service-lane-queue-promotion-v1")
 PRIORITY_SERVICE_LANE_BINDING = "vllm_priority_remote_cache_service_lane"
+BUSINESS_PRIORITY_SERVICE_LANE_BINDING = (
+    "vllm_priority_business_dual_route_service_lane")
+REMOTE_CACHE_PRIORITY_SERVICE_LANE_MODE = "vllm_priority_remote_cache_v1"
+BUSINESS_DUAL_ROUTE_PRIORITY_SERVICE_LANE_MODE = (
+    "vllm_priority_business_dual_route_v2")
 MESH_NEAR_TIE_SOURCE_BALANCE_BINDING = (
     "mesh_telemetry_uncertainty_source_virtual_service")
+PROTECTED_SERVICE_LANE_BINDING = (
+    "global_protected_service_lane_reservation_v1")
+PROTECTED_SERVICE_LANE_MODE = "tenant_pair_edge_reservation_v1"
+PROTECTED_SERVICE_LANE_RESERVE_MODE = "tenant_pair_edge_reservation_v2"
 
 
 def _positive_int(name: str, value: int, *, zero: bool = False) -> None:
@@ -780,6 +789,11 @@ class PairTelemetry:
     endpoint_completed_first_responses: int | None = None
     endpoint_residual_inflight: int | None = None
     completion_schema: str | None = None
+    service_lane_queue_requests: int | None = None
+    service_lane_queue_offers: int | None = None
+    service_lane_pending_global_commits: int | None = None
+    service_lane_active_reservations: int | None = None
+    service_lane_active_queue_leases: int | None = None
     quarantine_reason: str | None = None
     source: str = "application_endpoint_agent"
     schema: str = TELEMETRY_SCHEMA
@@ -853,6 +867,24 @@ class PairTelemetry:
                 raise ValueError("completion_schema is required with completion telemetry")
         elif self.completion_schema is not None:
             raise ValueError("completion identity requires completion telemetry")
+        service_lane_values = (
+            self.service_lane_queue_requests,
+            self.service_lane_queue_offers,
+            self.service_lane_pending_global_commits,
+            self.service_lane_active_reservations,
+            self.service_lane_active_queue_leases,
+        )
+        if any(value is not None for value in service_lane_values):
+            if any(value is None for value in service_lane_values):
+                raise ValueError("service-lane telemetry fields must be complete")
+            for name in (
+                "service_lane_queue_requests",
+                "service_lane_queue_offers",
+                "service_lane_pending_global_commits",
+                "service_lane_active_reservations",
+                "service_lane_active_queue_leases",
+            ):
+                _positive_int(name, getattr(self, name), zero=True)
         if self.quarantine_reason is not None and (
             not isinstance(self.quarantine_reason, str)
             or not self.quarantine_reason.strip()
@@ -1041,6 +1073,17 @@ class GlobalOrchestratorConfig:
     # endpoint. ``None`` inherits the frozen global ingress queue capacity
     # for backwards-compatible profiles.
     endpoint_queue_capacity: int | None = None
+    # A stale-feedback recovery probe is normally one-shot per route.  The
+    # opt-in shared mode lets later waiters reuse that already-running proof
+    # while explicit native queue headroom remains available.  It does not
+    # create another probe and does not bypass completion/fabric guards.
+    completion_liveness_shared_probe_mode: str = "disabled"
+    # An opt-in queue lease may use fresh, failure-free completion progress as
+    # the initial credit when the native endpoint queue still has headroom.
+    # This is what lets a burst enter the bounded vLLM queue before the global
+    # reservation window expires; it never waives endpoint headroom or route
+    # and fabric guards.
+    endpoint_queue_headroom_admission_mode: str = "disabled"
     # A production decoder can expose a bounded, business-owned priority lane
     # independently of its ordinary FCFS backlog.  The v1 lane is deliberately
     # narrow: only a proven remote cache-affinity candidate for an opted-in
@@ -1080,6 +1123,12 @@ class GlobalOrchestratorConfig:
     # score by this margin.  Zero means strict score improvement and keeps
     # legacy profiles' economics explicit rather than using a phase label.
     proactive_scale_up_route_benefit_margin_ms: float = 0.0
+    # Business pair packing protects a higher-priority tenant from a lower
+    # priority tenant's packed pair, but it must not turn into permanent
+    # single-pair pinning.  Once every clean candidate is at this observed
+    # utilization, re-admit dirty candidates and let the complete live score
+    # (decoder, endpoint, mesh, and fabric) choose a spill/scale route.
+    business_clean_pair_pressure_fraction: float = 1.0
     # The endpoint controller's semantic-op window is a transport/data-plane
     # safety boundary, not a promise that the final slot is safe to use under
     # contention.  A frozen non-zero reserve lets discovery protect that
@@ -1114,6 +1163,30 @@ class GlobalOrchestratorConfig:
     # lease so global admission remains work-conserving.
     cross_layer_control_mode: str = "hard_window_v1"
     cross_layer_shadow_price_ms: float = 0.0
+    # Price receiver-side LMCache transfer latency for LOCAL candidates when
+    # the observer is pair-scoped.  A local route avoids issuing a new KV
+    # transfer, but it still competes with the observed receiver/collective
+    # work on that decoder pair; treating that externality as zero was the
+    # measured cause of the C9 normal-control D0 tail.
+    cross_layer_local_receiver_price_ms: float = 0.0
+    # A pair-scoped LMCache transfer tail above this explicit service ceiling
+    # is a receiver admission guard, not merely a score penalty.  It denies
+    # new REMOTE work on that pair while still allowing LOCAL/spare-pair
+    # candidates to be evaluated.  Disabled by default so legacy profiles
+    # preserve their exact semantics.
+    cross_layer_remote_receiver_guard_mode: str = "disabled"
+    # ``pair`` protects only the receiver identified by the candidate's
+    # decoder pair. ``shared_group`` is the allocation-wide safety mode:
+    # when one compatible pair is hot, a new remote edge is not admitted to
+    # another member merely to move the incast victim.
+    cross_layer_remote_receiver_guard_scope: str = "pair"
+    # A deployment may bind several P/D pairs to one allocation-wide fabric
+    # group even when one member cannot publish a cross-layer sample (for
+    # example, a co-job observer covers only P0-D0).  This explicit identity
+    # lets the guard fail closed for the whole declared group; an empty value
+    # retains telemetry-derived group membership for legacy profiles.
+    cross_layer_remote_receiver_guard_group_id: str = ""
+    cross_layer_remote_receiver_guard_p99_ms: float = 0.0
     cross_layer_critical_pressure_fraction: float = 2.0
     # v3 enables an allocation-scoped shared remote budget.  Zero capacities
     # mean "derive the sum of configured pair capacities"; explicit values
@@ -1148,6 +1221,20 @@ class GlobalOrchestratorConfig:
     # prior only when an active decoder is hot while both the remote source
     # and destination are cool; normal phases retain ordinary E2E scoring.
     mesh_cool_remote_route_pressure_fraction: float = 0.5
+    # Candidate J: forecast currently observed service waves across the
+    # destination decoder/endpoint and, for remote work, source/edge/receiver
+    # before committing a request. Disabled preserves legacy profiles; the
+    # enabled mode is a hard deadline feasibility lease, not a future-arrival
+    # predictor or a second route-ratio policy.
+    service_feasibility_mode: str = "disabled"
+    service_forecast_safety_factor: float = 1.0
+    # Candidate K: reserve a small, explicit service lane per business tenant
+    # and physical P->D edge.  Lower-priority work is admitted only from the
+    # residual endpoint/decoder/edge budget; protected work consumes the
+    # reservation atomically with the normal route lease.
+    protected_service_lane_mode: str = "disabled"
+    protected_service_lane_capacity: int = 0
+    protected_service_lane_min_admission_priority: int = 0
 
     def __post_init__(self) -> None:
         if not self.capacities:
@@ -1220,6 +1307,22 @@ class GlobalOrchestratorConfig:
             "after_timeout", "headroom_first_v1",
         }:
             raise ValueError("unsupported endpoint_queue_admission_mode")
+        if self.completion_liveness_shared_probe_mode not in {
+            "disabled", "headroom_shared_v1",
+        }:
+            raise ValueError("unsupported completion_liveness_shared_probe_mode")
+        if self.endpoint_queue_headroom_admission_mode not in {
+            "disabled", "completion_progress_v1",
+        }:
+            raise ValueError("unsupported endpoint_queue_headroom_admission_mode")
+        if (
+            self.completion_liveness_shared_probe_mode != "disabled"
+            and self.endpoint_queue_debt_mode
+            != "completion_credit_mesh_endpoint_queue_v1"
+        ):
+            raise ValueError(
+                "shared liveness probes require receiver-credit mesh queue mode"
+            )
         endpoint_queue_capacity = self.endpoint_queue_capacity
         if endpoint_queue_capacity is None:
             endpoint_queue_capacity = self.queue_capacity
@@ -1227,7 +1330,9 @@ class GlobalOrchestratorConfig:
                 self, "endpoint_queue_capacity", endpoint_queue_capacity)
         _positive_int("endpoint_queue_capacity", endpoint_queue_capacity)
         if self.priority_service_lane_mode not in {
-            "disabled", "vllm_priority_remote_cache_v1",
+            "disabled",
+            REMOTE_CACHE_PRIORITY_SERVICE_LANE_MODE,
+            BUSINESS_DUAL_ROUTE_PRIORITY_SERVICE_LANE_MODE,
         }:
             raise ValueError("unsupported priority_service_lane_mode")
         _positive_int(
@@ -1275,8 +1380,10 @@ class GlobalOrchestratorConfig:
                 raise ValueError(
                     "disabled decoder business admission cannot retain wait")
         elif (
-            self.priority_service_lane_mode
-            != "vllm_priority_remote_cache_v1"
+            self.priority_service_lane_mode not in {
+                REMOTE_CACHE_PRIORITY_SERVICE_LANE_MODE,
+                BUSINESS_DUAL_ROUTE_PRIORITY_SERVICE_LANE_MODE,
+            }
             or self.decoder_business_background_max_wait_ns <= 0
             or any(
                 capacity.resources.active_sequences
@@ -1325,6 +1432,44 @@ class GlobalOrchestratorConfig:
             "cross_layer_shadow_price_ms",
             self.cross_layer_shadow_price_ms,
         )
+        _finite(
+            "cross_layer_local_receiver_price_ms",
+            self.cross_layer_local_receiver_price_ms,
+        )
+        if self.cross_layer_remote_receiver_guard_mode not in {
+            "disabled", "deny_while_hot",
+        }:
+            raise ValueError(
+                "unsupported cross_layer_remote_receiver_guard_mode")
+        if self.cross_layer_remote_receiver_guard_scope not in {
+            "pair", "shared_group",
+        }:
+            raise ValueError(
+                "unsupported cross_layer_remote_receiver_guard_scope")
+        if (
+            self.cross_layer_remote_receiver_guard_scope == "shared_group"
+            and self.mesh_control_mode == "disabled"
+        ):
+            raise ValueError(
+                "shared_group receiver guard requires P/D mesh control")
+        if (
+            self.cross_layer_remote_receiver_guard_scope == "shared_group"
+            and self.cross_layer_remote_receiver_guard_group_id
+            and not self.cross_layer_remote_receiver_guard_group_id.strip()
+        ):
+            raise ValueError(
+                "receiver guard group id must be non-whitespace when set")
+        _finite(
+            "cross_layer_remote_receiver_guard_p99_ms",
+            self.cross_layer_remote_receiver_guard_p99_ms,
+            minimum=0.0,
+        )
+        if (
+            self.cross_layer_remote_receiver_guard_mode == "deny_while_hot"
+            and self.cross_layer_remote_receiver_guard_p99_ms <= 0.0
+        ):
+            raise ValueError(
+                "receiver guard mode requires a positive p99 ceiling")
         _finite(
             "cross_layer_critical_pressure_fraction",
             self.cross_layer_critical_pressure_fraction,
@@ -1401,8 +1546,59 @@ class GlobalOrchestratorConfig:
             raise ValueError(
                 "mesh_cool_remote_route_pressure_fraction must be in (0, 1]"
             )
+        if self.service_feasibility_mode not in {
+            "disabled", "deadline_residual_v1",
+        }:
+            raise ValueError("unsupported service_feasibility_mode")
+        _finite(
+            "service_forecast_safety_factor",
+            self.service_forecast_safety_factor,
+            minimum=1.0,
+        )
+        if self.protected_service_lane_mode not in {
+            "disabled", PROTECTED_SERVICE_LANE_MODE,
+            PROTECTED_SERVICE_LANE_RESERVE_MODE,
+        }:
+            raise ValueError("unsupported protected_service_lane_mode")
+        _positive_int(
+            "protected_service_lane_capacity",
+            self.protected_service_lane_capacity,
+            zero=True,
+        )
+        _positive_int(
+            "protected_service_lane_min_admission_priority",
+            self.protected_service_lane_min_admission_priority,
+            zero=True,
+        )
+        if self.protected_service_lane_mode == "disabled":
+            if (
+                self.protected_service_lane_capacity != 0
+                or self.protected_service_lane_min_admission_priority != 0
+            ):
+                raise ValueError(
+                    "disabled protected service lane cannot retain capacity "
+                    "or a business priority"
+                )
+        elif (
+            self.mesh_control_mode != "receiver_credit_pxd_v1"
+            or self.protected_service_lane_capacity <= 0
+            or self.protected_service_lane_min_admission_priority <= 0
+            or any(
+                capacity.resources.endpoint_requests
+                <= self.protected_service_lane_capacity
+                for capacity in self.capacities
+            )
+        ):
+            raise ValueError(
+                "protected service lane requires mesh control, positive "
+                "capacity/priority, and residual endpoint capacity"
+            )
         if not 0.0 < float(self.scale_up_utilization) <= 1.0:
             raise ValueError("scale_up_utilization must be in (0, 1]")
+        if not 0.0 < float(self.business_clean_pair_pressure_fraction) <= 1.0:
+            raise ValueError(
+                "business_clean_pair_pressure_fraction must be in (0, 1]"
+            )
         for name in (
             "proactive_scale_up_queue_fraction",
             "proactive_scale_up_wait_fraction",
@@ -1559,6 +1755,12 @@ class GlobalDecision:
     mesh_near_tie_score_delta_ms: float | None = None
     mesh_source_virtual_service_before: float | None = None
     mesh_edge_virtual_service_before: float | None = None
+    service_queue_delay_ms: float | None = None
+    service_forecast_ms: float | None = None
+    protected_service_lane: bool = False
+    protected_service_lane_key: str | None = None
+    protected_service_lane_before: int | None = None
+    protected_service_lane_after: int | None = None
 
     def __post_init__(self) -> None:
         if self.schema != SCHEMA:
@@ -1644,6 +1846,29 @@ class GlobalDecision:
             "decision receiver_stagger_us", self.receiver_stagger_us, zero=True)
         if self.kind is not GlobalDecisionKind.ADMIT and self.receiver_stagger_us:
             raise ValueError("non-admission decision cannot stagger a receiver")
+        if type(self.protected_service_lane) is not bool:
+            raise TypeError("protected_service_lane must be bool")
+        protected_values = (
+            self.protected_service_lane_key,
+            self.protected_service_lane_before,
+            self.protected_service_lane_after,
+        )
+        if self.protected_service_lane:
+            if (
+                self.kind is not GlobalDecisionKind.ADMIT
+                or not isinstance(self.protected_service_lane_key, str)
+                or not self.protected_service_lane_key
+                or self.protected_service_lane_before is None
+                or self.protected_service_lane_after is None
+                or self.protected_service_lane_before < 0
+                or self.protected_service_lane_after
+                <= self.protected_service_lane_before
+            ):
+                raise ValueError(
+                    "protected service lane lacks an admission receipt")
+        elif any(value is not None for value in protected_values):
+            raise ValueError(
+                "unbound decision cannot carry protected service lane state")
         if type(self.mesh_near_tie_source_balanced) is not bool:
             raise TypeError("mesh_near_tie_source_balanced must be bool")
         for name in (
@@ -1651,6 +1876,8 @@ class GlobalDecision:
             "mesh_near_tie_score_delta_ms",
             "mesh_source_virtual_service_before",
             "mesh_edge_virtual_service_before",
+            "service_queue_delay_ms",
+            "service_forecast_ms",
         ):
             value = getattr(self, name)
             if value is not None:
@@ -1734,6 +1961,12 @@ def global_decision_dict(decision: GlobalDecision) -> dict[str, object]:
             decision.mesh_source_virtual_service_before),
         "mesh_edge_virtual_service_before": (
             decision.mesh_edge_virtual_service_before),
+        "service_queue_delay_ms": decision.service_queue_delay_ms,
+        "service_forecast_ms": decision.service_forecast_ms,
+        "protected_service_lane": decision.protected_service_lane,
+        "protected_service_lane_key": decision.protected_service_lane_key,
+        "protected_service_lane_before": decision.protected_service_lane_before,
+        "protected_service_lane_after": decision.protected_service_lane_after,
         "cache_group_key": decision.cache_group_key,
         "joint_actuation": (
             decision.joint_actuation.as_dict()
@@ -2184,6 +2417,9 @@ class _CandidateEvaluation:
     shared_scale_suppressed: bool = False
     endpoint_queue_debt_resources: tuple[str, ...] = ()
     completion_liveness_probe: bool = False
+    completion_liveness_shared_probe: bool = False
+    endpoint_queue_headroom_admission: bool = False
+    endpoint_queue_deadline_grace: bool = False
     # Endpoint service feedback can age out while the request-triggered
     # scheduler/completion envelope remains fresh.  In the global P-by-D mesh
     # that is uncertainty, not evidence of a failed path.  Keep the fallback
@@ -2198,6 +2434,12 @@ class _CandidateEvaluation:
     mesh_near_tie_score_delta_ms: float | None = None
     mesh_source_virtual_service_before: float | None = None
     mesh_edge_virtual_service_before: float | None = None
+    service_queue_delay_ms: float | None = None
+    service_forecast_ms: float | None = None
+    protected_service_lane: bool = False
+    protected_service_lane_key: str | None = None
+    protected_service_lane_before: int | None = None
+    protected_service_lane_after: int | None = None
 
 
 @dataclass
@@ -2749,14 +2991,23 @@ class GlobalOrchestrator:
             credit_consumed = bool(
                 completion_credit_mode
                 and not evaluated.priority_service_lane
+                and not evaluated.endpoint_queue_headroom_admission
                 and self._completion_credit_balance[pair] > 0
             )
             liveness_probe = bool(
                 evaluated.completion_liveness_probe and not credit_consumed)
+            shared_probe = bool(evaluated.completion_liveness_shared_probe)
+            headroom_admission = bool(
+                evaluated.endpoint_queue_headroom_admission)
             if (
                 completion_credit_mode
                 and not evaluated.priority_service_lane
-                and not (credit_consumed or liveness_probe)
+                and not (
+                    credit_consumed
+                    or liveness_probe
+                    or shared_probe
+                    or headroom_admission
+                )
             ):
                 raise RuntimeError(
                     "queue promotion lost its completion progress proof")
@@ -2766,7 +3017,7 @@ class GlobalOrchestrator:
                 + evaluated.endpoint_queue_debt_resources
                 + ("endpoint_service_lane_queue",)
                 + (
-                    (PRIORITY_SERVICE_LANE_BINDING,)
+                    (self._priority_service_lane_binding(),)
                     if evaluated.priority_service_lane else ()
                 )
                 + (
@@ -2774,16 +3025,24 @@ class GlobalOrchestrator:
                     if credit_consumed else
                     ("completion_liveness_bootstrap",)
                     if liveness_probe else
+                    ("completion_liveness_shared_probe",)
+                    if shared_probe else
+                    ("completion_progress_headroom",)
+                    if headroom_admission else
                     ()
                 )
             ))
             reason = (
-                "global_priority_remote_cache_service_lane_promoted"
+                self._priority_service_lane_reason(promoted=True)
                 if evaluated.priority_service_lane else
                 "global_endpoint_service_lane_completion_credit_promoted"
                 if credit_consumed else
                 "global_endpoint_service_lane_completion_liveness_promoted"
                 if liveness_probe else
+                "global_endpoint_service_lane_shared_liveness_route_committed"
+                if shared_probe else
+                "global_endpoint_service_lane_completion_progress_headroom_route_committed"
+                if headroom_admission else
                 "global_endpoint_service_lane_queue_promoted"
             )
             promoted = replace(
@@ -3245,14 +3504,25 @@ class GlobalOrchestrator:
             )
             binding = tuple(dict.fromkeys(
                 binding + selected.endpoint_queue_debt_resources))
+            if selected.protected_service_lane:
+                binding = tuple(dict.fromkeys(
+                    binding + (PROTECTED_SERVICE_LANE_BINDING,)))
             if selected.priority_service_lane:
                 binding = tuple(dict.fromkeys(
-                    binding + (PRIORITY_SERVICE_LANE_BINDING,)))
+                    binding + (self._priority_service_lane_binding(),)))
             if selected.mesh_near_tie_source_balanced:
                 binding = tuple(dict.fromkeys(
                     binding + (MESH_NEAR_TIE_SOURCE_BALANCE_BINDING,)))
+            if selected.completion_liveness_shared_probe:
+                binding = tuple(dict.fromkeys(
+                    binding + ("completion_liveness_shared_probe",)))
+            if selected.endpoint_queue_headroom_admission:
+                binding = tuple(dict.fromkeys(
+                    binding + ("completion_progress_headroom",)))
             completion_credit_used = bool(
                 not selected.priority_service_lane
+                and not selected.completion_liveness_shared_probe
+                and not selected.endpoint_queue_headroom_admission
                 and self.config.endpoint_queue_debt_mode in {
                     "completion_credit_endpoint_queue_v3",
                     "completion_credit_mesh_endpoint_queue_v1",
@@ -3267,8 +3537,14 @@ class GlobalOrchestrator:
                 kind=GlobalDecisionKind.ADMIT,
                 decided_ns=now_ns,
                 reason=(
-                    "global_priority_remote_cache_service_lane_route_committed"
+                    "global_protected_service_lane_queue_lease_committed"
+                    if selected.protected_service_lane else
+                    self._priority_service_lane_reason(promoted=False)
                     if selected.priority_service_lane else
+                    "global_endpoint_completion_progress_headroom_route_committed"
+                    if selected.endpoint_queue_headroom_admission else
+                    "global_endpoint_completion_liveness_shared_probe_route_committed"
+                    if selected.completion_liveness_shared_probe else
                     "global_endpoint_completion_liveness_probe_route_committed"
                     if selected.completion_liveness_probe else
                     "global_endpoint_completion_credit_route_committed"
@@ -3319,6 +3595,14 @@ class GlobalOrchestrator:
                     selected.mesh_source_virtual_service_before),
                 mesh_edge_virtual_service_before=(
                     selected.mesh_edge_virtual_service_before),
+                service_queue_delay_ms=selected.service_queue_delay_ms,
+                service_forecast_ms=selected.service_forecast_ms,
+                protected_service_lane=selected.protected_service_lane,
+                protected_service_lane_key=selected.protected_service_lane_key,
+                protected_service_lane_before=(
+                    selected.protected_service_lane_before),
+                protected_service_lane_after=(
+                    selected.protected_service_lane_after),
             )
             if completion_credit_used:
                 if self._completion_credit_balance[candidate.pair_index] <= 0:
@@ -3408,6 +3692,21 @@ class GlobalOrchestrator:
                 if budget is not None:
                     shared_groups[budget.group] = (
                         self._shared_budget_evidence(budget))
+            protected_debt: dict[str, int] = {}
+            for reservation in self._inflight.values():
+                if not reservation.decision.protected_service_lane:
+                    continue
+                candidate = reservation.candidate
+                key = self._protected_service_lane_key(candidate)
+                key_text = (
+                    f"local:d{key[1]}"
+                    if key[2] is GlobalRoute.LOCAL
+                    else f"remote:p{key[0]}->d{key[1]}"
+                )
+                protected_debt[key_text] = (
+                    protected_debt.get(key_text, 0)
+                    + reservation.held.active_sequences
+                )
             return {
                 "schema": SCHEMA,
                 "now_ns": now_ns,
@@ -3418,6 +3717,14 @@ class GlobalOrchestrator:
                 "telemetry_stale_grace_ns": (
                     self.config.telemetry_stale_grace_ns),
                 "shared_remote_budgets": shared_groups,
+                "cross_layer_remote_receiver_guard": {
+                    "mode": (
+                        self.config.cross_layer_remote_receiver_guard_mode),
+                    "scope": (
+                        self.config.cross_layer_remote_receiver_guard_scope),
+                    "p99_ceiling_ms": (
+                        self.config.cross_layer_remote_receiver_guard_p99_ms),
+                },
                 "queued": len(self._queued),
                 "inflight": len(self._inflight),
                 "terminal": len(self._terminal),
@@ -3442,6 +3749,17 @@ class GlobalOrchestrator:
                 "mesh_near_tie_source_balance_uncertainty_fraction": (
                     self.config.
                     mesh_near_tie_source_balance_uncertainty_fraction),
+                "service_feasibility_mode": (
+                    self.config.service_feasibility_mode),
+                "service_forecast_safety_factor": (
+                    self.config.service_forecast_safety_factor),
+                "protected_service_lane_mode": (
+                    self.config.protected_service_lane_mode),
+                "protected_service_lane_capacity": (
+                    self.config.protected_service_lane_capacity),
+                "protected_service_lane_min_admission_priority": (
+                    self.config.protected_service_lane_min_admission_priority),
+                "protected_service_lane_debt": protected_debt,
                 "priority_service_lane_debt": {
                     str(pair): self._priority_service_lane_debt(pair)
                     for pair in sorted(self._capacities)
@@ -4540,6 +4858,131 @@ class GlobalOrchestrator:
         capacity = self._capacities[pair].endpoint_requests
         return telemetry.endpoint_residual_inflight / capacity
 
+    def _service_feasibility_forecast(
+        self,
+        candidate: RouteCandidate,
+        *,
+        effective_used: ResourceVector,
+    ) -> tuple[float, float, tuple[str, ...]] | None:
+        """Forecast completion from currently observed service waves.
+
+        The forecast intentionally uses only state already installed in the
+        controller: decoder running/waiting work, endpoint residual/queue
+        work, and (for a mesh remote candidate) source/edge/receiver work.
+        ``max`` is used across overlapping observations so the same request
+        is not counted once as a scheduler request and again as completion
+        debt.  It is a conservative admission guard, not a claimed physical
+        service-rate model.
+        """
+
+        if self.config.service_feasibility_mode == "disabled":
+            return None
+        pair = int(candidate.decoder_index)
+        telemetry = self._telemetry[pair]
+        capacity = self._capacities[pair]
+        candidate_ttft = max(1e-9, candidate.predicted_ttft_ms)
+        candidate_service = max(1e-9, candidate.predicted_e2e_ms)
+        waves: list[tuple[str, float]] = []
+
+        decoder_ahead = float(effective_used.active_sequences)
+        if telemetry.scheduler_running_requests is not None:
+            decoder_ahead = max(
+                decoder_ahead,
+                float(
+                    telemetry.scheduler_running_requests
+                    + int(telemetry.scheduler_waiting_requests or 0)
+                ),
+            )
+        waves.append((
+            "decode_tokens",
+            decoder_ahead / max(1, capacity.active_sequences),
+        ))
+
+        endpoint_ahead = float(effective_used.endpoint_requests)
+        if telemetry.endpoint_residual_inflight is not None:
+            endpoint_ahead = max(
+                endpoint_ahead,
+                float(telemetry.endpoint_residual_inflight),
+            )
+        if telemetry.service_lane_queue_requests is not None:
+            endpoint_ahead = max(
+                endpoint_ahead,
+                float(telemetry.service_lane_queue_requests),
+            )
+        if telemetry.service_lane_pending_global_commits is not None:
+            endpoint_ahead = max(
+                endpoint_ahead,
+                float(
+                    telemetry.service_lane_pending_global_commits
+                    + telemetry.service_lane_active_reservations
+                    + telemetry.service_lane_active_queue_leases
+                ),
+            )
+        waves.append((
+            "endpoint_requests",
+            endpoint_ahead / max(1, capacity.endpoint_requests),
+        ))
+
+        if candidate.route is GlobalRoute.LOCAL:
+            waves.append((
+                "local_prefill_token_ms",
+                effective_used.local_prefill_token_ms
+                / max(1, capacity.local_prefill_token_ms),
+            ))
+        elif self._mesh_enabled():
+            prefill = int(candidate.prefill_index)
+            source_capacity = self._capacities[prefill]
+            waves.append((
+                "remote_prefill_token_ms",
+                self._mesh_source_used(prefill)
+                / max(1, source_capacity.remote_prefill_token_ms),
+            ))
+            edge = self._mesh_edges[(prefill, pair)]
+            waves.append((
+                "remote_semantic_ops",
+                max(
+                    edge.inflight_transfers,
+                    edge.held_remote_semantic_ops,
+                    effective_used.remote_semantic_ops,
+                ) / max(
+                    1,
+                    capacity.remote_semantic_ops
+                    - self.config.remote_semantic_ops_safety_reserve,
+                ),
+            ))
+            waves.append((
+                "remote_kv_bytes",
+                max(
+                    edge.held_remote_kv_bytes,
+                    effective_used.remote_kv_bytes,
+                ) / max(1, capacity.remote_kv_bytes),
+            ))
+
+        wave = max((value for _, value in waves), default=0.0)
+        queue_delay_ms = (
+            wave
+            * candidate_ttft
+            * self.config.service_forecast_safety_factor
+        )
+        multiplier = telemetry.multiplier(candidate.route)
+        if (
+            self._mesh_enabled()
+            and candidate.route is GlobalRoute.REMOTE
+        ):
+            multiplier = max(
+                multiplier,
+                self._telemetry[int(candidate.prefill_index)].remote_service_multiplier,
+            )
+        forecast_ms = (
+            queue_delay_ms
+            + candidate_service * multiplier
+            + candidate.uncertainty_ms
+        )
+        bindings = tuple(sorted({
+            name for name, value in waves if value >= wave and value > 0.0
+        }))
+        return queue_delay_ms, forecast_ms, bindings
+
     def _pair_pressure(self, pair: int) -> float:
         values = [
             self._effective_used(pair).dominant_ratio(
@@ -4698,6 +5141,19 @@ class GlobalOrchestrator:
         ]
         if not clean:
             return evaluations
+        # Pair isolation is a business preference, not a capacity guarantee.
+        # The old unconditional filter kept a protected MISS workload on one
+        # decoder even after that decoder's live service pressure was high;
+        # the v9 Perlmutter receipt shows the resulting 8.7 s miss-hot tail.
+        # At the configured current-state threshold, retain both clean and
+        # packed candidates so the normal global score can spread work.  This
+        # does not alter cache-affinity semantics: a candidate whose proven
+        # cache placement forbids another route is still rejected by the
+        # ordinary cache/edge guards below.
+        if min(item.utilization for item in clean) >= (
+            self.config.business_clean_pair_pressure_fraction
+        ):
+            return evaluations
         for item in evaluations:
             if item not in clean:
                 rejected.append(RejectedCandidate.from_candidate(
@@ -4818,7 +5274,7 @@ class GlobalOrchestrator:
         telemetry = self._telemetry.get(pair)
         if telemetry is None or telemetry.scheduler_waiting_requests is None:
             return False
-        queue_lease_debt = self._endpoint_queue_lease_debt(pair)
+        queue_occupancy = self._endpoint_queue_occupancy(pair)
         # ``endpoint_requests`` is the active route reservation and must stay
         # a hard global resource.  It is not the size of vLLM's waiting
         # queue: under real contention vLLM can report dozens of waiting
@@ -4828,12 +5284,60 @@ class GlobalOrchestrator:
         # lets the global controller remain work-conserving without silently
         # converting scheduler backlog into an unbounded route reservation.
         queue_capacity = int(self.config.endpoint_queue_capacity)
+        return queue_occupancy < queue_capacity
+
+    def _endpoint_queue_occupancy(self, pair: int) -> int:
+        """Return one de-duplicated downstream queue occupancy estimate.
+
+        ``scheduler_waiting_requests`` and TEMPO's queue-lease debt describe
+        the same downstream work from different observers.  Newer endpoint
+        agents additionally report their own queue records and two-phase
+        offers.  Use the maximum of the overlapping steady-state counters,
+        then add only the transient offer/commit states and active first-
+        response reservations.  This keeps global admission conservative
+        without counting one request three times.
+        """
+
+        telemetry = self._telemetry.get(pair)
+        if telemetry is None:
+            return 0
         scheduler_waiting = telemetry.scheduler_waiting_requests
-        residual = telemetry.endpoint_residual_inflight or 0
-        return (
-            scheduler_waiting + residual + queue_lease_debt
-            < queue_capacity
+        queue_lease_debt = self._endpoint_queue_lease_debt(pair)
+        queue_requests = telemetry.service_lane_queue_requests
+        if any(value is None for value in (
+            scheduler_waiting, queue_requests,
+            telemetry.service_lane_queue_offers,
+            telemetry.service_lane_pending_global_commits,
+        )):
+            # Preserve the legacy contract for old endpoint agents.
+            return (
+                (scheduler_waiting or 0)
+                + (telemetry.endpoint_residual_inflight or 0)
+                + queue_lease_debt
+            )
+        steady = max(scheduler_waiting, queue_requests, queue_lease_debt)
+        transient = (
+            telemetry.service_lane_queue_offers
+            + telemetry.service_lane_pending_global_commits
         )
+        return steady + (telemetry.endpoint_residual_inflight or 0) + transient
+
+    def _priority_service_lane_binding(self) -> str:
+        if (
+            self.config.priority_service_lane_mode
+            == BUSINESS_DUAL_ROUTE_PRIORITY_SERVICE_LANE_MODE
+        ):
+            return BUSINESS_PRIORITY_SERVICE_LANE_BINDING
+        return PRIORITY_SERVICE_LANE_BINDING
+
+    def _priority_service_lane_reason(self, *, promoted: bool) -> str:
+        suffix = "promoted" if promoted else "route_committed"
+        if (
+            self.config.priority_service_lane_mode
+            == BUSINESS_DUAL_ROUTE_PRIORITY_SERVICE_LANE_MODE
+        ):
+            return f"global_priority_business_dual_route_service_lane_{suffix}"
+        return f"global_priority_remote_cache_service_lane_{suffix}"
 
     def _priority_service_lane_candidate(
         self, request: GlobalRequest, candidate: RouteCandidate,
@@ -4846,15 +5350,27 @@ class GlobalOrchestrator:
         """
 
         policy = self._tenants[request.tenant_id]
-        return bool(
-            self.config.priority_service_lane_mode
-            == "vllm_priority_remote_cache_v1"
-            and policy.queue_lease_on_timeout
+        mode = self.config.priority_service_lane_mode
+        if not (
+            policy.queue_lease_on_timeout
             and policy.admission_priority
             >= self.config.priority_service_lane_min_admission_priority
-            and candidate.route is GlobalRoute.REMOTE
-            and candidate.cache_affinity
-        )
+        ):
+            return False
+        if mode == REMOTE_CACHE_PRIORITY_SERVICE_LANE_MODE:
+            return bool(
+                candidate.route is GlobalRoute.REMOTE
+                and candidate.cache_affinity
+            )
+        if mode == BUSINESS_DUAL_ROUTE_PRIORITY_SERVICE_LANE_MODE:
+            return bool(
+                candidate.route is GlobalRoute.LOCAL
+                or (
+                    candidate.route is GlobalRoute.REMOTE
+                    and candidate.cache_affinity
+                )
+            )
+        return False
 
     def _priority_service_lane_debt(self, pair: int) -> int:
         """Return live globally-owned priority slots for one decoder."""
@@ -4865,7 +5381,7 @@ class GlobalOrchestrator:
             if (
                 reservation.candidate.pair_index == pair
                 and reservation.decision.queue_lease
-                and PRIORITY_SERVICE_LANE_BINDING
+                and self._priority_service_lane_binding()
                 in reservation.decision.binding_resources
                 and reservation.phase is GlobalRequestPhase.ROUTE_COMMITTED
             )
@@ -4888,6 +5404,142 @@ class GlobalOrchestrator:
             return False
         return self._priority_service_lane_debt(candidate.pair_index) < (
             self.config.priority_service_lane_capacity)
+
+    def _protected_service_lane_key(
+        self, candidate: RouteCandidate,
+    ) -> tuple[int, int, GlobalRoute]:
+        """Return the physical service lane identity for one P/D edge."""
+
+        return (
+            int(candidate.prefill_index),
+            int(candidate.decoder_index),
+            candidate.route,
+        )
+
+    def _protected_service_lane_debt(
+        self, candidate: RouteCandidate,
+    ) -> int:
+        """Count active protected service slots on this exact P/D edge."""
+
+        key = self._protected_service_lane_key(candidate)
+        return sum(
+            reservation.held.active_sequences
+            for reservation in self._inflight.values()
+            if (
+                reservation.candidate.identity_key == key
+                and reservation.decision.protected_service_lane
+            )
+        )
+
+    def _protected_service_lane_guard(
+        self,
+        request: GlobalRequest,
+        candidate: RouteCandidate,
+        *,
+        effective_used: ResourceVector,
+        already_owned: bool = False,
+    ) -> tuple[bool, str, int, int] | RejectedCandidate:
+        """Apply an atomic tenant/edge service-lane reservation.
+
+        A protected request consumes a slot on its exact local or P->D edge.
+        Other tenants may use only the residual endpoint and decoder slots, so
+        the reservation exists before a victim arrives.  For remote work the
+        same residual rule is applied to the edge semantic-operation ledger;
+        this prevents a receiver reservation from being bypassed by a
+        different source feeding the same destination.
+        """
+
+        if self.config.protected_service_lane_mode == "disabled":
+            return False, "", 0, 0
+        key = self._protected_service_lane_key(candidate)
+        key_text = (
+            f"local:d{key[1]}"
+            if key[2] is GlobalRoute.LOCAL
+            else f"remote:p{key[0]}->d{key[1]}"
+        )
+        before = self._protected_service_lane_debt(candidate)
+        capacity = self.config.protected_service_lane_capacity
+        policy = self._tenants[request.tenant_id]
+        protected = (
+            policy.admission_priority
+            >= self.config.protected_service_lane_min_admission_priority
+        )
+        destination_work = self._destination_work(candidate)
+        after = effective_used if already_owned else effective_used + destination_work
+        if protected:
+            projected = (
+                before
+                if already_owned
+                else before + max(
+                    destination_work.active_sequences,
+                    destination_work.endpoint_requests,
+                )
+            )
+            # v1 treated the protected reserve as a second hard concurrency
+            # ceiling.  That makes a lane with capacity=2 reject the third
+            # protected request even when the physical endpoint still has
+            # room; under a real service wave this converts protection into
+            # throughput loss.  v2 makes the field a lower-priority reserve:
+            # protected work may consume physical capacity, while the normal
+            # capacity/endpoint/deadline guards below remain authoritative.
+            if (
+                self.config.protected_service_lane_mode
+                == PROTECTED_SERVICE_LANE_MODE
+                and projected > capacity
+            ):
+                return RejectedCandidate.from_candidate(
+                    candidate,
+                    "protected_service_lane_exhausted",
+                    (PROTECTED_SERVICE_LANE_BINDING, key_text),
+                )
+            return True, key_text, before, projected
+
+        # Keep both the running decoder slot and the endpoint admission slot
+        # available for a protected request.  This is a reservation, not a
+        # second physical capacity vector, so ordinary capacity checks still
+        # run after this guard.
+        reserved = max(0, capacity - before)
+        limits = {
+            "active_sequences": self._capacities[int(candidate.decoder_index)]
+            .active_sequences - reserved,
+            "endpoint_requests": self._capacities[int(candidate.decoder_index)]
+            .endpoint_requests - reserved,
+        }
+        binding = tuple(
+            name for name, limit in limits.items()
+            if getattr(after, name) > limit
+        )
+        if binding:
+            return RejectedCandidate.from_candidate(
+                candidate,
+                "protected_service_lane_reserve",
+                tuple(binding) + (PROTECTED_SERVICE_LANE_BINDING, key_text),
+            )
+        if candidate.route is GlobalRoute.REMOTE:
+            edge = self._mesh_edges[key[:2]]
+            edge_after = (
+                edge.held_remote_semantic_ops
+                if already_owned else edge.held_remote_semantic_ops
+                + destination_work.remote_semantic_ops
+            )
+            edge_limit = max(
+                1,
+                self._capacities[int(candidate.decoder_index)]
+                .remote_semantic_ops
+                - self.config.remote_semantic_ops_safety_reserve
+                - reserved,
+            )
+            if edge_after > edge_limit:
+                return RejectedCandidate.from_candidate(
+                    candidate,
+                    "protected_service_lane_edge_reserve",
+                    (
+                        "remote_semantic_ops",
+                        PROTECTED_SERVICE_LANE_BINDING,
+                        key_text,
+                    ),
+                )
+        return False, key_text, before, before
 
     def _endpoint_queue_lease_debt(self, pair: int) -> int:
         """Return live TEMPO-owned endpoint queue debt for one pair."""
@@ -4921,13 +5573,7 @@ class GlobalOrchestrator:
             or telemetry.endpoint_residual_inflight is None
         ):
             raise RuntimeError("completion liveness telemetry is incomplete")
-        work_ahead = (
-            max(
-                telemetry.scheduler_waiting_requests,
-                telemetry.endpoint_residual_inflight,
-            )
-            + self._endpoint_queue_lease_debt(pair)
-        )
+        work_ahead = self._endpoint_queue_occupancy(pair)
         waves = work_ahead / max(
             1, self._capacities[pair].endpoint_requests)
         return waves * candidate.predicted_ttft_ms
@@ -4964,6 +5610,124 @@ class GlobalOrchestrator:
         if name == "cassini_by_nic_pause_fraction_max":
             return cross_layer.cassini_nic_pause_max()
         return None
+
+    def _local_receiver_externality_ms(
+        self, cross_layer: CrossLayerTelemetry,
+    ) -> float:
+        """Price observed receiver pressure for a pair-local route.
+
+        LOCAL avoids a new inter-pair KV transfer, but it still executes on
+        the decoder pair whose receiver may be sharing the NCCL/LMCache
+        service window.  This term is enabled only by an explicit profile
+        value and only from a supported pair-scoped LMCache observer signal;
+        missing or communicator-only evidence contributes zero.
+        """
+
+        price = self.config.cross_layer_local_receiver_price_ms
+        if price <= 0.0:
+            return 0.0
+        signal = cross_layer.signal("lmcache_transfer_p99_ms")
+        if (
+            signal is None
+            or signal.support != "supported"
+            or signal.value is None
+            or signal.scope != "pair"
+        ):
+            return 0.0
+        return max(0.0, float(signal.value)) * price
+
+    def _remote_receiver_guard_binding(
+        self, cross_layer: CrossLayerTelemetry,
+    ) -> tuple[str, ...]:
+        """Return a hard receiver admission binding for a hot pair.
+
+        A transfer-tail observation is actionable only when it is supported
+        and pair-scoped.  Communicator-wide or missing observations cannot
+        identify the destination receiver and therefore remain score-only or
+        unsupported.  This guard is intentionally separate from the latency
+        shadow price: once a pair's receiver service is beyond its configured
+        ceiling, admitting more remote work there is not work-conserving; it
+        increases the native queue/timeout risk for all later victims.
+        """
+
+        if (
+            self.config.cross_layer_remote_receiver_guard_mode
+            != "deny_while_hot"
+        ):
+            return ()
+        signal = cross_layer.signal("lmcache_transfer_p99_ms")
+        if (
+            signal is None
+            or signal.support != "supported"
+            or signal.value is None
+            or signal.scope != "pair"
+        ):
+            return ()
+        if float(signal.value) >= self.config.cross_layer_remote_receiver_guard_p99_ms:
+            return ("lmcache_transfer_p99_ms",)
+        return ()
+
+    def _remote_receiver_group_guard_binding(
+        self, pair: int,
+    ) -> tuple[str, ...]:
+        """Guard every remote edge in a proven shared receiver group.
+
+        Pair-local guarding is insufficient for an incast: after ``P0->D0``
+        is denied, the selector can immediately choose ``P1->D1`` while the
+        same allocation-wide receiver service is still overloaded.  This
+        mode is fail-closed and only acts when every member has a usable
+        pair-scoped transfer-tail sample in the same installed telemetry
+        epoch.  Missing evidence never becomes congestion by assumption.
+        """
+
+        if (
+            self.config.cross_layer_remote_receiver_guard_mode
+            != "deny_while_hot"
+            or self.config.cross_layer_remote_receiver_guard_scope
+            != "shared_group"
+        ):
+            return ()
+        group = self._cross_layer_group_key(pair)
+        declared_group = self.config.cross_layer_remote_receiver_guard_group_id
+        if declared_group:
+            members = tuple(sorted(self._capacities))
+        elif group is not None:
+            members = tuple(
+                other for other in sorted(self._capacities)
+                if self._cross_layer_group_key(other) == group
+            )
+        else:
+            return ()
+        if len(members) < 2:
+            return ()
+        hot_members: list[int] = []
+        for other in members:
+            if other not in self._telemetry:
+                continue
+            cross_layer = self._telemetry[other].cross_layer
+            if cross_layer is None:
+                continue
+            signal = cross_layer.signal("lmcache_transfer_p99_ms")
+            if (
+                signal is None
+                or signal.support != "supported"
+                or signal.value is None
+                or signal.scope != "pair"
+            ):
+                continue
+            if float(signal.value) >= self.config.cross_layer_remote_receiver_guard_p99_ms:
+                hot_members.append(other)
+        if not hot_members:
+            return ()
+        return (
+            "lmcache_transfer_p99_ms",
+            "shared_receiver_group",
+            *(
+                (f"receiver_guard_group:{declared_group}",)
+                if declared_group else ()
+            ),
+            *(f"hot_receiver_pair:{other}" for other in hot_members),
+        )
 
     def _shared_scale_suppressed_for_pair(
         self, pair: int, budget: _SharedRemoteBudget
@@ -5297,6 +6061,13 @@ class GlobalOrchestrator:
         )
         nic_pause = cross_layer.cassini_nic_pause_max()
         action_signals = list(common)
+        # Pair-scoped LMCache receiver pressure is priced in the route score
+        # by ``_local_receiver_externality_ms``.  It must not also become a
+        # local dispatch sleep: the observation describes the already-running
+        # receiver service window, while staggering a local GPU request would
+        # delay the very fabric-avoiding escape route.  Local action
+        # limits/stagger remain driven by NCCL and Cassini signals that local
+        # work actually shares.
         if candidate.route is GlobalRoute.REMOTE:
             action_signals.extend((
                 ("cassini_host_posted_cycles_per_packet_max", 24.0),
@@ -5337,6 +6108,16 @@ class GlobalOrchestrator:
                 raw_by_name[name] = raw_contribution
                 continue
             signal = cross_layer.signal(name)
+            if (
+                candidate.route is GlobalRoute.LOCAL
+                and name == "lmcache_transfer_p99_ms"
+                and signal is not None
+                and signal.scope != "pair"
+            ):
+                # Communicator-wide transfer latency cannot identify which
+                # decoder pair owns the receiver pressure.  It is preserved
+                # in the raw envelope but cannot actuate LOCAL.
+                continue
             if (
                 signal is None
                 and name == "lmcache_remote_semantic_ops_inflight"
@@ -5638,6 +6419,24 @@ class GlobalOrchestrator:
         if cache_group_rejection is not None:
             return cache_group_rejection
         telemetry = self._telemetry[pair]
+        if candidate.route is GlobalRoute.REMOTE:
+            receiver_guard_binding = self._remote_receiver_guard_binding(
+                telemetry.cross_layer
+            ) if telemetry.cross_layer is not None else ()
+            if receiver_guard_binding:
+                return RejectedCandidate.from_candidate(
+                    candidate,
+                    "cross_layer_remote_receiver_hot",
+                    receiver_guard_binding,
+                )
+            receiver_group_guard_binding = (
+                self._remote_receiver_group_guard_binding(pair))
+            if receiver_group_guard_binding:
+                return RejectedCandidate.from_candidate(
+                    candidate,
+                    "cross_layer_remote_receiver_group_hot",
+                    receiver_group_guard_binding,
+                )
         if (pair, candidate.route) in self._route_quarantines:
             return RejectedCandidate.from_candidate(
                 candidate,
@@ -5692,6 +6491,38 @@ class GlobalOrchestrator:
         effective = self._effective_destination_used(candidate)
         capacity = self._capacities[pair]
         destination_work = self._destination_work(candidate)
+        protected_lane = self._protected_service_lane_guard(
+            request,
+            candidate,
+            effective_used=effective,
+        )
+        if isinstance(protected_lane, RejectedCandidate):
+            return protected_lane
+        (
+            protected_service_lane,
+            protected_service_lane_key,
+            protected_service_lane_before,
+            protected_service_lane_after,
+        ) = protected_lane
+        service_forecast = self._service_feasibility_forecast(
+            candidate, effective_used=effective)
+        service_queue_delay_ms = None
+        service_forecast_ms = None
+        if service_forecast is not None:
+            (
+                service_queue_delay_ms,
+                service_forecast_ms,
+                service_bindings,
+            ) = service_forecast
+            remaining_ms = (
+                self._effective_deadline_ns(request) - now_ns
+            ) / 1_000_000.0
+            if service_forecast_ms > remaining_ms:
+                return RejectedCandidate.from_candidate(
+                    candidate,
+                    "global_service_lane_slo_infeasible",
+                    tuple(service_bindings) or ("service_lane",),
+                )
         after = effective + destination_work
         shared_budget = self._shared_remote_budget_for_pair(pair)
         if shared_budget is not None:
@@ -5780,6 +6611,10 @@ class GlobalOrchestrator:
                 _cross_layer_contributions,
                 cross_layer_confidence,
             ) = telemetry.cross_layer.route_externality(candidate.route)
+            if candidate.route is GlobalRoute.LOCAL:
+                cross_layer_externality_ms += (
+                    self._local_receiver_externality_ms(
+                        telemetry.cross_layer))
             utilization = max(
                 utilization,
                 min(1.0, cross_layer_externality_ms / 1000.0),
@@ -5866,6 +6701,7 @@ class GlobalOrchestrator:
             + candidate.uncertainty_ms
             + utilization * self.config.utilization_penalty_ms
             + self._scheduler_queue_penalty_ms(pair, candidate)
+            + (service_queue_delay_ms or 0.0)
             - self._mesh_cool_remote_ttft_credit_ms(candidate, request)
             + cross_layer_externality_ms
             + edge_feedback_penalty_ms
@@ -5903,6 +6739,15 @@ class GlobalOrchestrator:
             ),
             stale_feedback_fallback=stale_feedback_fallback,
             receiver_stagger_us=receiver_stagger_us,
+            service_queue_delay_ms=service_queue_delay_ms,
+            service_forecast_ms=service_forecast_ms,
+            protected_service_lane=protected_service_lane,
+            protected_service_lane_key=protected_service_lane_key
+            if protected_service_lane else None,
+            protected_service_lane_before=protected_service_lane_before
+            if protected_service_lane else None,
+            protected_service_lane_after=protected_service_lane_after
+            if protected_service_lane else None,
         )
 
     def _evaluate_queue_lease_candidate(
@@ -6001,16 +6846,43 @@ class GlobalOrchestrator:
             return rejected(
                 "route_failure_quarantine", ("route_failure_quarantine",))
         telemetry = self._telemetry[pair]
+        if candidate.route is GlobalRoute.REMOTE:
+            receiver_guard_binding = self._remote_receiver_guard_binding(
+                telemetry.cross_layer
+            ) if telemetry.cross_layer is not None else ()
+            if receiver_guard_binding:
+                return rejected(
+                    "cross_layer_remote_receiver_hot",
+                    receiver_guard_binding,
+                )
+            receiver_group_guard_binding = (
+                self._remote_receiver_group_guard_binding(pair))
+            if receiver_group_guard_binding:
+                return rejected(
+                    "cross_layer_remote_receiver_group_hot",
+                    receiver_group_guard_binding,
+                )
         health = telemetry.health(candidate.route)
         completion_liveness_probe = False
+        completion_liveness_shared_probe = False
+        endpoint_queue_headroom_admission = False
+        endpoint_queue_deadline_grace = False
         if health is PathHealth.DENIED:
             return rejected(f"path_{health.value}")
+        failure_count = (
+            telemetry.local_failure_count
+            if candidate.route is GlobalRoute.LOCAL else
+            telemetry.remote_failure_count
+        )
+        endpoint_queue_deadline_grace = bool(
+            self.config.endpoint_queue_headroom_admission_mode
+            == "completion_progress_v1"
+            and self._endpoint_scheduler_queue_headroom(pair)
+            and telemetry.endpoint_completed_first_responses is not None
+            and telemetry.endpoint_completed_first_responses > 0
+            and failure_count == 0
+        )
         if health is PathHealth.SKIP:
-            failure_count = (
-                telemetry.local_failure_count
-                if candidate.route is GlobalRoute.LOCAL else
-                telemetry.remote_failure_count
-            )
             if (
                 self.config.endpoint_queue_debt_mode not in {
                     "completion_liveness_endpoint_queue_v2",
@@ -6027,16 +6899,26 @@ class GlobalOrchestrator:
                 or telemetry.scheduler_waiting_requests is None
             ):
                 return rejected("completion_liveness_telemetry_missing")
-            if self._completion_liveness_probe_inflight(
+            probe_inflight = self._completion_liveness_probe_inflight(
                 pair, candidate.route
-            ):
-                return rejected("completion_liveness_probe_inflight")
+            )
+            if probe_inflight:
+                if (
+                    self.config.completion_liveness_shared_probe_mode
+                    != "headroom_shared_v1"
+                ):
+                    return rejected("completion_liveness_probe_inflight")
+                # Reuse the already committed probe's failure-free evidence.
+                # The native queue headroom check below remains mandatory, so
+                # this mode cannot turn one probe into an unbounded bypass.
+                completion_liveness_shared_probe = True
             if not (
                 self._endpoint_scheduler_queue_headroom(pair)
                 or priority_service_lane
             ):
                 return rejected("endpoint_queue_capacity_full")
-            completion_liveness_probe = True
+            if not completion_liveness_shared_probe:
+                completion_liveness_probe = True
 
         completion_credit_mode = self.config.endpoint_queue_debt_mode in {
             "completion_credit_endpoint_queue_v3",
@@ -6068,9 +6950,23 @@ class GlobalOrchestrator:
                     and self._completion_liveness_bootstrap_sequences.get(
                         bootstrap_key) != telemetry.sequence
                 )
-                if not bootstrap_available:
+                shared_probe_available = (
+                    completion_liveness_shared_probe
+                    and self._endpoint_scheduler_queue_headroom(pair)
+                )
+                endpoint_headroom_available = (
+                    endpoint_queue_deadline_grace
+                )
+                if endpoint_headroom_available:
+                    endpoint_queue_headroom_admission = True
+                if not (
+                    bootstrap_available
+                    or shared_probe_available
+                    or endpoint_headroom_available
+                ):
                     return rejected("completion_credit_unavailable")
-                completion_liveness_probe = True
+                if bootstrap_available:
+                    completion_liveness_probe = True
             if not (
                 self._endpoint_scheduler_queue_headroom(pair)
                 or priority_service_lane
@@ -6085,6 +6981,8 @@ class GlobalOrchestrator:
             if (
                 self._completion_credit_balance[pair] <= 0
                 and not completion_liveness_probe
+                and not completion_liveness_shared_probe
+                and not endpoint_queue_headroom_admission
                 and not priority_service_lane
             ):
                 return rejected("completion_credit_unavailable")
@@ -6101,6 +6999,20 @@ class GlobalOrchestrator:
         # mesh work) in source/edge ledgers.  Re-adding it here would invent
         # a second request and reject the very debt transition being checked.
         after = effective if already_owned else effective + destination_work
+        protected_lane = self._protected_service_lane_guard(
+            request,
+            candidate,
+            effective_used=effective,
+            already_owned=already_owned,
+        )
+        if isinstance(protected_lane, RejectedCandidate):
+            return protected_lane
+        (
+            protected_service_lane,
+            protected_service_lane_key,
+            protected_service_lane_before,
+            protected_service_lane_after,
+        ) = protected_lane
         shared_budget = self._shared_remote_budget_for_pair(pair)
         if shared_budget is not None:
             shared_binding = self._shared_remote_budget_binding(
@@ -6205,6 +7117,10 @@ class GlobalOrchestrator:
                 _contributions,
                 _confidence,
             ) = telemetry.cross_layer.route_externality(candidate.route)
+            if candidate.route is GlobalRoute.LOCAL:
+                cross_layer_externality_ms += (
+                    self._local_receiver_externality_ms(
+                        telemetry.cross_layer))
             utilization = max(
                 utilization,
                 min(1.0, cross_layer_externality_ms / 1000.0),
@@ -6376,7 +7292,7 @@ class GlobalOrchestrator:
         )
         effective_deadline_ns = self._effective_deadline_ns(request)
         slack = (effective_deadline_ns - now_ns) / 1_000_000 - score
-        if slack < 0.0:
+        if slack < 0.0 and not endpoint_queue_deadline_grace:
             return rejected("deadline")
         return _CandidateEvaluation(
             candidate=candidate,
@@ -6401,9 +7317,19 @@ class GlobalOrchestrator:
             ),
             endpoint_queue_debt_resources=tuple(endpoint_binding),
             completion_liveness_probe=completion_liveness_probe,
+            completion_liveness_shared_probe=completion_liveness_shared_probe,
+            endpoint_queue_headroom_admission=endpoint_queue_headroom_admission,
+            endpoint_queue_deadline_grace=endpoint_queue_deadline_grace,
             priority_service_lane=priority_service_lane,
             stale_feedback_fallback=source_stale_feedback_fallback,
             receiver_stagger_us=receiver_stagger_us,
+            protected_service_lane=protected_service_lane,
+            protected_service_lane_key=protected_service_lane_key
+            if protected_service_lane else None,
+            protected_service_lane_before=protected_service_lane_before
+            if protected_service_lane else None,
+            protected_service_lane_after=protected_service_lane_after
+            if protected_service_lane else None,
         )
 
     def _active_pressure(self) -> float:
@@ -6723,6 +7649,9 @@ class GlobalOrchestrator:
                 kind=GlobalDecisionKind.ADMIT,
                 decided_ns=now_ns,
                 reason=(
+                    "global_protected_service_lane_route_committed"
+                    if selected.protected_service_lane
+                    else
                     "global_mesh_stale_feedback_fallback_route_committed"
                     if selected.stale_feedback_fallback
                     else "global_tenant_pair_scope_assigned_and_route_committed"
@@ -6761,8 +7690,15 @@ class GlobalOrchestrator:
                 uncertainty_ms=candidate.uncertainty_ms,
                 cache_affinity=candidate.cache_affinity,
                 binding_resources=(
-                    (MESH_NEAR_TIE_SOURCE_BALANCE_BINDING,)
-                    if selected.mesh_near_tie_source_balanced else ()
+                    tuple(
+                        value for value in (
+                            PROTECTED_SERVICE_LANE_BINDING
+                            if selected.protected_service_lane else None,
+                            MESH_NEAR_TIE_SOURCE_BALANCE_BINDING
+                            if selected.mesh_near_tie_source_balanced else None,
+                        )
+                        if value is not None
+                    )
                 ),
                 rejected_candidates=tuple(rejected),
                 resource_used_before=used_before,
@@ -6793,6 +7729,14 @@ class GlobalOrchestrator:
                     selected.mesh_source_virtual_service_before),
                 mesh_edge_virtual_service_before=(
                     selected.mesh_edge_virtual_service_before),
+                service_queue_delay_ms=selected.service_queue_delay_ms,
+                service_forecast_ms=selected.service_forecast_ms,
+                protected_service_lane=selected.protected_service_lane,
+                protected_service_lane_key=selected.protected_service_lane_key,
+                protected_service_lane_before=(
+                    selected.protected_service_lane_before),
+                protected_service_lane_after=(
+                    selected.protected_service_lane_after),
             )
             self._hold_cache_group_locked(request, candidate)
             self._inflight[request.request_id] = _Reservation(

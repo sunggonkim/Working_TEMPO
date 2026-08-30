@@ -1,0 +1,40 @@
+{
+  "schema": "tempo-pd-latched-cap6-release-437",
+  "policy": "tempo-pd-latched-bypass-rolling-credit6-401",
+  "allocation_id": 57078464,
+  "suite_result": {
+    "path": "results/tempo_pd_latched_cap6_suite_v429_job_57078464.json",
+    "sha256": "84568e0350de18ac5b9ae30b99806a8b6e3ccc4eb163633c233b5e55dd6a34ee"
+  },
+  "combined_evidence": {
+    "pairs": 136,
+    "e2e_win_count": 124,
+    "e2e_win_fraction": 0.9117647058823529,
+    "e2e_delta_median_ms": -118.03152499999999,
+    "e2e_delta_max_ms": 58.18890199999987,
+    "tpot_win_count": 135,
+    "tpot_win_fraction": 0.9926470588235294,
+    "tpot_delta_median_ms": -3.9020281876794805,
+    "tpot_delta_p90_ms": -1.6345898253968265
+  },
+  "backpressure_falsification": {
+    "workload": "six_bursts_four_pairs_8ms_with_100ms_idle_v419",
+    "cap6": {
+      "capped_requests": 1,
+      "passes": true,
+      "e2e_delta_max_ms": 58.18890199999987
+    },
+    "cap5": {
+      "capped_requests": 2,
+      "passes": false,
+      "e2e_delta_max_ms": 435.5209500000001
+    }
+  },
+  "extreme_probe": {
+    "workload": "six_bursts_four_pairs_4ms_with_50ms_idle_v433",
+    "performance_gates_passed": true,
+    "backpressure_gate_valid": false,
+    "reason": "no request reached the cap, so this probe does not validate overload backpressure"
+  },
+  "claim_boundary": "Actual-vLLM TP4x2-replica P/D same-allocation paired screen versus pinned official LMCacheConnectorV1 remote-prefill; no audited Mooncake same-harness result and no independent multi-allocation confidence interval."
+}

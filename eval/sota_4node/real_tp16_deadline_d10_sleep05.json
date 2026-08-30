@@ -1,0 +1,72 @@
+{
+  "campaign": {
+    "blocks": 9,
+    "candidate_gates": {
+      "all_candidate_boost_polls_zero": true,
+      "all_candidate_configured_sleep_ms": 0.5,
+      "all_candidate_gate_bubbles_zero": true,
+      "all_candidate_observed_slack_ge_ms": 200.0,
+      "all_candidate_poll_accounting_exact": true,
+      "all_candidate_post_foreground_drain_zero": true,
+      "candidate_e2e_p50_le_fg_ratio": 1.05,
+      "candidate_tpot_p99_le_lmcache_ratio": 1.1,
+      "no_measured_candidate_hook_events": true,
+      "paired_service_delta_median_le_ms": -5.0,
+      "paired_service_win_max_delta_ms": -5.0,
+      "paired_service_win_min_prompts": 2
+    },
+    "duplicate_trace_ids_fail_closed": true,
+    "modes": [
+      "fg_only",
+      "lmcache_prelaunch_no_gate",
+      "tempo_prelaunch_deadline_defer_sleep05"
+    ],
+    "rank_block_identity_fail_closed": true,
+    "replicates_per_mode": 3,
+    "unmeasured_fence_prewarm": true
+  },
+  "contract_id": "tp16-single-flight-deadline-defer-sleep05-d10",
+  "deadline_controller": {
+    "basis_mode": "lmcache_prelaunch_no_gate",
+    "basis_result": "results/vllm_lmcache_tp16_hybrid_B_async_job_56946009/result.json",
+    "candidate_mode": "tempo_prelaunch_deadline_defer_sleep05",
+    "decision": "defer/no_rescue",
+    "decision_rule": "defer_if_prior_observed_min_slack_ms_ge_threshold_ms",
+    "decode_progress_sleep_ms": 0.5,
+    "defer_threshold_ms": 200.0,
+    "gate_collectives_per_candidate": 0,
+    "measured_candidate_request_marked": false,
+    "permanent_boost": false,
+    "prior_observed_min_slack_ms": 263.210418,
+    "rescue_armed_sources": 0,
+    "runtime_rescue_enabled": false,
+    "token31_hook_events_per_candidate": 0
+  },
+  "schema_version": "tempo-tp16-single-flight-deadline-sleep05-contract-10",
+  "topology": {
+    "nodes": 4,
+    "pairing": [
+      [0, 8],
+      [1, 9],
+      [2, 10],
+      [3, 11],
+      [4, 12],
+      [5, 13],
+      [6, 14],
+      [7, 15]
+    ],
+    "receiver_ranks": [8, 9, 10, 11, 12, 13, 14, 15],
+    "source_ranks": [0, 1, 2, 3, 4, 5, 6, 7],
+    "world_size": 16
+  },
+  "transfer": {
+    "bytes_per_source": 16777216,
+    "calls_global": 8,
+    "global_bytes": 134217728,
+    "physical_descriptors_global": 8,
+    "prelaunch_at_request_start": true,
+    "prepared_handle_repost": true,
+    "single_flight_per_source": true,
+    "worker_entry_precedes_http_request": true
+  }
+}

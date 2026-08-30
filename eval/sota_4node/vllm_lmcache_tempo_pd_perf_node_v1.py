@@ -377,24 +377,28 @@ def _lifecycle(
             handles.append(handle)
             frontend_url = f"http://{hosts[0]}:{ports['frontend']}"
             common._wait_url(frontend_url + "/health", [engine, proxy, router, frontend])
-            # Warm the exact stage route and workload classes with distinct IDs.
-            warmup = stage_dir / "warmup.jsonl"
-            warm_rows = []
-            for index, line in enumerate(workload.read_text(encoding="utf-8").splitlines()):
-                value = json.loads(line)
-                value["request_id"] = f"warm-{stage_name}-{index}"
-                warm_rows.append(value)
-            warmup.write_text("".join(json.dumps(value, separators=(",", ":")) + "\n"
-                                      for value in warm_rows), encoding="utf-8")
-            subprocess.run(
-                _client_command(
-                    python, base_url=frontend_url, model=model, workload=warmup,
-                    output=stage_dir / "warmup.raw.json", mode=router_mode,
-                    run_id=f"{stage_name}-warmup", request_rate=args.request_rate,
-                    max_workers=args.max_workers,
-                ),
-                cwd=args.repo_root, env=env, check=True, timeout=1200.0,
-            )
+            # Some source-bound populations intentionally measure cold-start
+            # behavior.  Replaying the same token IDs as a generic warmup
+            # would contaminate residency before the measured request.
+            if os.environ.get("TEMPO_GO_SKIP_WARMUP") != "1":
+                # Warm the exact stage route and workload classes with distinct IDs.
+                warmup = stage_dir / "warmup.jsonl"
+                warm_rows = []
+                for index, line in enumerate(workload.read_text(encoding="utf-8").splitlines()):
+                    value = json.loads(line)
+                    value["request_id"] = f"warm-{stage_name}-{index}"
+                    warm_rows.append(value)
+                warmup.write_text("".join(json.dumps(value, separators=(",", ":")) + "\n"
+                                          for value in warm_rows), encoding="utf-8")
+                subprocess.run(
+                    _client_command(
+                        python, base_url=frontend_url, model=model, workload=warmup,
+                        output=stage_dir / "warmup.raw.json", mode=router_mode,
+                        run_id=f"{stage_name}-warmup", request_rate=args.request_rate,
+                        max_workers=args.max_workers,
+                    ),
+                    cwd=args.repo_root, env=env, check=True, timeout=1200.0,
+                )
             subprocess.run(
                 _client_command(
                     python, base_url=frontend_url, model=model, workload=workload,

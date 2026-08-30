@@ -3567,7 +3567,7 @@ index 57aa28f..ad440f7 100644
      }
      pause_cv_.notify_all();
  }
-@@ -79,6 +92,83 @@ void gpu_tier_t::flush_io_() {
+@@ -79,6 +92,117 @@ void gpu_tier_t::flush_io_() {
              return;
          auto src = flush_q.get_front();
          perf_profiler.record_event(src, GPU_WAIT_END);
@@ -3609,33 +3609,67 @@ index 57aa28f..ad440f7 100644
 +                    const size_t granted = credit_controller_->admit_d2h_up_to(
 +                        request_limit
 +                    );
-+                    if (!region_started) {
-+                        // Admission precedes allocation.  A partially filled
-+                        // aggregate may retain one bounded 4 MiB pinned region
-+                        // while later subcopies wait for phase credit, but a
-+                        // protected phase consumes no PCIe bandwidth.
-+                        successor_tier_->mem_pool->allocate(dest);
-+                        std::uint64_t expected_first_issue = 0;
-+                        const auto issue_unix_ns = static_cast<std::uint64_t>(
-+                            std::chrono::duration_cast<std::chrono::nanoseconds>(
-+                                std::chrono::system_clock::now().time_since_epoch()
-+                            ).count()
-+                        );
-+                        first_issue_unix_ns_.compare_exchange_strong(
-+                            expected_first_issue, issue_unix_ns, std::memory_order_acq_rel
-+                        );
-+                        perf_profiler.record_event(dest, GPU_WAIT_END);
-+                        perf_profiler.record_event(dest, GPU_START);
-+                        region_started = true;
++                    {
++                        std::unique_lock<std::mutex> lock(pause_mutex_);
++                        pause_cv_.wait(lock, [&] {
++                            return !flush_paused_.load(std::memory_order_acquire);
++                        });
++                        double pacing_rate = pacing_bytes_per_second_.load(std::memory_order_acquire);
++                        while (pacing_rate > 0.0 && pacing_initialized_) {
++                            const bool interrupted = pause_cv_.wait_until(lock, pacing_next_issue_, [&] {
++                                return flush_paused_.load(std::memory_order_acquire);
++                            });
++                            if (!interrupted)
++                                break;
++                            pause_cv_.wait(lock, [&] {
++                                return !flush_paused_.load(std::memory_order_acquire);
++                            });
++                            pacing_rate = pacing_bytes_per_second_.load(std::memory_order_acquire);
++                        }
++                        if (!region_started) {
++                            // Admission precedes allocation.  A partially filled
++                            // aggregate may retain one bounded 4 MiB pinned region
++                            // while later subcopies wait for phase credit, but a
++                            // protected phase consumes no PCIe bandwidth.
++                            successor_tier_->mem_pool->allocate(dest);
++                            std::uint64_t expected_first_issue = 0;
++                            const auto issue_unix_ns = static_cast<std::uint64_t>(
++                                std::chrono::duration_cast<std::chrono::nanoseconds>(
++                                    std::chrono::system_clock::now().time_since_epoch()
++                                ).count()
++                            );
++                            first_issue_unix_ns_.compare_exchange_strong(
++                                expected_first_issue, issue_unix_ns, std::memory_order_acq_rel
++                            );
++                            perf_profiler.record_event(dest, GPU_WAIT_END);
++                            perf_profiler.record_event(dest, GPU_START);
++                            region_started = true;
++                        }
++                        checkCuda(cudaMemcpyAsync(
++                            const_cast<void*>(static_cast<const void*>(dest->ptr + region_offset)),
++                            static_cast<const void*>(src->ptr + source_offset + region_offset),
++                            granted,
++                            cudaMemcpyDeviceToHost,
++                            flush_stream
++                        ));
++                        checkCuda(cudaStreamSynchronize(flush_stream));
++                        if (pacing_rate > 0.0) {
++                            auto interval = std::chrono::duration_cast<std::chrono::nanoseconds>(
++                                std::chrono::duration<double>(static_cast<double>(granted) / pacing_rate)
++                            );
++                            if (interval.count() < 1)
++                                interval = std::chrono::nanoseconds(1);
++                            pacing_next_issue_ += interval;
++                            const auto now = std::chrono::steady_clock::now();
++                            if (pacing_next_issue_ < now) {
++                                const auto behind = std::chrono::duration_cast<std::chrono::nanoseconds>(
++                                    now - pacing_next_issue_
++                                );
++                                const auto slots = behind.count() / interval.count() + 1;
++                                pacing_next_issue_ += interval * slots;
++                            }
++                        }
 +                    }
-+                    checkCuda(cudaMemcpyAsync(
-+                        const_cast<void*>(static_cast<const void*>(dest->ptr + region_offset)),
-+                        static_cast<const void*>(src->ptr + source_offset + region_offset),
-+                        granted,
-+                        cudaMemcpyDeviceToHost,
-+                        flush_stream
-+                    ));
-+                    checkCuda(cudaStreamSynchronize(flush_stream));
 +                    credit_controller_->complete_d2h(granted);
 +                    region_offset += granted;
 +                }

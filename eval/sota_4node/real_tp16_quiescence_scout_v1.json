@@ -1,0 +1,31 @@
+{
+  "schema_version": "tempo-vllm-tp16-quiescence-scout-contract-1",
+  "contract_id": "tp16-quiescence-scout-v1",
+  "topology": {
+    "nodes": 4,
+    "world_size": 16,
+    "source_ranks": [0, 1, 2, 3, 4, 5, 6, 7],
+    "receiver_ranks": [8, 9, 10, 11, 12, 13, 14, 15]
+  },
+  "request": {
+    "generated_tokens": 64,
+    "gate_generated_token_count_one_based": 31,
+    "single_request": true,
+    "speculative_decoding": false,
+    "async_scheduling": false
+  },
+  "wave": {
+    "bytes_per_source": 524288,
+    "global_bytes": 4194304,
+    "source_calls": 8,
+    "physical_descriptors": 8,
+    "max_source_elapsed_ns": 4000000,
+    "max_wave_elapsed_ns": 5000000
+  },
+  "campaign": {
+    "modes": ["ungated", "gated_noop", "gated_transfer"],
+    "latin_rows": 3,
+    "replicates_per_mode": 3,
+    "promotion_valid": false
+  }
+}

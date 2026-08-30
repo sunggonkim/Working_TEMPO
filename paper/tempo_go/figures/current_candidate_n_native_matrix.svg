@@ -1,0 +1,122 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="790" viewBox="0 0 1500 790" role="img" aria-labelledby="figure-title figure-description">
+  <title id="figure-title">Current TEMPO Candidate N native matrix</title>
+  <desc id="figure-description">Same-population offered SLO and completed-request p99 for seven native policies.</desc>
+  <rect x="0.00" y="0.00" width="1500.00" height="790.00" fill="#FFFFFF" />
+  <text x="48.00" y="43.00" fill="#172033" font-size="26" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">최신 4-node native matrix: 병목 crossover는 크지만 Candidate N은 utility를 잃음</text>
+  <text x="48.00" y="72.00" fill="#5F6B7A" font-size="14" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Allocation 57732862 · 210 offered victims per arm · actual vLLM + LMCache/NIXL + NCCL/Slingshot</text>
+  <rect x="35.00" y="98.00" width="820.00" height="620.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <rect x="875.00" y="98.00" width="590.00" height="620.00" fill="#F7F9FC" stroke="#DCE3EC" stroke-width="1" rx="16" />
+  <text x="70.00" y="138.00" fill="#172033" font-size="18" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Offered-population SLO attainment (%)</text>
+  <text x="910.00" y="138.00" fill="#172033" font-size="18" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">Completed-request E2E p99 (seconds)</text>
+  <rect x="330.00" y="159.00" width="18.00" height="12.00" fill="#78A7FF" rx="2" />
+  <text x="355.00" y="170.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">normal</text>
+  <rect x="475.00" y="159.00" width="18.00" height="12.00" fill="#F59E0B" rx="2" />
+  <text x="500.00" y="170.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">miss-hot</text>
+  <rect x="620.00" y="159.00" width="18.00" height="12.00" fill="#7C3AED" rx="2" />
+  <text x="645.00" y="170.00" fill="#5F6B7A" font-size="13" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="start">remote-favorable</text>
+  <line x1="85.00" y1="605.00" x2="810.00" y2="605.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="75.00" y="610.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">0</text>
+  <line x1="85.00" y1="525.00" x2="810.00" y2="525.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="75.00" y="530.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">20</text>
+  <line x1="85.00" y1="445.00" x2="810.00" y2="445.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="75.00" y="450.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">40</text>
+  <line x1="85.00" y1="365.00" x2="810.00" y2="365.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="75.00" y="370.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">60</text>
+  <line x1="85.00" y1="285.00" x2="810.00" y2="285.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="75.00" y="290.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">80</text>
+  <line x1="85.00" y1="205.00" x2="810.00" y2="205.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="75.00" y="210.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">100</text>
+  <rect x="103.79" y="398.33" width="20.00" height="206.67" fill="#78A7FF" rx="2" />
+  <text x="113.79" y="392.33" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">52</text>
+  <rect x="126.79" y="298.33" width="20.00" height="306.67" fill="#F59E0B" rx="2" />
+  <text x="136.79" y="292.33" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">77</text>
+  <rect x="149.79" y="605.00" width="20.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="154.79" y="633.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-32 154.79 633.00)">Local D0</text>
+  <rect x="207.36" y="405.00" width="20.00" height="200.00" fill="#78A7FF" rx="2" />
+  <text x="217.36" y="399.00" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">50</text>
+  <rect x="230.36" y="521.67" width="20.00" height="83.33" fill="#F59E0B" rx="2" />
+  <text x="240.36" y="515.67" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">21</text>
+  <rect x="253.36" y="605.00" width="20.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="258.36" y="633.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-32 258.36 633.00)">Local D1</text>
+  <rect x="310.93" y="398.33" width="20.00" height="206.67" fill="#78A7FF" rx="2" />
+  <text x="320.93" y="392.33" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">52</text>
+  <rect x="333.93" y="345.00" width="20.00" height="260.00" fill="#F59E0B" rx="2" />
+  <text x="343.93" y="339.00" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">65</text>
+  <rect x="356.93" y="605.00" width="20.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="361.93" y="633.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-32 361.93 633.00)">Remote 0→1</text>
+  <rect x="414.50" y="385.00" width="20.00" height="220.00" fill="#78A7FF" rx="2" />
+  <text x="424.50" y="379.00" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">55</text>
+  <rect x="437.50" y="531.67" width="20.00" height="73.33" fill="#F59E0B" rx="2" />
+  <text x="447.50" y="525.67" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">18</text>
+  <rect x="460.50" y="605.00" width="20.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="465.50" y="633.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-32 465.50 633.00)">Remote 1→0</text>
+  <rect x="518.07" y="405.00" width="20.00" height="200.00" fill="#78A7FF" rx="2" />
+  <text x="528.07" y="399.00" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">50</text>
+  <rect x="541.07" y="355.00" width="20.00" height="250.00" fill="#F59E0B" rx="2" />
+  <text x="551.07" y="349.00" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">62</text>
+  <rect x="564.07" y="431.67" width="20.00" height="173.33" fill="#7C3AED" rx="2" />
+  <text x="574.07" y="425.67" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">43</text>
+  <text x="569.07" y="633.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-32 569.07 633.00)">Predictor</text>
+  <rect x="621.64" y="405.00" width="20.00" height="200.00" fill="#78A7FF" rx="2" />
+  <text x="631.64" y="399.00" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">50</text>
+  <rect x="644.64" y="278.33" width="20.00" height="326.67" fill="#F59E0B" rx="2" />
+  <text x="654.64" y="272.33" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">82</text>
+  <rect x="667.64" y="458.33" width="20.00" height="146.67" fill="#7C3AED" rx="2" />
+  <text x="677.64" y="452.33" fill="#172033" font-size="9" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">37</text>
+  <text x="672.64" y="633.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-32 672.64 633.00)">Queue-GPU</text>
+  <rect x="710.21" y="193.00" width="96.00" height="424.00" fill="#FEE2E2" rx="8" opacity="0.65" />
+  <rect x="725.21" y="605.00" width="20.00" height="0.00" fill="#78A7FF" rx="2" />
+  <rect x="748.21" y="605.00" width="20.00" height="0.00" fill="#F59E0B" rx="2" />
+  <rect x="771.21" y="605.00" width="20.00" height="0.00" fill="#7C3AED" rx="2" />
+  <text x="776.21" y="633.00" fill="#172033" font-size="11" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-32 776.21 633.00)">Candidate N</text>
+  <line x1="925.00" y1="605.00" x2="1415.00" y2="605.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="610.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">0</text>
+  <line x1="925.00" y1="555.00" x2="1415.00" y2="555.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="560.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">10</text>
+  <line x1="925.00" y1="505.00" x2="1415.00" y2="505.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="510.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">20</text>
+  <line x1="925.00" y1="455.00" x2="1415.00" y2="455.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="460.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">30</text>
+  <line x1="925.00" y1="405.00" x2="1415.00" y2="405.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="410.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">40</text>
+  <line x1="925.00" y1="355.00" x2="1415.00" y2="355.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="360.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">50</text>
+  <line x1="925.00" y1="305.00" x2="1415.00" y2="305.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="310.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">60</text>
+  <line x1="925.00" y1="255.00" x2="1415.00" y2="255.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="260.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">70</text>
+  <line x1="925.00" y1="205.00" x2="1415.00" y2="205.00" stroke="#DCE3EC" stroke-width="1" />
+  <text x="915.00" y="210.00" fill="#5F6B7A" font-size="12" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end">80</text>
+  <rect x="939.00" y="515.83" width="12.00" height="89.17" fill="#78A7FF" rx="2" />
+  <rect x="954.00" y="556.13" width="12.00" height="48.87" fill="#F59E0B" rx="2" />
+  <rect x="969.00" y="413.82" width="12.00" height="191.18" fill="#7C3AED" rx="2" />
+  <text x="974.00" y="633.00" fill="#172033" font-size="10" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 974.00 633.00)">Local D0</text>
+  <rect x="1009.00" y="500.21" width="12.00" height="104.79" fill="#78A7FF" rx="2" />
+  <rect x="1024.00" y="287.38" width="12.00" height="317.62" fill="#F59E0B" rx="2" />
+  <rect x="1039.00" y="417.11" width="12.00" height="187.89" fill="#7C3AED" rx="2" />
+  <text x="1044.00" y="633.00" fill="#172033" font-size="10" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1044.00 633.00)">Local D1</text>
+  <rect x="1079.00" y="461.21" width="12.00" height="143.79" fill="#78A7FF" rx="2" />
+  <rect x="1094.00" y="513.02" width="12.00" height="91.98" fill="#F59E0B" rx="2" />
+  <rect x="1109.00" y="423.99" width="12.00" height="181.01" fill="#7C3AED" rx="2" />
+  <text x="1114.00" y="633.00" fill="#172033" font-size="10" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1114.00 633.00)">Remote 0→1</text>
+  <rect x="1149.00" y="442.83" width="12.00" height="162.17" fill="#78A7FF" rx="2" />
+  <rect x="1164.00" y="209.76" width="12.00" height="395.24" fill="#F59E0B" rx="2" />
+  <rect x="1179.00" y="410.34" width="12.00" height="194.66" fill="#7C3AED" rx="2" />
+  <text x="1184.00" y="633.00" fill="#172033" font-size="10" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1184.00 633.00)">Remote 1→0</text>
+  <rect x="1219.00" y="475.87" width="12.00" height="129.13" fill="#78A7FF" rx="2" />
+  <rect x="1234.00" y="314.01" width="12.00" height="290.99" fill="#F59E0B" rx="2" />
+  <rect x="1249.00" y="351.13" width="12.00" height="253.87" fill="#7C3AED" rx="2" />
+  <text x="1254.00" y="633.00" fill="#172033" font-size="10" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1254.00 633.00)">Predictor</text>
+  <rect x="1289.00" y="501.29" width="12.00" height="103.71" fill="#78A7FF" rx="2" />
+  <rect x="1304.00" y="399.93" width="12.00" height="205.07" fill="#F59E0B" rx="2" />
+  <rect x="1319.00" y="344.88" width="12.00" height="260.12" fill="#7C3AED" rx="2" />
+  <text x="1324.00" y="633.00" fill="#172033" font-size="10" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1324.00 633.00)">Queue-GPU</text>
+  <rect x="1348.00" y="193.00" width="64.00" height="424.00" fill="#FEE2E2" rx="8" opacity="0.65" />
+  <rect x="1359.00" y="448.28" width="12.00" height="156.72" fill="#78A7FF" rx="2" />
+  <rect x="1374.00" y="514.06" width="12.00" height="90.94" fill="#F59E0B" rx="2" />
+  <line x1="1390.00" y1="596.00" x2="1400.00" y2="606.00" stroke="#DC2626" stroke-width="2" />
+  <line x1="1400.00" y1="596.00" x2="1390.00" y2="606.00" stroke="#DC2626" stroke-width="2" />
+  <text x="1394.00" y="633.00" fill="#172033" font-size="10" font-weight="400" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="end" transform="rotate(-35 1394.00 633.00)">Candidate N</text>
+  <text x="1170.00" y="684.00" fill="#DC2626" font-size="13" font-weight="700" font-family="NanumGothic, Noto Sans CJK KR, Apple SD Gothic Neo, sans-serif" text-anchor="middle">Candidate N remote-favorable: 0/30 completed → p99 undefined</text>
+</svg>

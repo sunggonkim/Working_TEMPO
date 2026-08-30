@@ -1,0 +1,48 @@
+{
+  "claim_boundary": {
+    "controller_performance_claim_allowed": false,
+    "performance_claim_allowed": false,
+    "purpose": "Q1 real NCCL victim qualification under official LMCache receiver incast"
+  },
+  "nccl_victim_abba": {
+    "arms": [
+      {
+        "background_mode": "nccl_only",
+        "name": "00_nccl_only_sustained_a"
+      },
+      {
+        "background_mode": "nixl_ucx",
+        "name": "01_lmcache_incast_a"
+      },
+      {
+        "background_mode": "nixl_ucx",
+        "name": "02_lmcache_incast_b"
+      },
+      {
+        "background_mode": "nccl_only",
+        "name": "03_nccl_only_sustained_b"
+      }
+    ],
+    "minimum_active_duration_s": 30,
+    "parameters": {
+      "block_delay_s": 0,
+      "foreground_mib": 16,
+      "kv_mib": 128,
+      "maximum_blocks": 64,
+      "minimum_blocks": 4,
+      "nixl_transfer_timeout_s": 60,
+      "process_group_timeout_s": 120,
+      "requests": 8,
+      "token_iters": 4096
+    },
+    "traffic_pattern": "incast_4to1",
+    "topology": {
+      "background": "four official LMCache NixlChannel UCX sources write disjoint descriptors into one receiver GPU",
+      "nodes": 2,
+      "ranks_per_node": 4,
+      "victim": "eight-rank WORLD NCCL all-reduce completion sustained across each LMCache transfer",
+      "world_size": 8
+    }
+  },
+  "schema": "tempo-go-c6-nccl-receiver-incast-contract-v1"
+}

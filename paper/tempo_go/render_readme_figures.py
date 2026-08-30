@@ -274,6 +274,234 @@ def _log_y(value: float, minimum: float, maximum: float, top: float, height: flo
     )
 
 
+def render_current_native_matrix() -> Path:
+    """Render the latest same-population seven-arm native result.
+
+    This figure intentionally uses offered-population SLO next to completed-
+    request p99.  A policy with zero completions therefore appears as zero SLO
+    and an explicit undefined latency marker rather than as an artificial win.
+    """
+    relative = (
+        "results/tempo_go_c9_route_liveness_job_57736076_"
+        "r3_canonical_outer/analysis_failclosed_business_v2.json"
+    )
+    analysis = _load(relative)
+    aggregates = analysis["aggregates"]
+    arm_specs = [
+        ("fixed_local_d0", "Local D0"),
+        ("fixed_local_d1", "Local D1"),
+        ("fixed_remote_p0d1", "Remote 0→1"),
+        ("fixed_remote_p1d0", "Remote 1→0"),
+        ("predictor", "Predictor"),
+        ("queue_gpu", "Queue-GPU"),
+        ("full_c7_managed_background", "Candidate O"),
+    ]
+    regimes = [
+        ("normal", "normal", COLORS["tempo_light"]),
+        ("miss_hot", "miss-hot", COLORS["miss"]),
+        ("remote_favorable", "remote-favorable", COLORS["remote"]),
+    ]
+    rows = []
+    for arm, label in arm_specs:
+        values = aggregates[arm]
+        rows.append({
+            "label": label,
+            "slo": [100.0 * values[key]["slo_good_fraction"] for key, _, _ in regimes],
+            "p99": [
+                values[key]["mean_e2e_p99_ms"] / 1000.0
+                if values[key]["mean_e2e_p99_ms"] is not None
+                else None
+                for key, _, _ in regimes
+            ],
+        })
+
+    canvas = Canvas(
+        1500,
+        790,
+        "Current TEMPO Candidate O native matrix",
+        "Same-population offered SLO and completed-request p99 for seven native policies.",
+    )
+    _header(
+        canvas,
+        "최신 4-node native matrix: Candidate O는 remote를 살렸지만 strongest fixed를 못 이김",
+        "Allocation 57736076 · 210 offered victims per arm · actual vLLM + LMCache/NIXL + NCCL/Slingshot",
+    )
+    canvas.panel(35, 98, 820, 620)
+    canvas.panel(875, 98, 590, 620)
+    canvas.text(70, 138, "Offered-population SLO attainment (%)", size=18, weight=700)
+    canvas.text(910, 138, "Completed-request E2E p99 (seconds)", size=18, weight=700)
+    _legend(
+        canvas,
+        330,
+        170,
+        [(label, color) for _, label, color in regimes],
+        step=145,
+    )
+
+    left_x, left_y, left_w, left_h = 85, 205, 725, 400
+    for tick in range(0, 101, 20):
+        y = _linear_y(tick, 0, 100, left_y, left_h)
+        canvas.line(left_x, y, left_x + left_w, y, stroke=COLORS["grid"])
+        canvas.text(left_x - 10, y + 5, tick, size=12, fill=COLORS["muted"], anchor="end")
+    group_width = left_w / len(rows)
+    bar_width = 20
+    for index, row in enumerate(rows):
+        center = left_x + group_width * (index + 0.5)
+        if row["label"] == "Candidate O":
+            canvas.rect(center - 48, left_y - 12, 96, left_h + 24, fill="#FEE2E2", rx=8, opacity=0.65)
+        for regime_index, (_, _, color) in enumerate(regimes):
+            value = float(row["slo"][regime_index])
+            offset = (regime_index - 1) * 23
+            y = _linear_y(value, 0, 100, left_y, left_h)
+            canvas.rect(center + offset - bar_width / 2, y, bar_width, left_y + left_h - y, fill=color, rx=2)
+            if value > 0:
+                canvas.text(center + offset, y - 6, f"{value:.0f}", size=9, anchor="middle", weight=700)
+        canvas.text(
+            center + 18,
+            left_y + left_h + 28,
+            row["label"],
+            size=11,
+            anchor="end",
+            transform=f"rotate(-32 {center + 18:.2f} {left_y + left_h + 28:.2f})",
+        )
+
+    right_x, right_y, right_w, right_h = 925, 205, 490, 400
+    for tick in range(0, 101, 20):
+        y = _linear_y(tick, 0, 100, right_y, right_h)
+        canvas.line(right_x, y, right_x + right_w, y, stroke=COLORS["grid"])
+        canvas.text(right_x - 10, y + 5, tick, size=12, fill=COLORS["muted"], anchor="end")
+    group_width = right_w / len(rows)
+    bar_width = 12
+    for index, row in enumerate(rows):
+        center = right_x + group_width * (index + 0.5)
+        if row["label"] == "Candidate O":
+            canvas.rect(center - 32, right_y - 12, 64, right_h + 24, fill="#FEE2E2", rx=8, opacity=0.65)
+        for regime_index, (_, _, color) in enumerate(regimes):
+            value = row["p99"][regime_index]
+            offset = (regime_index - 1) * 15
+            if value is None:
+                marker_y = right_y + right_h - 4
+                canvas.line(center + offset - 5, marker_y - 5, center + offset + 5, marker_y + 5, stroke=COLORS["bad"], stroke_width=2)
+                canvas.line(center + offset + 5, marker_y - 5, center + offset - 5, marker_y + 5, stroke=COLORS["bad"], stroke_width=2)
+                continue
+            numeric = float(value)
+            y = _linear_y(min(numeric, 100.0), 0, 100, right_y, right_h)
+            canvas.rect(center + offset - bar_width / 2, y, bar_width, right_y + right_h - y, fill=color, rx=2)
+        canvas.text(
+            center + 14,
+            right_y + right_h + 28,
+            row["label"],
+            size=10,
+            anchor="end",
+            transform=f"rotate(-35 {center + 14:.2f} {right_y + right_h + 28:.2f})",
+        )
+    canvas.text(1170, 684, "Candidate O remote 30/30 · miss-hot 65/120 · normal p99 26.37 s", size=13, fill=COLORS["bad"], anchor="middle", weight=700)
+    path = OUTPUT / "current_candidate_o_native_matrix.svg"
+    canvas.save(path)
+    return path
+
+
+def render_candidate_business_progression() -> Path:
+    relative = (
+        "results/tempo_go_c9_route_liveness_job_57736076_"
+        "r3_canonical_outer/candidate_o_diagnosis.json"
+    )
+    diagnosis = _load(relative)
+    context = diagnosis["cross_allocation_context_noncausal"]
+    specs = [
+        ("candidate_m", "Candidate M", COLORS["fixed"]),
+        ("candidate_n", "Candidate N", COLORS["predictor"]),
+        ("candidate_o", "Candidate O", COLORS["tempo"]),
+    ]
+    rows = []
+    for key, label, color in specs:
+        campaign = context[key]
+        business = campaign["business"]
+        background = business["background"]
+        foreground = business["foreground"]
+        rows.append({
+            "label": label,
+            "color": color,
+            "background_complete": 100.0 * background["completion_fraction"],
+            "background_failure": 100.0 * background["failures"] / background["offered"],
+            "background_reject": 100.0 * background["global_rejects"] / background["offered"],
+            "foreground_complete": 100.0 * foreground["completion_fraction"],
+            "observer": 100.0 * business["observer_supported_fraction"],
+            "background_completed_count": background["completed"],
+            "foreground_completed_count": foreground["completed"],
+            "observer_count": business["observer_supported_decisions"],
+        })
+
+    canvas = Canvas(
+        1450,
+        730,
+        "Candidate M N O business and observer progression",
+        "Raw-terminal corrected business completion, failure, rejection, and observer support.",
+    )
+    _header(
+        canvas,
+        "M→N→O: route-liveness는 business completion을 회복했지만 관측·tail gate는 남음",
+        "Same offered population · M/N↔O는 separate allocation이라 비인과 context · valid failure receipt ≠ completion",
+    )
+    canvas.panel(35, 98, 710, 570)
+    canvas.panel(765, 98, 650, 570)
+    canvas.text(70, 138, "Background terminal outcome (% of offered)", size=18, weight=700)
+    canvas.text(800, 138, "Completion and observer support (%)", size=18, weight=700)
+
+    left_x, left_y, left_w, left_h = 110, 190, 560, 350
+    for tick in range(0, 101, 20):
+        y = _linear_y(tick, 0, 100, left_y, left_h)
+        canvas.line(left_x, y, left_x + left_w, y, stroke=COLORS["grid"])
+        canvas.text(left_x - 10, y + 5, tick, size=12, fill=COLORS["muted"], anchor="end")
+    group_width = left_w / len(rows)
+    bar_width = 92
+    outcome_colors = [COLORS["good"], COLORS["miss"], COLORS["bad"]]
+    outcome_labels = ["complete", "service failure", "queue reject"]
+    for index, row in enumerate(rows):
+        center = left_x + group_width * (index + 0.5)
+        values = [
+            row["background_complete"],
+            row["background_failure"],
+            row["background_reject"],
+        ]
+        bottom = 0.0
+        for value, color in zip(values, outcome_colors):
+            y_top = _linear_y(bottom + value, 0, 100, left_y, left_h)
+            y_bottom = _linear_y(bottom, 0, 100, left_y, left_h)
+            canvas.rect(center - bar_width / 2, y_top, bar_width, y_bottom - y_top, fill=color, rx=2)
+            bottom += value
+        canvas.text(center, left_y + left_h + 30, row["label"], size=13, anchor="middle", weight=700)
+        canvas.text(center, left_y - 12, f"{row['background_complete']:.1f}%", size=12, anchor="middle", fill=row["color"], weight=700)
+    _legend(canvas, 135, 594, list(zip(outcome_labels, outcome_colors)), step=170)
+    canvas.text(390, 637, "Candidate O: 2,004 complete · 40 failure · 704 queue reject", size=13, anchor="middle", fill=COLORS["tempo"], weight=700)
+
+    right_x, right_y, right_w, right_h = 825, 190, 520, 350
+    for tick in range(0, 101, 20):
+        y = _linear_y(tick, 0, 100, right_y, right_h)
+        canvas.line(right_x, y, right_x + right_w, y, stroke=COLORS["grid"])
+        canvas.text(right_x - 10, y + 5, tick, size=12, fill=COLORS["muted"], anchor="end")
+    group_width = right_w / len(rows)
+    metric_specs = [
+        ("foreground_complete", "foreground", COLORS["good"]),
+        ("background_complete", "background", COLORS["tempo_light"]),
+        ("observer", "observer", COLORS["remote"]),
+    ]
+    for index, row in enumerate(rows):
+        center = right_x + group_width * (index + 0.5)
+        for metric_index, (key, _, color) in enumerate(metric_specs):
+            value = float(row[key])
+            offset = (metric_index - 1) * 31
+            y = _linear_y(value, 0, 100, right_y, right_h)
+            canvas.rect(center + offset - 13, y, 26, right_y + right_h - y, fill=color, rx=2)
+        canvas.text(center, right_y + right_h + 30, row["label"], size=13, anchor="middle", weight=700)
+    _legend(canvas, 850, 594, [(label, color) for _, label, color in metric_specs], step=155)
+    canvas.text(1085, 625, "O: foreground 207/210 · background 2004/2748 · observer 37/210", size=13, anchor="middle", fill=COLORS["bad"], weight=700)
+    canvas.text(1085, 649, "route-scope mechanism activation: 0/1,614 decisions → causal positive 아님", size=12, anchor="middle", fill=COLORS["bad"], weight=700)
+    path = OUTPUT / "current_candidate_business_progression.svg"
+    canvas.save(path)
+    return path
+
+
 def render_c9_performance() -> Path:
     arm_specs = [
         ("fixed_local_d0", "Local D0", COLORS["fixed"]),
@@ -722,6 +950,8 @@ def render_hierarchy_scale() -> Path:
 def main() -> int:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     generated = [
+        render_current_native_matrix(),
+        render_candidate_business_progression(),
         render_c9_performance(),
         render_c10_comparison(),
         render_fairness_telemetry(),
@@ -730,6 +960,11 @@ def main() -> int:
     ]
     source_paths = [
         "paper/tempo_go/artifact_manifest.json",
+        "paper/tempo_go/current_evidence_manifest.json",
+        "results/tempo_go_c9_global_frontier_job_57732862/analysis_failclosed_business_v3.json",
+        "results/tempo_go_c9_causal_burst_job_57732862/analysis_failclosed_business_v3.json",
+        "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/analysis_failclosed_business_v2.json",
+        "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/candidate_o_diagnosis.json",
         "results/tempo_go_c8_independent_validation_job_57586612_v3/analysis.json",
         "results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d0/result.json",
         "results/tempo_go_c8_independent_validation_job_57586612_v3/fixed_local_d1/result.json",
@@ -754,7 +989,10 @@ def main() -> int:
             for path in generated
         },
         "claim_boundary": (
-            "C9 is independent four-node evidence; C10 is post-hoc; "
+            "Candidate O is current negative native evidence and its changed "
+            "route-scope mechanism did not activate; exact terminal post-hoc "
+            "analysis does not modify native raw or analysis; historical C9 "
+            "positive and C10 post-hoc figures are not current claims; "
             "hierarchy scale is CPU control-plane only."
         ),
     }

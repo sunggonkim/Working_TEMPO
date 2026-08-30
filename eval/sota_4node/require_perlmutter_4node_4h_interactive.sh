@@ -84,6 +84,18 @@ fi
 ]]
 [[ " ${TEMPO_PD_ALLOCATION_RECORD} " == *" NumNodes=4 "* ]]
 [[ "${TEMPO_PD_ALLOCATION_RECORD}" == *"gres/gpu=16"* ]]
+if [[ "${TEMPO_PD_ALLOCATION_RECORD}" == *" Network=job_vni "* ]]; then
+  # Some Perlmutter salloc records leave the allocation-level network field
+  # unspecified. The native child srun steps below request job_vni
+  # explicitly, which is the resource boundary that configures the VNI.
+  TEMPO_PD_ALLOCATION_NETWORK=job_vni
+elif [[ "${TEMPO_PD_ALLOCATION_RECORD}" == *" Network=(null) "* ]]; then
+  TEMPO_PD_ALLOCATION_NETWORK=allocation_unspecified
+else
+  tempo_pd_native_guard_fail \
+    "allocation Network is neither job_vni nor unspecified"
+fi
+export TEMPO_PD_ALLOCATION_NETWORK
 case "${TEMPO_PD_ALLOCATION_RECORD,,}" in
   *shifter*|*udiroot*|*"--image"*)
     tempo_pd_native_guard_fail "containerized Slurm job rejected"

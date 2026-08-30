@@ -1,0 +1,44 @@
+{
+  "schema": "tempo-go-c9-posthoc-business-reanalysis-receipt-v1",
+  "status": "complete",
+  "reason": "valid terminal receipt was incorrectly treated as business completion even for HTTP 503 service-lane failure",
+  "semantics": {
+    "receipt_integrity": "terminal valid means the response and router ledger are structurally consistent",
+    "business_completion": "HTTP 200 and done_seen and no transport error and exact contracted output-token count",
+    "global_reject": "terminal_kind equals global_reject",
+    "other_terminal": "business failure"
+  },
+  "native_original": {
+    "analysis": "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/analysis.json",
+    "analysis_sha256": "1d5f9c5a785ffd0b3a35c9bc2709fbb13b45af86d099d869e9fef0da9341b9a5",
+    "completed_receipt": "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/completed_attempt.json",
+    "completed_receipt_sha256": "a56da8013a6fdf69747c4c08ea68708d1a28ebb545f27c12e636b0fd6b4b96a9",
+    "modified": false
+  },
+  "posthoc": {
+    "analysis": "results/tempo_go_c9_route_liveness_job_57736076_r3_canonical_outer/analysis_failclosed_business_v2.json",
+    "analysis_sha256": "850c2858a30473235fb9bbfaa0c8940abf94405e4243607db96e2e1935cd3590",
+    "analyzer": "eval/sota_4node/analyze_tempo_go_c9_causal_burst_discovery.py",
+    "analyzer_sha256": "073c281ff187e6c14c375da979d969009fa1a387be67b590e6d936ffb83be121",
+    "foreground": {
+      "offered": 210,
+      "completed": 207,
+      "failures": 3,
+      "global_rejects": 0,
+      "output_token_completion_fraction": 0.9857142857142858
+    },
+    "background": {
+      "offered": 2748,
+      "completed": 2004,
+      "failures": 40,
+      "global_rejects": 704,
+      "output_token_completion_fraction": 0.7292576419213974
+    }
+  },
+  "claim_boundary": {
+    "raw_changed": false,
+    "native_execution_repeated": false,
+    "causal_discovery_positive": false,
+    "performance_claim_allowed": false
+  }
+}

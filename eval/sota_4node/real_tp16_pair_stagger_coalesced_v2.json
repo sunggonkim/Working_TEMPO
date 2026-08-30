@@ -1,0 +1,41 @@
+{
+  "schema_version": "tempo-real-tp16-pair-stagger-coalesced-contract-2",
+  "contract_id": "real-tp16-pair-stagger-coalesced-v2",
+  "provenance": {
+    "source": "four_node_real_tp16_research_screen",
+    "adaptive_pilot": true,
+    "promotion_valid": false,
+    "policy_label": "tp16_pair_staggered_coalesced_admission_v1",
+    "global_single_flight": false,
+    "physical_transfer_overlap_possible": true
+  },
+  "topology": {
+    "nodes": 4,
+    "world_size": 16,
+    "ranks_per_node": 4,
+    "source_ranks": [0, 1, 2, 3, 4, 5, 6, 7],
+    "receiver_ranks": [8, 9, 10, 11, 12, 13, 14, 15],
+    "pairing": [[0, 8], [1, 9], [2, 10], [3, 11], [4, 12], [5, 13], [6, 14], [7, 15]]
+  },
+  "schedule": {
+    "scheduled_tokens": [1, 2, 3, 4, 5, 6, 7, 8],
+    "active_pairs": [0, 1, 2, 3, 4, 5, 6, 7],
+    "calls_per_source": 1,
+    "source_calls_global": 8,
+    "requests_per_source": 2,
+    "chunks_per_request": 16,
+    "chunk_bytes": 524288,
+    "bytes_per_request": 8388608,
+    "bytes_per_source_call": 16777216,
+    "global_bytes": 134217728,
+    "deadline_ns": 1250000000,
+    "active_sources": [0, 1, 2, 3, 4, 5, 6, 7]
+  },
+  "campaign": {
+    "independent_campaigns": 3,
+    "latin_rows_per_campaign": 3,
+    "replicates_per_mode_per_campaign": 3,
+    "first_mode_by_campaign": ["fg_only", "lmcache_greedy", "tempo_coalesced"],
+    "single_allocation_required": true
+  }
+}

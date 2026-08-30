@@ -1,0 +1,8 @@
+{
+  "schema": "tempo-go-c9-causal-burst-attempt-v1",
+  "status": "complete",
+  "analysis": "/pscratch/sd/s/sgkim/Skim-Tempo/results/tempo_go_c9_candidate_j_service_feasibility_v1/native_job_57708417_r5/analysis.json",
+  "analysis_sha256": "884bc0c860db16e81c08c9932bbfc2b3dc885c8d59dbc184321a177ece605a3d",
+  "one_campaign_no_retry": true,
+  "discovery_only": true
+}

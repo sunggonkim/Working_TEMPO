@@ -7,7 +7,7 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/require_perlmutter_4node_4h_interactive.sh"
 
 REPO_ROOT=$(cd -- "${SCRIPT_DIR}/../.." && pwd)
-CONTRACT="${TEMPO_GO_C8_INDEPENDENT_VALIDATION_CONTRACT:-${REPO_ROOT}/eval/sota_4node/tempo_go_c8_independent_validation_contract_v3.json}"
+CONTRACT="${TEMPO_GO_C8_INDEPENDENT_VALIDATION_CONTRACT:-${REPO_ROOT}/results/tempo_go_c8_independent_validation_contract_v10_c8v49.json}"
 CONTRACT=$(realpath -e -- "${CONTRACT}")
 case "${CONTRACT}" in "${REPO_ROOT}/"*) ;; *) exit 2 ;; esac
 [[ "$(jq -er '.schema' "${CONTRACT}")" == tempo-go-c8-dual-regime-contract-v1 ]]
@@ -25,6 +25,7 @@ fi
 JOB_RECEIPT=$(scontrol show job "${SLURM_JOB_ID}" -o)
 [[ "${JOB_RECEIPT}" == *"JobName=no-shell"* ]]
 [[ "${JOB_RECEIPT}" == *"Command=(null)"* ]]
+[[ "${JOB_RECEIPT}" == *"Network=job_vni"* ]]
 
 SOURCE_REL=$(jq -er '.joint_control.source_workload.path' "${CONTRACT}")
 PROFILE_REL=$(jq -er '.joint_control.profile.path' "${CONTRACT}")
@@ -94,6 +95,7 @@ run_arm() {
     --nodes=4 --ntasks=4 --ntasks-per-node=1 \
     --distribution=block:block --gpus-per-task=4 --gpu-bind=none \
     --cpus-per-task=128 --cpu-bind=cores --kill-on-bad-exit=1 --wait=10 \
+    --network=job_vni \
     --time=00:29:00 --export=ALL \
     --output="${result_dir}/slurm-node-%N.stdout.log" \
     --error="${result_dir}/slurm-node-%N.stderr.log" \

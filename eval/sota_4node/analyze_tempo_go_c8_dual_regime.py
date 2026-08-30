@@ -21,6 +21,12 @@ CONTRACT_SCHEMA = "tempo-go-c8-dual-regime-contract-v1"
 REMOTE_ROUTE = "official_lmcache_remote_prefill"
 LOCAL_ROUTE = "decoder_local_chunked_prefill"
 REMOTE_REGIME = "dual_decoder_hot_p_only_remote_favorable"
+BUSINESS_PRIORITY_SERVICE_LANE_BINDING = (
+    "vllm_priority_business_dual_route_service_lane")
+BUSINESS_PRIORITY_SERVICE_LANE_REASONS = frozenset({
+    "global_priority_business_dual_route_service_lane_route_committed",
+    "global_priority_business_dual_route_service_lane_promoted",
+})
 
 
 def _require(condition: bool, message: str) -> None:
@@ -30,6 +36,51 @@ def _require(condition: bool, message: str) -> None:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _priority_lane_receipt(
+    decision: dict[str, object],
+    global_decision: dict[str, object] | None,
+    expected_managed_priority: int | None,
+) -> bool:
+    """Validate either the legacy or v2 business-dual-route lane receipt.
+
+    The v2 business lane intentionally does not rewrite vLLM's upstream
+    request priority.  It is a global queue lease plus an accepted reservation
+    recorded in the decision binding.  Requiring the legacy ``strong_remote``
+    fields here incorrectly rejects valid v2 native receipts.
+    """
+    if expected_managed_priority is None or not isinstance(global_decision, dict):
+        return False
+    legacy = (
+        decision.get("upstream_priority_effective")
+        == expected_managed_priority
+        and decision.get("strong_remote_catchup_priority_applied") is True
+        and decision.get("upstream_priority_class") == "strong_remote_catchup"
+        and decision.get("global_priority_service_lane_committed") is True
+        and global_decision.get("reason") in {
+            "global_priority_remote_cache_service_lane_route_committed",
+            "global_priority_remote_cache_service_lane_promoted",
+        }
+        and global_decision.get("queue_lease") is True
+        and "vllm_priority_remote_cache_service_lane"
+        in global_decision.get("binding_resources", [])
+    )
+    if legacy:
+        return True
+    reservation = decision.get("tempo_go_service_lane_reservation")
+    if not isinstance(reservation, dict):
+        return False
+    return (
+        decision.get("tempo_go_service_lane_reservation_status") == "accepted"
+        and reservation.get("status") == "accepted"
+        and reservation.get("queue_lease") is True
+        and reservation.get("global_route") == REMOTE_ROUTE
+        and decision.get("tempo_go_global_commit_queue_lease") is True
+        and global_decision.get("reason") in BUSINESS_PRIORITY_SERVICE_LANE_REASONS
+        and BUSINESS_PRIORITY_SERVICE_LANE_BINDING
+        in global_decision.get("binding_resources", [])
+    )
 
 
 def _group(
@@ -141,25 +192,8 @@ def _remote_hit_receipt(
                     != global_decision.get("decoder_index")
                 ):
                     cross_pair_source_balance_receipts += 1
-            if (
-                expected_managed_priority is not None
-                and decision.get("upstream_priority_effective")
-                == expected_managed_priority
-                and decision.get("strong_remote_catchup_priority_applied")
-                is True
-                and decision.get("upstream_priority_class")
-                == "strong_remote_catchup"
-                and decision.get("global_priority_service_lane_committed")
-                is True
-                and isinstance(global_decision, dict)
-                and global_decision.get("reason") in {
-                    "global_priority_remote_cache_service_lane_route_committed",
-                    "global_priority_remote_cache_service_lane_promoted",
-                }
-                and global_decision.get("queue_lease") is True
-                and "vllm_priority_remote_cache_service_lane"
-                in global_decision.get("binding_resources", [])
-            ):
+            if _priority_lane_receipt(
+                decision, global_decision, expected_managed_priority):
                 priority_lane_receipts += 1
     return {
         "remote_completed_victims": remote_completed,
@@ -354,6 +388,42 @@ def analyze_campaign(
                  and analysis.get("schema") == ARM_SCHEMA
                  and analysis.get("arm") == arm,
                  f"C8 arm analysis differs: {arm}")
+        # The node wrapper stores a compact analysis snapshot, but the raw
+        # bundle is authoritative for provenance gates.  Refresh remote
+        # activation receipts here so a newer receipt schema (for example the
+        # business-dual-route v2 lane) cannot be rejected merely because the
+        # node-side snapshot was produced by an older analyzer.
+        raw_bundle_path = Path(wrapper.get("raw", ""))
+        if raw_bundle_path.is_file():
+            raw_bundle = json.loads(raw_bundle_path.read_text(encoding="utf-8"))
+            raw_artifacts = raw_bundle.get("artifacts", {})
+            raw_contracts = raw_bundle.get("contracts", {})
+            expected_priority = (
+                int(section["remote_activation"]["managed_remote_priority"])
+                if arm == section["headline_full_arm"] else None
+            )
+            source_balance_required = bool(
+                expected_priority is not None
+                and section["remote_activation"].get(
+                    "mesh_near_tie_source_balance_mode")
+                == "telemetry_uncertainty_virtual_service_v1"
+            )
+            for block in analysis.get("blocks", []):
+                name = block.get("name")
+                if (
+                    block.get("pressure_regime") == REMOTE_REGIME
+                    and isinstance(name, str)
+                    and isinstance(raw_artifacts, dict)
+                    and isinstance(raw_contracts, dict)
+                    and name in raw_artifacts
+                    and name in raw_contracts
+                ):
+                    block["remote_activation_receipt"] = _remote_hit_receipt(
+                        raw_path=Path(raw_artifacts[name]),
+                        block_contract=raw_contracts[name],
+                        expected_managed_priority=expected_priority,
+                        source_balance_required=source_balance_required,
+                    )
         arms[arm] = analysis
         sources[arm] = {"path": str(path.resolve()), "sha256": _sha256(path)}
 
