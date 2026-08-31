@@ -72,9 +72,18 @@ observer publisher가 NIXL timeout과 함께 사라져 뒤 5개 block이 stale f
 lease로 예약되지 않는 구조다.
 
 `../../results/tempo_go_c9_candidate_p_bounded_observer_v1/`은 이 observer-lifetime
-confound만 분리하는 preregistered diagnostic이다. O policy delta는 없고 native
-result도 없으므로 성능 evidence가 아니며, durable observer sidecar와 atomic service
+confound만 분리하는 preregistered diagnostic이다. allocation `57740736`에서
+7개 arm과 두 개의 8-rank cojob은 terminal receipt를 남겼고 마지막 observer도
+존재했지만, global decision support는 102/210 (48.57%)였다. 따라서 cojob timeout과
+observer process lifetime의 결합은 일부 분리했으나, P는 O policy delta가 없고
+성능 evidence나 인과 검증이 아니며 durable observer sidecar와 atomic service
 lease의 대체물이 아니다.
+
+P의 fail-closed business accounting은 foreground 210/210 complete, background
+1,898/2,748 complete, 145 failure, 705 global reject다. 최종 pair observer는
+NCCL p99 36.82/36.87 ms와 LMCache transfer p99 5.94/6.09 s를 기록했다. compact
+analysis와 completion receipt는 current evidence manifest의 SHA-256 binding으로
+추적한다.
 
 ## Historical C9/C10 핵심 결과
 
@@ -150,7 +159,7 @@ population 결과는 다음과 같다. 이 표는 새 allocation independent val
 jq . paper/tempo_go/figures/manifest.json
 ```
 
-[`figures/manifest.json`](figures/manifest.json)은 source JSON 18개와 SVG 7개의
+[`figures/manifest.json`](figures/manifest.json)은 source JSON 17개와 SVG 7개의
 SHA-256을 고정한다.
 
 ## Background와 telemetry gate

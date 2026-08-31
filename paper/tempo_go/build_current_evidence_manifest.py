@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ROOT / "paper/tempo_go/current_evidence_manifest.json"
 FULL_ARM = "full_c7_managed_background"
 REGIMES = ("normal", "miss_hot", "remote_favorable")
+P_ANALYSIS = "results/tempo_go_c9_bounded_observer_job_57740736/analysis.json"
+P_COMPLETED_RECEIPT = (
+    "results/tempo_go_c9_bounded_observer_job_57740736/completed_attempt.json"
+)
 
 CAMPAIGNS: dict[str, dict[str, Any]] = {
     "candidate_m": {
@@ -188,8 +192,38 @@ def noncausal_delta(new: dict[str, Any], old: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def diagnostic_result() -> dict[str, Any]:
+    analysis = load(P_ANALYSIS)
+    business = analysis["business"]["full_tempo"]
+    telemetry = analysis["telemetry"]
+    return {
+        "allocation": "57740736",
+        "status": "complete",
+        "result_root": "results/tempo_go_c9_bounded_observer_job_57740736",
+        "native_analysis": artifact(P_ANALYSIS),
+        "terminal_receipt": artifact(P_COMPLETED_RECEIPT),
+        "business": business,
+        "observer": {
+            "supported": int(telemetry["full_cross_layer_supported_decisions"]),
+            "total": int(telemetry["full_victim_global_decisions"]),
+            "fraction": float(telemetry["full_cross_layer_supported_fraction"]),
+        },
+        "gates": analysis["gates"],
+        "causal_discovery_positive": bool(
+            analysis["causal_discovery_positive"]
+        ),
+        "outer_allocation_note": (
+            "all 7 inner vLLM/cojob steps completed with exit 0; the top-level "
+            "no-shell allocation reached its time limit while the wrapper was "
+            "waiting, so this is an execution-boundary note, not a failed arm"
+        ),
+        "claim_boundary": analysis["claim_boundary"],
+    }
+
+
 def build_payload() -> dict[str, Any]:
     campaigns = {name: campaign(spec) for name, spec in CAMPAIGNS.items()}
+    p_result = diagnostic_result()
     diagnosis = load(CAMPAIGNS["candidate_o"]["diagnosis"])
     mechanism = diagnosis["candidate_specific_mechanism"]
     totals = mechanism["route_failure_evidence_total"]
@@ -211,7 +245,8 @@ def build_payload() -> dict[str, Any]:
         },
         "platform": {
             "system": "NERSC Perlmutter",
-            "latest_allocation": "57736076",
+            "latest_allocation": "57740736",
+            "latest_allocation_role": "Candidate P diagnostic only",
             "nodes": 4,
             "gpus": 16,
             "qos": "gpu_interactive",
@@ -262,12 +297,16 @@ def build_payload() -> dict[str, Any]:
                 "tempo_go_c9_candidate_p_bounded_observer_contract.json"
             ),
             "policy_delta_from_candidate_o": False,
-            "native_result_exists": False,
+            "native_result_exists": True,
+            "result": p_result,
             "performance_claim_allowed": False,
+            "causal_discovery_positive": False,
             "purpose": (
                 "isolate observer-process lifetime from the 2 GiB timeout-shaped "
-                "co-load; this diagnostic cannot replace the realistic overload "
-                "campaign or the durable state-plane implementation"
+                "co-load; terminal observer survival was demonstrated, but "
+                "decision coverage remained partial, so this diagnostic cannot "
+                "replace the realistic overload campaign or durable state-plane "
+                "implementation"
             ),
         },
         "candidate_o_execution_boundary": {

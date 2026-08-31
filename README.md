@@ -843,9 +843,20 @@ carrier에서 검증하는 것이다.
 ## 17. 남은 연구 gate
 
 Preregistered Candidate P는 O policy를 바꾸지 않고 bounded-resident dual-pair
-co-load로 observer lifetime confound만 분리하는 진단이다. 아직 native result가
-없으며, realistic overload나 아래 durable state-plane/joint-policy gate를 대체하지
-않는다.
+co-load로 observer lifetime confound만 분리하는 진단이다. 4-node allocation
+`57740736`에서 7개 arm과 두 개의 8-rank cojob이 terminal receipt를 남겼지만,
+global decision observer support는 102/210 (48.57%)에 그쳤다. 즉 observer
+프로세스가 cojob timeout과 함께 사라지는 현상은 일부 분리했지만, 100% fresh
+coverage나 성능 인과성은 입증하지 못했다. P는 realistic overload와 아래 durable
+state-plane/joint-policy gate를 대체하지 않는다.
+
+Candidate P의 fail-closed 결과는 foreground 210/210 complete, background
+1,898/2,748 complete (145 failure, 705 global reject)였다. 최종 observer receipt는
+pair-0 NCCL p99 36.82 ms/LMCache p99 5.94 s, pair-1 NCCL p99 36.87 ms/LMCache
+p99 6.09 s를 기록했다. O policy delta가 0이고 allocation도 별도이므로 이 수치는
+TEMPO 성능 개선이나 O의 원인 검증으로 승격하지 않는다. compact analysis와
+completion receipt는 `results/tempo_go_c9_bounded_observer_job_57740736/`에
+보존하고 current manifest에서 SHA-256으로 고정한다.
 
 1. **Observer closure:** 모든 global decision에서 vLLM scheduler, LMCache/NIXL,
    NCCL/Cassini epoch와 support/freshness를 atomic receipt로 남긴다.

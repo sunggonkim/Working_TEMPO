@@ -10874,10 +10874,22 @@ P는 O의 controller/policy를 전혀 바꾸지 않고, 과거 v9/v10의 bounded
 dual-pair load를 사용해 2 GiB timeout-shaped co-load와 observer process lifetime의
 결합만 분리한다. contract SHA는
 `4f76efac34eb930da1ef61e4fe883e1d5fd557fb2d976008e285b000df3d1828`이다.
-아직 native result는 없고 performance claim도 없다. P가 실행되더라도 realistic
-overload를 대체하거나 완성된 solution이 되는 것이 아니라 state-plane coupling을
-확인하는 진단일 뿐이며, durable observer sidecar와 atomic service lease 구현 gate는
-그대로 남는다.
+allocation `57740736`에서 7개 arm과 두 개의 8-rank cojob이 모두 terminal
+artifact를 남겼다. foreground는 210/210 complete, background는
+1,898/2,748 complete, 145 failure, 705 global reject였고, global decision observer
+support는 102/210 (48.57%)였다. 두 cojob의 최종 observer는 NCCL p99
+36.82/36.87 ms, LMCache transfer p99 5.94/6.09 s를 기록했다. 즉 observer
+publisher가 co-load timeout과 함께 죽는 lifetime confound는 일부 분리됐지만,
+decision-level fresh coverage 100%에는 실패했다. top-level no-shell allocation은
+wrapper wait 중 TIMEOUT으로 종료됐으나 모든 내부 vLLM/cojob step은 exit 0으로
+완료됐으므로 execution-boundary note로만 보존한다.
+
+P는 O controller/policy delta가 0인 진단이고 별도 allocation의 단일 campaign이므로
+성능 claim·인과 claim은 여전히 금지한다. realistic overload를 대체하거나 완성된
+solution이 되는 것이 아니라 state-plane coupling을 확인하는 진단일 뿐이며,
+durable observer sidecar와 atomic service lease 구현 gate는 그대로 남는다. compact
+native analysis와 completion receipt는 current evidence manifest에 SHA-256으로
+고정했다.
 
 따라서 현재 최종 답은 다음과 같다. **문제는 실존하고 global orchestrator는
 필요하다. Candidate O는 높은 business completion을 기록했지만 바꾼 route-liveness

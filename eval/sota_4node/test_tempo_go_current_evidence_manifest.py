@@ -62,5 +62,17 @@ def test_current_manifest_fails_candidate_mechanism_and_cross_run_claim_closed()
         "candidate_o_changed_mechanism_activated"] is False
     preregistered = manifest["preregistered_next_diagnostic"]
     assert preregistered["policy_delta_from_candidate_o"] is False
-    assert preregistered["native_result_exists"] is False
+    assert preregistered["native_result_exists"] is True
     assert preregistered["performance_claim_allowed"] is False
+    assert preregistered["causal_discovery_positive"] is False
+    result = preregistered["result"]
+    assert result["allocation"] == "57740736"
+    assert result["status"] == "complete"
+    assert result["business"]["foreground"]["completed"] == 210
+    assert result["business"]["background"]["completed"] == 1898
+    assert result["business"]["background"]["global_rejects"] == 705
+    assert result["observer"] == {
+        "supported": 102,
+        "total": 210,
+        "fraction": 102 / 210,
+    }

@@ -375,7 +375,8 @@
     "fabric_load": "two physical-pair NCCL over Slingshot/Cassini co-jobs",
     "gpus": 16,
     "kv_transport": "official LMCache/NIXL-UCX",
-    "latest_allocation": "57736076",
+    "latest_allocation": "57740736",
+    "latest_allocation_role": "Candidate P diagnostic only",
     "nodes": 4,
     "qos": "gpu_interactive",
     "serving": "actual vLLM P/D",
@@ -401,15 +402,79 @@
     }
   },
   "preregistered_next_diagnostic": {
+    "causal_discovery_positive": false,
     "contract": {
       "path": "results/tempo_go_c9_candidate_p_bounded_observer_v1/tempo_go_c9_candidate_p_bounded_observer_contract.json",
       "sha256": "4f76efac34eb930da1ef61e4fe883e1d5fd557fb2d976008e285b000df3d1828"
     },
     "id": "Candidate P bounded-observer lifecycle",
-    "native_result_exists": false,
+    "native_result_exists": true,
     "performance_claim_allowed": false,
     "policy_delta_from_candidate_o": false,
-    "purpose": "isolate observer-process lifetime from the 2 GiB timeout-shaped co-load; this diagnostic cannot replace the realistic overload campaign or the durable state-plane implementation"
+    "purpose": "isolate observer-process lifetime from the 2 GiB timeout-shaped co-load; terminal observer survival was demonstrated, but decision coverage remained partial, so this diagnostic cannot replace the realistic overload campaign or durable state-plane implementation",
+    "result": {
+      "allocation": "57740736",
+      "business": {
+        "background": {
+          "completed": 1898,
+          "completed_output_tokens": 3796,
+          "completion_fraction": 0.6906841339155749,
+          "failures": 145,
+          "global_rejects": 705,
+          "offered": 2748,
+          "offered_output_tokens": 5496,
+          "output_token_completion_fraction": 0.6906841339155749
+        },
+        "foreground": {
+          "completed": 210,
+          "completed_output_tokens": 26880,
+          "completion_fraction": 1.0,
+          "failures": 0,
+          "global_rejects": 0,
+          "offered": 210,
+          "offered_output_tokens": 26880,
+          "output_token_completion_fraction": 1.0
+        }
+      },
+      "causal_discovery_positive": false,
+      "claim_boundary": {
+        "discovery_only": true,
+        "independent_validation_claim_allowed": false,
+        "performance_claim_allowed": false,
+        "reason": "current-source reproduction of the historical v10 load boundary; all offered-population, terminal, observer, and performance gates must pass before promotion to a held-out validation"
+      },
+      "gates": {
+        "baseline_cross_layer_blind": true,
+        "correctness": true,
+        "fixed_baseline_present": true,
+        "full_cross_layer_actuation": true,
+        "full_observer_supported": false,
+        "native_transport": true,
+        "normal_p50_regression_bounded": true,
+        "predictor_baseline_present": true,
+        "same_population": true,
+        "stressed_p99_reduction_vs_best_fixed": false,
+        "stressed_p99_reduction_vs_predictor": true,
+        "stressed_slo_not_lower_vs_best_fixed": false,
+        "stressed_slo_not_lower_vs_predictor": false
+      },
+      "native_analysis": {
+        "path": "results/tempo_go_c9_bounded_observer_job_57740736/analysis.json",
+        "sha256": "7de5640049619592c4497efbd5cbe0da06fc5af4ef6f38a9d54d2c24fb753546"
+      },
+      "observer": {
+        "fraction": 0.4857142857142857,
+        "supported": 102,
+        "total": 210
+      },
+      "outer_allocation_note": "all 7 inner vLLM/cojob steps completed with exit 0; the top-level no-shell allocation reached its time limit while the wrapper was waiting, so this is an execution-boundary note, not a failed arm",
+      "result_root": "results/tempo_go_c9_bounded_observer_job_57740736",
+      "status": "complete",
+      "terminal_receipt": {
+        "path": "results/tempo_go_c9_bounded_observer_job_57740736/completed_attempt.json",
+        "sha256": "e50bee07840d5f070962ec32a010e283973d7fcc804fd8f54889026105d5d0d1"
+      }
+    }
   },
   "root_cause": {
     "admission_lifecycle": "Global admission does not atomically reserve endpoint service-lane capacity through completion; HTTP 503 service-lane failures and global queue rejections remain distinct business failures.",
